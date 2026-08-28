@@ -232,6 +232,8 @@ class SearchViewModelSuggestionsTest {
             emit(NetworkResult.Success(row(matches)))
         }
 
+        override suspend fun clearCaches() = Unit
+
         private fun row(matches: Boolean): CatalogRow = CatalogRow(
             addonId = addon.id,
             addonName = addon.displayName,

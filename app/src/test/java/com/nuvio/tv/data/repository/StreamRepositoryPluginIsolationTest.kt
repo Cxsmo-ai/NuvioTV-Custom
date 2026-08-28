@@ -1,6 +1,7 @@
 package com.nuvio.tv.data.repository
 
 import android.content.Context
+import com.nuvio.tv.core.health.AddonHealthStore
 import com.nuvio.tv.core.debrid.DebridStreamPresentation
 import com.nuvio.tv.core.debrid.LocalDebridAvailabilityService
 import com.nuvio.tv.core.network.NetworkResult
@@ -18,6 +19,8 @@ import com.nuvio.tv.domain.model.DebridSettings
 import com.nuvio.tv.domain.model.RepositoryType
 import com.nuvio.tv.domain.model.ScraperInfo
 import com.nuvio.tv.domain.repository.AddonRepository
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -34,6 +37,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.Response
+import okhttp3.OkHttpClient
 
 class StreamRepositoryPluginIsolationTest {
     @Test
@@ -124,13 +128,16 @@ class StreamRepositoryPluginIsolationTest {
             repository = StreamRepositoryImpl(
                 context = mockk<Context>(relaxed = true),
                 api = api,
+                okHttpClient = mockk<OkHttpClient>(relaxed = true),
+                moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build(),
                 addonRepository = addonRepository,
                 pluginManager = pluginManager,
                 profileManager = profileManager,
                 debridSettingsDataStore = debridSettingsDataStore,
                 tmdbService = tmdbService,
                 debridStreamPresentation = presentation,
-                localDebridAvailabilityService = availability
+                localDebridAvailabilityService = availability,
+                healthStore = mockk<AddonHealthStore>(relaxed = true)
             ),
             api = api,
             tmdbService = tmdbService

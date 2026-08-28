@@ -1,6 +1,7 @@
 package com.nuvio.tv.data.repository
 
 import android.content.Context
+import com.nuvio.tv.core.health.AddonHealthStore
 import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.data.remote.api.AddonApi
 import com.nuvio.tv.data.remote.dto.CatalogResponseDto
@@ -37,7 +38,8 @@ class CatalogRepositoryMalformedEntryTest {
         coEvery { api.getCatalog(any()) } returns Response.success(response)
         val repository = CatalogRepositoryImpl(
             context = mockk<Context>(relaxed = true),
-            api = api
+            api = api,
+            healthStore = mockk(relaxed = true)
         )
 
         val result = repository.getCatalog(

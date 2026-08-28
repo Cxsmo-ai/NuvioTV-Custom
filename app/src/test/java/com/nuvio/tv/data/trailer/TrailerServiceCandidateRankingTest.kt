@@ -2,6 +2,8 @@ package com.nuvio.tv.data.trailer
 
 import com.nuvio.tv.core.tmdb.TmdbService
 import com.nuvio.tv.data.local.TmdbSettingsDataStore
+import com.nuvio.tv.data.local.TrailerSettingsDataStore
+import com.nuvio.tv.data.local.TrailerSettings
 import com.nuvio.tv.data.remote.api.TmdbApi
 import com.nuvio.tv.data.remote.api.TmdbVideoResult
 import com.nuvio.tv.data.remote.api.TmdbVideosResponse
@@ -131,7 +133,9 @@ class TrailerServiceCandidateRankingTest {
             tmdbApi = tmdbApi,
             inAppYouTubeExtractor = extractor,
             tmdbSettingsDataStore = tmdbSettingsDataStore,
-            tmdbService = tmdbService
+            tmdbService = tmdbService,
+            imdbTrailerResolver = mockk(relaxed = true),
+            trailerSettingsDataStore = mockk<TrailerSettingsDataStore>(relaxed = true)
         )
 
         val result = service.getExternalTrailerUrl(tmdbId = "123", type = "movie")
@@ -173,7 +177,9 @@ class TrailerServiceCandidateRankingTest {
             tmdbApi = tmdbApi,
             inAppYouTubeExtractor = extractor,
             tmdbSettingsDataStore = tmdbSettingsDataStore,
-            tmdbService = tmdbService
+            tmdbService = tmdbService,
+            imdbTrailerResolver = mockk(relaxed = true),
+            trailerSettingsDataStore = mockk<TrailerSettingsDataStore>(relaxed = true)
         )
 
         val result = service.getExternalTrailerUrl(tmdbId = "123", type = "movie")
