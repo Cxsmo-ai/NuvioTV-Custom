@@ -13,7 +13,7 @@ import retrofit2.Response
  * A Stremio JSON endpoint should answer in low single-digit seconds; 20 s is
  * generous headroom.
  */
-const val ADDON_REQUEST_TIMEOUT_MS = 20_000L
+const val ADDON_REQUEST_TIMEOUT_MS = 90_000L
 
 /** [safeApiCall] with a hard per-request deadline, for addon-facing endpoints. */
 suspend fun <T> safeAddonApiCall(

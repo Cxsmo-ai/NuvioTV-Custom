@@ -266,7 +266,11 @@ data class ProxyHeaders(
 data class AddonStreams(
     val addonName: String,
     val addonLogo: String?,
-    val streams: List<Stream>
+    val streams: List<Stream>,
+    /** Replace the previous snapshot for this addon instead of union-merging it. */
+    val replaceExisting: Boolean = false,
+    /** True while a progressive addon is still delivering cumulative snapshots. */
+    val isProgressiveSnapshot: Boolean = false
 )
 
 private fun String?.isMagnetLink(): Boolean =

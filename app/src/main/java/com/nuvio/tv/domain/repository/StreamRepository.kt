@@ -37,6 +37,7 @@ interface StreamRepository {
         type: String,
         videoId: String,
         addonName: String? = null,
-        addonLogo: String? = null
+        addonLogo: String? = null,
+        onProgress: (suspend (streams: List<Stream>, replaceExisting: Boolean) -> Unit)? = null
     ): NetworkResult<List<Stream>>
 }

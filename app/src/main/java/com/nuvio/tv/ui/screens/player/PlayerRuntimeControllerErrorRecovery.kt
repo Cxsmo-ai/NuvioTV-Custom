@@ -628,8 +628,10 @@ private fun PlayerRuntimeController.clearMimeOverrideForParsingError(error: Play
  * [androidx.media3.exoplayer.source.UnrecognizedInputFormatException], surfaced as
  * ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED (3003) - means the body is not media at
  * all: an HTML error page behind HTTP 200, or a .rar/.zip payload from a torrent.
- * HTTP 404/410 are equally permanent for the URL. Same-URL retries only make the
- * user sit through doomed rebuild cycles.
+ * HTTP 400/401/403/404/410 are equally permanent for the current media URL in
+ * the common addon/debrid case. Same-URL retries only make the user sit through
+ * doomed rebuild cycles; the existing bounded source failover can try another
+ * candidate instead.
  *
  * Deliberately NOT classified dead: HTTP 429 and timeouts - auto-advancing on a
  * debrid rate limit (TorBox parallel-connection 429s are transient) would wrongly
@@ -642,13 +644,14 @@ internal fun PlayerRuntimeController.isDeadSourcePlaybackError(error: PlaybackEx
 }
 
 /**
- * The HTTP arm of the dead-source classification. 404/410 is certain-dead with
- * no probe value, so callers can advance without spending the 0.8.5
- * parsing-error probe on it.
+ * The HTTP arm of the dead-source classification. Client/auth/resource errors
+ * (400/401/403/404/410) are not recoverable by re-opening the same media URL,
+ * so callers can advance without spending the retry budget on it. 429 and 5xx
+ * remain transient and continue through the normal retry policy.
  */
 internal fun PlayerRuntimeController.isDeadSourceHttpError(error: PlaybackException): Boolean {
     val http = error.findInvalidResponseCodeException()
-    return http != null && (http.responseCode == 404 || http.responseCode == 410)
+    return http != null && http.responseCode in setOf(400, 401, 403, 404, 410)
 }
 
 /**

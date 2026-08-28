@@ -51,7 +51,8 @@ fun SourceStatusFilterChip(
     isSelectable: Boolean = true,
     onClick: () -> Unit,
     onFocusSelect: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    count: Int? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val isError = status == SourceChipStatus.ERROR
@@ -161,6 +162,13 @@ fun SourceStatusFilterChip(
                 style = MaterialTheme.typography.labelLarge,
                 color = textColor
             )
+            if (count != null) {
+                Text(
+                    text = count.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = textColor.copy(alpha = 0.78f)
+                )
+            }
         }
     }
 }

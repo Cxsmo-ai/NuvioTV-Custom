@@ -71,7 +71,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val TAG = "StreamScreenViewModel"
-private const val DIRECT_AUTOPLAY_HARD_TIMEOUT_MS = 60_000L
+private const val DIRECT_AUTOPLAY_HARD_TIMEOUT_MS = 95_000L
 
 @HiltViewModel
 class StreamScreenViewModel @Inject constructor(
@@ -645,7 +645,12 @@ class StreamScreenViewModel @Inject constructor(
                         availableAddons = availableAddons,
                         sourceChips = mergeSourceChipStatuses(
                             existing = _uiState.value.sourceChips,
-                            succeededNames = mergedAddonStreams.map { it.addonName }
+                            succeededNames = mergedAddonStreams
+                                .filterNot { it.isProgressiveSnapshot }
+                                .map { it.addonName },
+                            pendingNames = mergedAddonStreams
+                                .filter { it.isProgressiveSnapshot }
+                                .map { it.addonName }
                         ),
                         // Preserve an already-resolved stream: the post-collect
                         // "isAllLoaded=true" pass re-runs the selector with
@@ -1103,24 +1108,36 @@ class StreamScreenViewModel @Inject constructor(
 
     private fun mergeSourceChipStatuses(
         existing: List<SourceChipItem>,
-        succeededNames: List<String>
+        succeededNames: List<String>,
+        pendingNames: List<String> = emptyList()
     ): List<SourceChipItem> {
-        if (succeededNames.isEmpty()) return existing
+        if (succeededNames.isEmpty() && pendingNames.isEmpty()) return existing
         if (existing.isEmpty()) {
-            return succeededNames.distinct().map { name ->
-                SourceChipItem(name = name, status = SourceChipStatus.SUCCESS)
+            return (pendingNames + succeededNames).distinct().map { name ->
+                SourceChipItem(
+                    name = name,
+                    status = if (name in pendingNames) SourceChipStatus.LOADING else SourceChipStatus.SUCCESS
+                )
             }
         }
 
         val successSet = succeededNames.toSet()
+        val pendingSet = pendingNames.toSet()
         val updated = existing.map { chip ->
-            if (chip.name in successSet) chip.copy(status = SourceChipStatus.SUCCESS) else chip
+            when {
+                chip.name in pendingSet -> chip.copy(status = SourceChipStatus.LOADING)
+                chip.name in successSet -> chip.copy(status = SourceChipStatus.SUCCESS)
+                else -> chip
+            }
         }.toMutableList()
 
         val knownNames = updated.map { it.name }.toSet()
-        succeededNames.forEach { name ->
+        (pendingNames + succeededNames).distinct().forEach { name ->
             if (name !in knownNames) {
-                updated += SourceChipItem(name = name, status = SourceChipStatus.SUCCESS)
+                updated += SourceChipItem(
+                    name = name,
+                    status = if (name in pendingSet) SourceChipStatus.LOADING else SourceChipStatus.SUCCESS
+                )
             }
         }
         return updated

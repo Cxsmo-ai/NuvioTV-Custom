@@ -195,6 +195,7 @@ internal fun AddonFilterChips(
     sourceChips: List<SourceChipItem> = emptyList(),
     selectedAddon: String?,
     isStillFetching: Boolean = false,
+    streamCounts: Map<String, Int> = emptyMap(),
     onRefresh: (() -> Unit)? = null,
     onAddonSelected: (String?) -> Unit,
     externalFocusRequesters: List<FocusRequester>? = null,
@@ -370,6 +371,7 @@ internal fun AddonFilterChips(
             val allChipIndex = if (hasRefresh) 1 else 0
             SourceStatusFilterChip(
                 name = stringResource(R.string.stream_filter_all),
+                count = streamCounts.takeIf { it.isNotEmpty() }?.values?.sum(),
                 isSelected = isAllSelected,
                 status = SourceChipStatus.SUCCESS,
                 isSelectable = true,
@@ -392,6 +394,7 @@ internal fun AddonFilterChips(
             val requesterIdx = if (hasRefresh) i + 2 else i + 1
             SourceStatusFilterChip(
                 name = addon,
+                count = streamCounts[addon] ?: streamCounts.takeIf { it.isNotEmpty() }?.let { 0 },
                 isSelected = selectedAddon == addon,
                 status = chipStatus,
                 isSelectable = isSelectable,

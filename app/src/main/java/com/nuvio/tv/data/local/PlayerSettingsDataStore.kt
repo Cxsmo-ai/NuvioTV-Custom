@@ -390,7 +390,7 @@ data class PlayerSettings(
         const val STREAM_AUTOPLAY_TIMEOUT_UNLIMITED = Int.MAX_VALUE
 
         val STREAM_AUTOPLAY_TIMEOUT_VALUES: List<Int> =
-            listOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, STREAM_AUTOPLAY_TIMEOUT_UNLIMITED)
+            listOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 45, 60, STREAM_AUTOPLAY_TIMEOUT_UNLIMITED)
 
         fun applyLegacyTimeoutSentinelMigration(stored: Int?): Int {
             val raw = stored ?: 3

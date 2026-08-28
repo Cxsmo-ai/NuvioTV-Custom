@@ -92,6 +92,7 @@ import com.nuvio.tv.ui.components.SourceChipStatus
 import com.nuvio.tv.ui.components.P2pConsentDialog
 import com.nuvio.tv.ui.components.StreamBadgeChips
 import com.nuvio.tv.ui.components.StreamsSkeletonList
+import com.nuvio.tv.ui.components.LoadingIndicator
 import com.nuvio.tv.ui.screens.player.LoadingOverlay
 import com.nuvio.tv.ui.screens.player.AddonFilterChips
 import com.nuvio.tv.ui.theme.NuvioTheme
@@ -419,6 +420,7 @@ fun StreamScreen(
                     isLoading = uiState.isLoading,
                     error = uiState.error,
                     streams = uiState.filteredStreams,
+                    allStreams = uiState.allStreams,
                     availableAddons = uiState.availableAddons,
                     sourceChips = uiState.sourceChips,
                     selectedAddonFilter = uiState.selectedAddonFilter,
@@ -715,6 +717,7 @@ private fun RightStreamSection(
     isLoading: Boolean,
     error: String?,
     streams: List<Stream>,
+    allStreams: List<Stream>,
     availableAddons: List<String>,
     sourceChips: List<SourceChipItem>,
     selectedAddonFilter: String?,
@@ -747,6 +750,12 @@ private fun RightStreamSection(
             sourceChips.forEach { if (it.name !in this) add(it.name) }
         }
     }
+    // Keep counts based on the complete list even when the user is viewing one
+    // addon tab. These are the actual post-processing sources Nuvio can show.
+    val streamCounts = remember(allStreams) {
+        allStreams.groupingBy { it.addonName }.eachCount()
+    }
+    val isStillFetching = isLoading || sourceChips.any { it.status == SourceChipStatus.LOADING }
     val firstStreamKey = streams.firstOrNull()?.stableKey(0)
     val refreshFocusRequester = remember { FocusRequester() }
     val allFocusRequester = remember { FocusRequester() }
@@ -833,7 +842,8 @@ private fun RightStreamSection(
                     addons = availableAddons,
                     sourceChips = sourceChips,
                     selectedAddon = selectedAddonFilter,
-                    isStillFetching = sourceChips.any { it.status == SourceChipStatus.LOADING },
+                    isStillFetching = isStillFetching,
+                    streamCounts = streamCounts,
                     onRefresh = {
                         userMovedFromFirstResult = false
                         firstResultFocusAssigned = false
@@ -848,6 +858,14 @@ private fun RightStreamSection(
         }
 
         Spacer(modifier = Modifier.height(NuvioTheme.spacing.lg))
+
+        if (isStillFetching) {
+            ProgressiveScrapeStatus(
+                sourceCount = allStreams.size,
+                pendingAddonCount = sourceChips.count { it.status == SourceChipStatus.LOADING }
+            )
+            Spacer(modifier = Modifier.height(NuvioTheme.spacing.md))
+        }
 
         androidx.compose.animation.AnimatedVisibility(
             visible = enter,
@@ -867,19 +885,9 @@ private fun RightStreamSection(
                 contentAlignment = Alignment.Center
             ) {
                 when {
-                    isLoading -> {
-                        LoadingState(showAddonLogo = showAddonLogo)
-                    }
-                    error != null -> {
-                        ErrorState(
-                            message = error,
-                            onRetry = onRetry
-                        )
-                    }
-                    streams.isEmpty() -> {
-                        EmptyState()
-                    }
-                    else -> {
+                    // A progressive snapshot is already usable. Keep it visible
+                    // while later addons continue to deliver more sources.
+                    streams.isNotEmpty() -> {
                         StreamsList(
                             streams = streams,
                             onStreamSelected = onStreamSelected,
@@ -903,8 +911,58 @@ private fun RightStreamSection(
                             onFocusChanged = { listHasFocus = it }
                         )
                     }
+                    isLoading -> {
+                        LoadingState(showAddonLogo = showAddonLogo)
+                    }
+                    error != null -> {
+                        ErrorState(
+                            message = error,
+                            onRetry = onRetry
+                        )
+                    }
+                    else -> {
+                        EmptyState()
+                    }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun ProgressiveScrapeStatus(
+    sourceCount: Int,
+    pendingAddonCount: Int
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(NuvioTheme.radii.lg))
+            .background(NuvioTheme.colors.BackgroundCard.copy(alpha = 0.84f))
+            .padding(horizontal = NuvioTheme.spacing.lg, vertical = NuvioTheme.spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
+    ) {
+        LoadingIndicator(
+            modifier = Modifier.size(16.dp),
+            color = NuvioTheme.colors.Primary
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xxs)) {
+            Text(
+                text = if (sourceCount > 0) {
+                    stringResource(R.string.stream_searching_sources_count, sourceCount)
+                } else {
+                    stringResource(R.string.stream_searching_sources)
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = NuvioTheme.colors.TextPrimary
+            )
+            Text(
+                text = stringResource(R.string.stream_searching_sources_hint, pendingAddonCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = NuvioTheme.colors.TextSecondary
+            )
         }
     }
 }

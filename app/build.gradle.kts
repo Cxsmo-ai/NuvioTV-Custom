@@ -40,6 +40,20 @@ val localProperties = Properties().apply {
     }
 }
 
+// A release/benchmark APK must never silently ship with an empty backend. An
+// empty value makes OkHttp receive a relative RPC path and leaves QR login
+// looking like a generic error on the TV. Keep the validation here, where the
+// build still has enough context to explain the problem without embedding or
+// printing any credential values.
+val productionSupabaseUrl = localProperties.getProperty("NUVIO_SUPABASE_URL").orEmpty().trim()
+val productionSupabaseAnonKey = localProperties.getProperty("NUVIO_SUPABASE_ANON_KEY").orEmpty().trim()
+check(productionSupabaseUrl.isNotBlank()) {
+    "local.properties must define NUVIO_SUPABASE_URL before building a production or benchmark APK"
+}
+check(productionSupabaseAnonKey.isNotBlank()) {
+    "local.properties must define NUVIO_SUPABASE_ANON_KEY before building a production or benchmark APK"
+}
+
 val devProperties = Properties().apply {
     val devPropertiesFile = rootProject.file("local.dev.properties")
     if (devPropertiesFile.exists()) {

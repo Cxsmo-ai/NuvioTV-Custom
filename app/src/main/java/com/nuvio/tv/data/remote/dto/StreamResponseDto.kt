@@ -8,6 +8,14 @@ data class StreamResponseDto(
     @Json(name = "streams") val streams: List<StreamDto>? = null
 )
 
+/** One line from AIOStreams' opt-in Nuvio progressive stream endpoint. */
+@JsonClass(generateAdapter = true)
+data class ProgressiveStreamEnvelopeDto(
+    @Json(name = "event") val event: String? = null,
+    @Json(name = "complete") val complete: Boolean? = null,
+    @Json(name = "streams") val streams: List<StreamDto>? = null
+)
+
 @JsonClass(generateAdapter = true)
 data class StreamDto(
     @Json(name = "name") val name: String? = null,

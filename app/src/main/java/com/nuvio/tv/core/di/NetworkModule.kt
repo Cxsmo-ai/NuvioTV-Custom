@@ -222,7 +222,7 @@ object NetworkModule {
         OkHttpClient.Builder()
             .dns(IPv4FirstDns())
             .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val version = BuildConfig.VERSION_NAME.ifBlank { "dev" }
                 val request = chain.request().newBuilder()

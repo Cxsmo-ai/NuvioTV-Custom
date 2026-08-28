@@ -14,6 +14,7 @@ import com.nuvio.tv.core.tmdb.TmdbService
 import com.nuvio.tv.data.local.DebridSettingsDataStore
 import com.nuvio.tv.data.mapper.toDomain
 import com.nuvio.tv.data.remote.api.AddonApi
+import com.nuvio.tv.data.remote.dto.ProgressiveStreamEnvelopeDto
 import com.nuvio.tv.domain.model.Addon
 import com.nuvio.tv.domain.model.AddonStreams
 import com.nuvio.tv.domain.model.DebridSettings
@@ -30,6 +31,9 @@ import com.nuvio.tv.core.health.AddonHealthStore
 import com.nuvio.tv.core.health.HealthOutcome
 import com.nuvio.tv.core.util.canonicalizeAddonUrl
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.squareup.moshi.Moshi
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
@@ -47,9 +51,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import java.net.URLEncoder
 import java.security.MessageDigest
 import javax.inject.Inject
+import java.util.concurrent.TimeUnit
 
 private const val TAG = "StreamRepositoryImpl"
 
@@ -64,11 +71,14 @@ private const val TAG = "StreamRepositoryImpl"
  * Results already stream out as each addon lands, so a slow addon that beats
  * the deadline still contributes.
  */
-private const val ADDON_STREAM_FETCH_TIMEOUT_MS = 15_000L
+private const val ADDON_STREAM_FETCH_TIMEOUT_MS = 90_000L
+private const val PROGRESSIVE_ADDON_STREAM_FETCH_TIMEOUT_MS = 180_000L
 
 class StreamRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val api: AddonApi,
+    private val okHttpClient: OkHttpClient,
+    private val moshi: Moshi,
     private val addonRepository: AddonRepository,
     private val pluginManager: PluginManager,
     private val profileManager: ProfileManager,
@@ -248,24 +258,53 @@ class StreamRepositoryImpl @Inject constructor(
                         val addonT0 = android.os.SystemClock.elapsedRealtime()
                         var addonOutcome = "cancelled"
                         var addonStreamCount = 0
+                        var emittedViaCallback = false
                         try {
-                          withTimeout(ADDON_STREAM_FETCH_TIMEOUT_MS) {
-                            val streamsResult = getStreamsFromAddon(addon.baseUrl, type, videoId, addon.displayName, addon.logo)
+                          val isProgressiveAddon = isProgressiveAioStreamsUrl(addon.baseUrl)
+                          val addonTimeoutMs = if (isProgressiveAddon) {
+                              PROGRESSIVE_ADDON_STREAM_FETCH_TIMEOUT_MS
+                          } else {
+                              ADDON_STREAM_FETCH_TIMEOUT_MS
+                          }
+                          withTimeout(addonTimeoutMs) {
+                            val streamsResult = getStreamsFromAddon(
+                                addon.baseUrl,
+                                type,
+                                videoId,
+                                addon.displayName,
+                                addon.logo
+                            ) { streams, replaceExisting ->
+                                if (streams.isNotEmpty()) {
+                                    emittedViaCallback = true
+                                    resultChannel.send(
+                                        AddonStreams(
+                                            addonName = addon.displayName,
+                                            addonLogo = addon.logo,
+                                            streams = streams,
+                                            replaceExisting = replaceExisting,
+                                            isProgressiveSnapshot = replaceExisting && isProgressiveAddon
+                                        )
+                                    )
+                                }
+                            }
                             when (streamsResult) {
                                 is NetworkResult.Success -> {
                                     if (streamsResult.data.isNotEmpty()) {
-                                        val namedStreams = streamsResult.data.map {
-                                            it.copy(addonName = addon.displayName, addonLogo = addon.logo)
-                                        }
+                                        val namedStreams = streamsResult.data
                                         addonOutcome = "ok"
                                         addonStreamCount = namedStreams.size
-                                        resultChannel.send(
-                                            AddonStreams(
-                                                addonName = addon.displayName,
-                                                addonLogo = addon.logo,
-                                                streams = namedStreams
+                                        if (!emittedViaCallback || isProgressiveAddon) {
+                                            resultChannel.send(
+                                                AddonStreams(
+                                                    addonName = addon.displayName,
+                                                    addonLogo = addon.logo,
+                                                    streams = namedStreams,
+                                                    // Terminal event clears the
+                                                    // progressive loading state.
+                                                    isProgressiveSnapshot = false
+                                                )
                                             )
-                                        )
+                                        }
                                     } else {
                                         // Stream endpoint returned empty - try inline
                                         // streams from meta response as fallback.
@@ -314,7 +353,7 @@ class StreamRepositoryImpl @Inject constructor(
                                 throw e
                             }
                             addonOutcome = "timeout"
-                            Log.w(TAG, "Addon ${addon.name} exceeded ${ADDON_STREAM_FETCH_TIMEOUT_MS}ms - abandoning")
+                            Log.w(TAG, "Addon ${addon.name} exceeded ${if (isProgressiveAioStreamsUrl(addon.baseUrl)) PROGRESSIVE_ADDON_STREAM_FETCH_TIMEOUT_MS else ADDON_STREAM_FETCH_TIMEOUT_MS}ms - abandoning")
                             attemptedFailures += StreamAttemptFailure(
                                 addonName = addon.displayName,
                                 kind = StreamFailureKind.REQUEST_FAILED,
@@ -548,9 +587,15 @@ class StreamRepositoryImpl @Inject constructor(
         val existingIndex = accumulatedResults.indexOfFirst { it.addonName == result.addonName }
         if (existingIndex >= 0) {
             val existing = accumulatedResults[existingIndex]
-            val merged = existing.copy(
-                streams = mergeStreams(existing.streams, result.streams)
-            )
+            val merged = if (result.replaceExisting) {
+                result
+            } else {
+                existing.copy(
+                    streams = mergeStreams(existing.streams, result.streams),
+                    replaceExisting = result.replaceExisting,
+                    isProgressiveSnapshot = result.isProgressiveSnapshot
+                )
+            }
             accumulatedResults[existingIndex] = presentStreams(merged, debridSettings)
         } else {
             accumulatedResults.add(presentStreams(result, debridSettings))
@@ -759,7 +804,8 @@ class StreamRepositoryImpl @Inject constructor(
         type: String,
         videoId: String,
         addonName: String?,
-        addonLogo: String?
+        addonLogo: String?,
+        onProgress: (suspend (streams: List<Stream>, replaceExisting: Boolean) -> Unit)?
     ): NetworkResult<List<Stream>> {
         val cleanBaseUrl = baseUrl.trimEnd('/')
         val queryStart = cleanBaseUrl.indexOf('?')
@@ -778,11 +824,25 @@ class StreamRepositoryImpl @Inject constructor(
         val resolvedAddonName = addonName
             ?: context.getString(com.nuvio.tv.R.string.stream_addon_unknown)
 
+        if (isProgressiveAioStreamsUrl(cleanBaseUrl)) {
+            val progressive = fetchProgressiveStreams(
+                baseUrl = cleanBaseUrl,
+                type = type,
+                videoId = videoId,
+                addonName = resolvedAddonName,
+                addonLogo = addonLogo,
+                onProgress = onProgress
+            )
+            if (progressive != null) return progressive
+            Log.d(TAG, "Progressive endpoint unavailable; falling back to JSON addon=$resolvedAddonName")
+        }
+
         return when (val result = safeAddonApiCall(context) { api.getStreams(streamUrl) }) {
             is NetworkResult.Success -> {
                 val streams = result.data.streams?.map { 
                     it.toDomain(resolvedAddonName, addonLogo) 
                 } ?: emptyList()
+                if (streams.isNotEmpty()) onProgress?.invoke(streams, false)
                 Log.d(TAG, "Streams success addon=$resolvedAddonName count=${streams.size} url=$streamUrl")
                 NetworkResult.Success(streams)
             }
@@ -794,6 +854,77 @@ class StreamRepositoryImpl @Inject constructor(
                 result
             }
             NetworkResult.Loading -> NetworkResult.Loading
+        }
+    }
+
+    private fun isProgressiveAioStreamsUrl(url: String): Boolean {
+        val query = url.substringAfter('?', "")
+        return query.split('&').any { pair ->
+            val parts = pair.split('=', limit = 2)
+            parts.size == 2 && parts[0].equals("client", ignoreCase = true) &&
+                parts[1].equals("nuvio-progressive", ignoreCase = true)
+        }
+    }
+
+    /**
+     * Reads AIOStreams' opt-in NDJSON endpoint line-by-line. Returning null
+     * means the endpoint is unavailable or incomplete, so the caller performs
+     * the normal JSON request instead. A completed response (including an empty
+     * one) is authoritative and is not retried, preventing duplicate scrapes.
+     */
+    private suspend fun fetchProgressiveStreams(
+        baseUrl: String,
+        type: String,
+        videoId: String,
+        addonName: String,
+        addonLogo: String?,
+        onProgress: (suspend (streams: List<Stream>, replaceExisting: Boolean) -> Unit)?
+    ): NetworkResult<List<Stream>>? = withContext(Dispatchers.IO) {
+        val queryStart = baseUrl.indexOf('?')
+        val basePath = if (queryStart >= 0) baseUrl.substring(0, queryStart).trimEnd('/') else baseUrl
+        val baseQuery = if (queryStart >= 0) baseUrl.substring(queryStart) else ""
+        val encodedType = encodePathSegment(type)
+        val encodedVideoId = encodePathSegment(videoId)
+        val progressiveUrl = "$basePath/stream-progressive/$encodedType/$encodedVideoId.ndjson$baseQuery"
+        val adapter = moshi.adapter(ProgressiveStreamEnvelopeDto::class.java)
+        val client = okHttpClient.newBuilder()
+            .readTimeout(120, TimeUnit.SECONDS)
+            .build()
+
+        try {
+            client.newCall(
+                Request.Builder()
+                    .url(progressiveUrl)
+                    .header("Accept", "application/x-ndjson")
+                    .build()
+            ).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val source = response.body?.source() ?: return@withContext null
+                var latest = emptyList<Stream>()
+                var completed = false
+                while (!source.exhausted()) {
+                    ensureActive()
+                    val line = source.readUtf8Line()?.trim().orEmpty()
+                    if (line.isEmpty() || line.startsWith(":")) continue
+                    val event = runCatching { adapter.fromJson(line) }.getOrNull() ?: continue
+                    val mapped = event?.streams?.map { it.toDomain(addonName, addonLogo) }.orEmpty()
+                    if (mapped.isNotEmpty()) {
+                        latest = mapped
+                        onProgress?.invoke(mapped, true)
+                    }
+                    if (event?.complete == true) {
+                        completed = true
+                        break
+                    }
+                }
+                if (!completed) return@withContext null
+                NetworkResult.Success(latest)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "Progressive stream read failed addon=$addonName: ${e.message}")
+            null
         }
     }
 

@@ -1660,6 +1660,9 @@
     <string name="stream_player_external">External</string>
     <string name="stream_filter_all">All</string>
     <string name="stream_episode_label">S%1$d E%2$d</string>
+    <string name="stream_searching_sources">Still searching for sources…</string>
+    <string name="stream_searching_sources_count">Still searching… %1$d sources found</string>
+    <string name="stream_searching_sources_hint">Updating from %1$d addon(s) as they finish</string>
 
     <string name="player_no_external_player">No external player found</string>
     <string name="player_loading_preparing">Preparing stream…</string>
