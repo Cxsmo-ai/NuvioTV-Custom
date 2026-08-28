@@ -42,6 +42,10 @@ val SubtitleLanguage.displayName: String
 
 const val SUBTITLE_LANGUAGE_FORCED = "forced"
 
+object SubtitleLanguageOption {
+    const val DEVICE = "device"
+}
+
 val AVAILABLE_SUBTITLE_LANGUAGES = listOf(
     SubtitleLanguage("af", "Afrikaans"),
     SubtitleLanguage("sq", "Albanian"),
@@ -134,6 +138,7 @@ val AVAILABLE_TMDB_LANGUAGES = AVAILABLE_SUBTITLE_LANGUAGES + listOf(
  */
 data class SubtitleStyleSettings(
     val preferredLanguage: String = "en",
+    val isPreferredLanguageSystemDefault: Boolean = true,
     val secondaryPreferredLanguage: String? = null,
     val useForcedSubtitles: Boolean = false,
     val showOnlyPreferredLanguages: Boolean = false,
@@ -297,6 +302,8 @@ data class PlayerSettings(
     val streamAutoPlaySelectedAddons: Set<String> = emptySet(),
     val streamAutoPlaySelectedPlugins: Set<String> = emptySet(),
     val streamAutoPlayRegex: String = "",
+    // Fork: default OFF until validated against the passthrough audio lifecycle.
+    val postPlayRecommendationsEnabled: Boolean = false,
     val streamAutoPlayNextEpisodeEnabled: Boolean = false,
     val streamAutoPlayNextEpisodeFallbackEnabled: Boolean = true,
     val streamAutoPlayPreferBingeGroupForNextEpisode: Boolean = true,
@@ -616,6 +623,7 @@ class PlayerSettingsDataStore @Inject constructor(
     private val streamAutoPlaySelectedAddonsKey = stringSetPreferencesKey("stream_auto_play_selected_addons")
     private val streamAutoPlaySelectedPluginsKey = stringSetPreferencesKey("stream_auto_play_selected_plugins")
     private val streamAutoPlayRegexKey = stringPreferencesKey("stream_auto_play_regex")
+    private val postPlayRecommendationsEnabledKey = booleanPreferencesKey("post_play_recommendations_enabled")
     private val streamAutoPlayNextEpisodeEnabledKey = booleanPreferencesKey("stream_auto_play_next_episode_enabled")
     private val streamAutoPlayNextEpisodeFallbackEnabledKey = booleanPreferencesKey("stream_auto_play_next_episode_fallback_enabled")
     private val streamAutoPlayPreferBingeGroupForNextEpisodeKey = booleanPreferencesKey("stream_auto_play_prefer_bingegroup_next_episode")
@@ -895,7 +903,7 @@ class PlayerSettingsDataStore @Inject constructor(
                     prefs[subtitleUseForcedSubtitlesKey] = true
                     val migratedPreferred = normalizedSecondarySubtitleLanguage
                         ?.takeUnless { it == SUBTITLE_LANGUAGE_FORCED || it == "none" }
-                        ?: "en"
+                        ?: SubtitleLanguageOption.DEVICE
                     prefs[subtitlePreferredLanguageKey] = migratedPreferred
                     prefs.remove(subtitleSecondaryLanguageKey)
                 }
@@ -1001,6 +1009,7 @@ class PlayerSettingsDataStore @Inject constructor(
                 streamAutoPlaySelectedAddons = prefs[streamAutoPlaySelectedAddonsKey] ?: emptySet(),
                 streamAutoPlaySelectedPlugins = prefs[streamAutoPlaySelectedPluginsKey] ?: emptySet(),
                 streamAutoPlayRegex = prefs[streamAutoPlayRegexKey] ?: "",
+                postPlayRecommendationsEnabled = prefs[postPlayRecommendationsEnabledKey] ?: false,
                 streamAutoPlayNextEpisodeEnabled = prefs[streamAutoPlayNextEpisodeEnabledKey] ?: false,
                 streamAutoPlayNextEpisodeFallbackEnabled = prefs[streamAutoPlayNextEpisodeFallbackEnabledKey] ?: true,
                 streamAutoPlayPreferBingeGroupForNextEpisode =
@@ -1071,28 +1080,32 @@ class PlayerSettingsDataStore @Inject constructor(
                 enableHttp2 = prefs[enableHttp2Key] ?: PlayerSettings.DEFAULT_ENABLE_HTTP2,
                 nuvioPerformanceModeEnabled = (prefs[nuvioPerformanceModeEnabledKey] ?: PlayerSettings.DEFAULT_NUVIO_PERFORMANCE_MODE_ENABLED) &&
                         android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O,
-                subtitleStyle = SubtitleStyleSettings(
-                    preferredLanguage = normalizeSubtitlePreferredLanguageForRead(
+                subtitleStyle = run {
+                    val resolvedPreferredLanguage = resolveSubtitlePreferredLanguage(
                         prefs[subtitlePreferredLanguageKey],
                         prefs[subtitleSecondaryLanguageKey]
-                    ),
-                    secondaryPreferredLanguage = prefs[subtitleSecondaryLanguageKey]
-                        ?.let(::normalizeSelectableLanguageCode)
-                        ?.takeUnless { it == SUBTITLE_LANGUAGE_FORCED },
-                    useForcedSubtitles = (prefs[subtitleUseForcedSubtitlesKey] ?: false) ||
-                        prefs[subtitlePreferredLanguageKey]?.let(::normalizeSelectableLanguageCode) == SUBTITLE_LANGUAGE_FORCED ||
-                        prefs[subtitleSecondaryLanguageKey]?.let(::normalizeSelectableLanguageCode) == SUBTITLE_LANGUAGE_FORCED,
-                    showOnlyPreferredLanguages = prefs[subtitleShowOnlyPreferredLanguagesKey] ?: false,
-                    stripSdh = prefs[subtitleStripSdhKey] ?: false,
-                    size = prefs[subtitleSizeKey] ?: 100,
-                    verticalOffset = prefs[subtitleVerticalOffsetKey] ?: 5,
-                    bold = prefs[subtitleBoldKey] ?: false,
-                    textColor = prefs[subtitleTextColorKey] ?: Color.White.toArgb(),
-                    backgroundColor = prefs[subtitleBackgroundColorKey] ?: Color.Transparent.toArgb(),
-                    outlineEnabled = prefs[subtitleOutlineEnabledKey] ?: true,
-                    outlineColor = prefs[subtitleOutlineColorKey] ?: Color.Black.toArgb(),
-                    outlineWidth = prefs[subtitleOutlineWidthKey] ?: 2
-                ),
+                    )
+                    SubtitleStyleSettings(
+                        preferredLanguage = resolvedPreferredLanguage.languageCode,
+                        isPreferredLanguageSystemDefault = resolvedPreferredLanguage.isSystemDefault,
+                        secondaryPreferredLanguage = prefs[subtitleSecondaryLanguageKey]
+                            ?.let(::normalizeSelectableLanguageCode)
+                            ?.takeUnless { it == SUBTITLE_LANGUAGE_FORCED },
+                        useForcedSubtitles = (prefs[subtitleUseForcedSubtitlesKey] ?: false) ||
+                            prefs[subtitlePreferredLanguageKey]?.let(::normalizeSelectableLanguageCode) == SUBTITLE_LANGUAGE_FORCED ||
+                            prefs[subtitleSecondaryLanguageKey]?.let(::normalizeSelectableLanguageCode) == SUBTITLE_LANGUAGE_FORCED,
+                        showOnlyPreferredLanguages = prefs[subtitleShowOnlyPreferredLanguagesKey] ?: false,
+                        stripSdh = prefs[subtitleStripSdhKey] ?: false,
+                        size = prefs[subtitleSizeKey] ?: 100,
+                        verticalOffset = prefs[subtitleVerticalOffsetKey] ?: 5,
+                        bold = prefs[subtitleBoldKey] ?: false,
+                        textColor = prefs[subtitleTextColorKey] ?: Color.White.toArgb(),
+                        backgroundColor = prefs[subtitleBackgroundColorKey] ?: Color.Transparent.toArgb(),
+                        outlineEnabled = prefs[subtitleOutlineEnabledKey] ?: true,
+                        outlineColor = prefs[subtitleOutlineColorKey] ?: Color.Black.toArgb(),
+                        outlineWidth = prefs[subtitleOutlineWidthKey] ?: 2
+                    )
+                },
                 bufferSettings = BufferSettings(
                     minBufferMs = prefs[minBufferMsKey] ?: BufferSettings.DEFAULT_MIN_BUFFER_MS,
                     maxBufferMs = prefs[maxBufferMsKey] ?: BufferSettings.DEFAULT_MAX_BUFFER_MS,
@@ -1411,6 +1424,12 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
+    suspend fun setPostPlayRecommendationsEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[postPlayRecommendationsEnabledKey] = enabled
+        }
+    }
+
     suspend fun setStreamAutoPlayNextEpisodeEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[streamAutoPlayNextEpisodeEnabledKey] = enabled
@@ -1542,7 +1561,17 @@ class PlayerSettingsDataStore @Inject constructor(
 
     private fun normalizeSelectableLanguageCode(language: String): String {
         val code = language.trim().lowercase()
-        return when (code) { "pt-br", "pt_br", "br", "pob" -> "pt-br"; "pt-pt", "pt_pt", "por" -> "pt"; "forced", "force", "forc" -> SUBTITLE_LANGUAGE_FORCED; else -> code }
+        return when (code) {
+            "pt-br", "pt_br", "br", "pob" -> "pt-br"
+            "pt-pt", "pt_pt", "por" -> "pt"
+            "forced", "force", "forc" -> SUBTITLE_LANGUAGE_FORCED
+            "zh-cn", "zh_cn" -> "zh-CN"
+            "zh-tw", "zh_tw" -> "zh-TW"
+            "en-au", "en_au" -> "en-AU"
+            "en-ca", "en_ca" -> "en-CA"
+            "en-gb", "en_gb" -> "en-GB"
+            else -> code
+        }
     }
 
     private fun normalizeSecondaryAudioLanguageCode(language: String): String? {
@@ -1555,19 +1584,63 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
-    private fun normalizeSubtitlePreferredLanguageForRead(
+    private data class ResolvedSubtitlePreferredLanguage(
+        val languageCode: String,
+        val isSystemDefault: Boolean
+    )
+
+    private fun resolveDeviceSubtitleLanguage(): String {
+        val locale = if (android.os.Build.VERSION.SDK_INT >= 24) {
+            android.content.res.Resources.getSystem().configuration.locales[0]
+        } else {
+            @Suppress("DEPRECATION")
+            android.content.res.Resources.getSystem().configuration.locale
+        }
+        
+        val rawLanguage = locale?.language.orEmpty()
+        val legacyMapped = when (rawLanguage) {
+            "iw" -> "he"
+            "in" -> "id"
+            "ji" -> "yi"
+            else -> rawLanguage
+        }
+        val country = locale?.country.orEmpty()
+
+        if (country.isNotBlank()) {
+            val regionSpecific = normalizeSelectableLanguageCode("$legacyMapped-$country")
+            if (AVAILABLE_SUBTITLE_LANGUAGES.any { it.code == regionSpecific }) {
+                return regionSpecific
+            }
+        }
+
+        val candidate = normalizeSelectableLanguageCode(legacyMapped)
+        val isSupported = candidate.isNotBlank() && AVAILABLE_SUBTITLE_LANGUAGES.any { it.code == candidate }
+        return if (isSupported) candidate else "en"
+    }
+
+    private fun resolveSubtitlePreferredLanguage(
         preferredLanguage: String?,
         secondaryLanguage: String?
-    ): String {
-        val preferred = preferredLanguage
-            ?.let(::normalizeSelectableLanguageCode)
-            ?: return "none"
-        if (preferred != SUBTITLE_LANGUAGE_FORCED) return preferred
+    ): ResolvedSubtitlePreferredLanguage {
+        val preferred = preferredLanguage?.let(::normalizeSelectableLanguageCode)
+            // Fork: no saved preference means subtitles off ("none"), not the
+            // device language. "Device" remains available as an explicit choice.
+            ?: return ResolvedSubtitlePreferredLanguage("none", isSystemDefault = false)
+        if (preferred == SubtitleLanguageOption.DEVICE) {
+            return ResolvedSubtitlePreferredLanguage(resolveDeviceSubtitleLanguage(), isSystemDefault = true)
+        }
+        if (preferred != SUBTITLE_LANGUAGE_FORCED) {
+            return ResolvedSubtitlePreferredLanguage(preferred, isSystemDefault = false)
+        }
 
-        return secondaryLanguage
+        val migratedFromForced = secondaryLanguage
             ?.let(::normalizeSelectableLanguageCode)
             ?.takeUnless { it == SUBTITLE_LANGUAGE_FORCED || it == "none" }
-            ?: "en"
+        return if (migratedFromForced != null) {
+            ResolvedSubtitlePreferredLanguage(migratedFromForced, isSystemDefault = false)
+        } else {
+            ResolvedSubtitlePreferredLanguage(resolveDeviceSubtitleLanguage(), isSystemDefault = true)
+        }
     }
 
     suspend fun setMpvHardwareDecodeMode(mode: MpvHardwareDecodeMode) {
@@ -1603,7 +1676,7 @@ class PlayerSettingsDataStore @Inject constructor(
     suspend fun setInjectHdr10MetadataOnStrip(enabled: Boolean) { store().edit { it[injectHdr10MetadataOnStripKey] = enabled } }
 
     // Subtitle styles
-    suspend fun setSubtitlePreferredLanguage(language: String) { store().edit { it[subtitlePreferredLanguageKey] = normalizeSelectableLanguageCode(language.ifBlank { "en" }) } }
+    suspend fun setSubtitlePreferredLanguage(language: String) { store().edit { it[subtitlePreferredLanguageKey] = normalizeSelectableLanguageCode(language.ifBlank { SubtitleLanguageOption.DEVICE }) } }
     suspend fun setSubtitleSecondaryLanguage(language: String?) {
         store().edit { prefs ->
             val normalizedLanguage = language?.takeIf { it.isNotBlank() }?.let(::normalizeSelectableLanguageCode)

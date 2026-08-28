@@ -536,7 +536,8 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
                             isReleaseAlert = freshIsReleaseAlert,
                             isNewSeasonRelease = freshIsNewSeasonRelease,
                             seedSeason = cached.seedSeason,
-                            seedEpisode = cached.seedEpisode
+                            seedEpisode = cached.seedEpisode,
+                            contentLanguage = cached.contentLanguage
                         )
                     )
                 }
@@ -1001,7 +1002,8 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
                                 isReleaseAlert = freshIsReleaseAlert,
                                 isNewSeasonRelease = freshIsNewSeasonRelease,
                                 seedSeason = cached.seedSeason,
-                                seedEpisode = cached.seedEpisode
+                                seedEpisode = cached.seedEpisode,
+                                contentLanguage = cached.contentLanguage
                             )
                         )
                     }
@@ -1889,7 +1891,8 @@ private suspend fun HomeViewModel.buildNextUpItem(
         isReleaseAlert = releaseState.isReleaseAlert,
         isNewSeasonRelease = releaseState.isNewSeasonRelease,
         seedSeason = progress.season,
-        seedEpisode = progress.episode
+        seedEpisode = progress.episode,
+        contentLanguage = normalizeLanguageCode(seedMeta?.language) ?: countryToLanguageCode(seedMeta?.country)
     )
     logNextUpDecision(
         "built contentId=${progress.contentId} name=${progress.name} next=${nextUp.season}x${nextUp.episode} " +

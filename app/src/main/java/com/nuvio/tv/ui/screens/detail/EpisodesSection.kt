@@ -76,6 +76,7 @@ import coil3.request.crossfade
 import coil3.request.transformations
 import com.nuvio.tv.R
 import com.nuvio.tv.domain.model.Video
+import com.nuvio.tv.domain.model.EpisodeOptionsOverlayStyle
 import com.nuvio.tv.ui.components.FocusMarqueeText
 import com.nuvio.tv.ui.components.ImdbRatingSourceLabel
 import com.nuvio.tv.ui.components.NuvioDialog
@@ -255,6 +256,8 @@ fun EpisodesRow(
     watchedEpisodes: Set<Pair<Int, Int>> = emptySet(),
     episodeWatchedPendingKeys: Set<String> = emptySet(),
     blurUnwatchedEpisodes: Boolean = false,
+    episodeOptionsOverlayStyle: EpisodeOptionsOverlayStyle = EpisodeOptionsOverlayStyle.ARTWORK,
+    posterCardCornerRadiusDp: Int = 12,
     onEpisodeClick: (Video) -> Unit,
     onEpisodeManualPlayClick: (Video) -> Unit = onEpisodeClick,
     onEpisodeStartFromBeginningClick: (Video) -> Unit = onEpisodeClick,
@@ -281,7 +284,7 @@ fun EpisodesRow(
     val restoreTargetRequester = restoreEpisodeId?.let { episodeFocusRequesters[it] }
     var optionsEpisode by remember { mutableStateOf<Video?>(null) }
     val isOverlayOpen = optionsEpisode != null
-    val cardMetrics = rememberEpisodeCardMetrics()
+    val cardMetrics = rememberEpisodeCardMetrics(posterCardCornerRadiusDp)
     val density = LocalDensity.current
     val rowPrefetchStrategy = remember { LazyListPrefetchStrategy(nestedPrefetchItemCount = 2) }
     val initialEpisodeIndex = remember(dedupedEpisodes, restoreEpisodeId, scrollToEpisodeId) {
@@ -1062,11 +1065,12 @@ private data class EpisodeCardMetrics(
 )
 
 @Composable
-private fun rememberEpisodeCardMetrics(): EpisodeCardMetrics {
+private fun rememberEpisodeCardMetrics(posterCardCornerRadiusDp: Int = 12): EpisodeCardMetrics {
     val sectionDensity = LocalDensity.current
     val sectionWindowWidthPx = LocalContext.current.resources.displayMetrics.widthPixels
     val screenWidthDp = with(sectionDensity) { sectionWindowWidthPx.toDp() }.value.toInt()
-    return remember(screenWidthDp) {
+    val userCornerRadius = posterCardCornerRadiusDp.dp
+    return remember(screenWidthDp, userCornerRadius) {
         when {
             screenWidthDp >= 1300 -> EpisodeCardMetrics(
                 rowHorizontalPadding = NuvioTheme.spacing.huge,
@@ -1074,7 +1078,7 @@ private fun rememberEpisodeCardMetrics(): EpisodeCardMetrics {
                 itemSpacing = 20.dp,
                 cardWidth = 400.dp,
                 cardHeight = 263.dp,
-                cornerRadius = 20.dp,
+                cornerRadius = userCornerRadius,
                 contentPadding = 20.dp,
                 contentBottomPadding = NuvioTheme.spacing.xl,
                 episodeBadgeHorizontalPadding = 10.dp,
@@ -1099,7 +1103,7 @@ private fun rememberEpisodeCardMetrics(): EpisodeCardMetrics {
                 itemSpacing = 18.dp,
                 cardWidth = 360.dp,
                 cardHeight = 235.dp,
-                cornerRadius = 18.dp,
+                cornerRadius = userCornerRadius,
                 contentPadding = 18.dp,
                 contentBottomPadding = 22.dp,
                 episodeBadgeHorizontalPadding = 9.dp,
@@ -1124,7 +1128,7 @@ private fun rememberEpisodeCardMetrics(): EpisodeCardMetrics {
                 itemSpacing = NuvioTheme.spacing.lg,
                 cardWidth = 320.dp,
                 cardHeight = 207.dp,
-                cornerRadius = NuvioTheme.spacing.lg,
+                cornerRadius = userCornerRadius,
                 contentPadding = NuvioTheme.spacing.lg,
                 contentBottomPadding = 20.dp,
                 episodeBadgeHorizontalPadding = NuvioTheme.spacing.sm,
@@ -1149,7 +1153,7 @@ private fun rememberEpisodeCardMetrics(): EpisodeCardMetrics {
                 itemSpacing = 14.dp,
                 cardWidth = 280.dp,
                 cardHeight = 179.dp,
-                cornerRadius = NuvioTheme.spacing.lg,
+                cornerRadius = userCornerRadius,
                 contentPadding = 14.dp,
                 contentBottomPadding = NuvioTheme.spacing.lg,
                 episodeBadgeHorizontalPadding = 7.dp,

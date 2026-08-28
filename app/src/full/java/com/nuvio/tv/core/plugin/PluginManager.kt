@@ -221,6 +221,10 @@ class PluginManager @Inject constructor(
                 isDaemon = true
             }
         }.asCoroutineDispatcher()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val scraperOrchestrationDispatcher: CoroutineDispatcher =
+        Dispatchers.IO.limitedParallelism(MAX_CONCURRENT_SCRAPERS)
     
     // Flow of all repositories
     val repositories: Flow<List<PluginRepository>> = dataStore.repositories
@@ -674,7 +678,7 @@ class PluginManager @Inject constructor(
         }
 
         val results = enabledScraperList.mapIndexed { index, scraper ->
-            async {
+            async(scraperOrchestrationDispatcher) {
                 if (index > 0) {
                     kotlinx.coroutines.delay(index * 60L)
                 }
@@ -717,9 +721,8 @@ class PluginManager @Inject constructor(
             }
         }
  
-        // Launch all scrapers concurrently within the channelFlow scope
         enabledList.forEachIndexed { index, scraper ->
-            launch {
+            launch(scraperOrchestrationDispatcher) {
                 if (index > 0) {
                     kotlinx.coroutines.delay(index * 60L)
                 }

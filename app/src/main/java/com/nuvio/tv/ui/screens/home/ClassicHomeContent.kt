@@ -50,6 +50,7 @@ import com.nuvio.tv.domain.model.MetaPreview
 import com.nuvio.tv.domain.model.Collection
 import com.nuvio.tv.domain.model.CollectionFolder
 import com.nuvio.tv.domain.model.legacyKey
+import com.nuvio.tv.domain.model.stableItemKeys
 import com.nuvio.tv.domain.model.stableKey
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -102,6 +103,7 @@ fun ClassicHomeContent(
     onItemFocus: (MetaPreview) -> Unit = {},
     catalogSeeAllLabel: String? = null,
     onSaveFocusState: (Int, Int, String?, Map<String, String>, Map<String, Int>, Int, Int) -> Unit,
+    onFocusedRowKeyChanged: (String?) -> Unit = {},
     scrollToTopTrigger: Int = 0,
     onRequestLazyCatalogLoad: (String) -> Unit = {}
 ) {
@@ -206,6 +208,9 @@ fun ClassicHomeContent(
     val rowStates = remember { mutableMapOf<String, LazyListState>() }
     val rowFocusRequesters = remember { mutableMapOf<String, FocusRequester>() }
     val rowFocusedItemIndex = remember { mutableMapOf<String, Int>() }
+    // Item keys of each row as they were when its focused index was last recorded, so the index
+    // can be relocated when a refresh shifts the row instead of pointing at a new card.
+    val previousRowItemKeys = remember { mutableMapOf<String, List<String>>() }
     val cwItemFocusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
     val upcomingItemFocusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
     val lastFocusedUpcomingIndex = remember { mutableIntStateOf(-1) }
@@ -583,6 +588,7 @@ fun ClassicHomeContent(
                         currentFocusSnapshot.itemIndex = itemIndex
                         currentFocusSnapshot.rowKey = "continue_watching"
                         onContinueWatchingItemFocused(itemIndex)
+                        onFocusedRowKeyChanged(null)
                         if (uiState.classicFocusGradientEnabled) {
                             focusedArtwork = uiState.continueWatchingItems.getOrNull(itemIndex)
                                 ?.toClassicFocusArtwork(uiState.focusedPosterBackdropExpandEnabled)
@@ -677,6 +683,15 @@ fun ClassicHomeContent(
                 is HomeRow.Catalog -> {
                     val catalogRow = homeRow.row
                     val catalogKey = catalogRow.stableKey()
+                    val currentItemKeys = catalogRow.stableItemKeys()
+                    rowFocusedItemIndex[catalogKey]?.let { storedIdx ->
+                        previousRowItemKeys[catalogKey]
+                            ?.getOrNull(storedIdx)
+                            ?.let { currentItemKeys.indexOf(it) }
+                            ?.takeIf { it >= 0 && it != storedIdx }
+                            ?.let { rowFocusedItemIndex[catalogKey] = it }
+                    }
+                    previousRowItemKeys[catalogKey] = currentItemKeys
                     // Match by saved row key first, fall back to index
                     val shouldRestoreFocus = restoringFocus &&
                         (currentFocusSnapshot.rowKey == catalogKey || index == focusState.focusedRowIndex)
@@ -737,6 +752,7 @@ fun ClassicHomeContent(
                                 currentFocusSnapshot.rowIndex = index
                                 currentFocusSnapshot.itemIndex = itemIndex
                                 currentFocusSnapshot.rowKey = catalogKey
+                                onFocusedRowKeyChanged(catalogKey)
                                 rowFocusedItemIndex[catalogKey] = itemIndex
                             }
                         }
@@ -771,6 +787,7 @@ fun ClassicHomeContent(
                             currentFocusSnapshot.rowIndex = index
                             currentFocusSnapshot.itemIndex = itemIndex
                             currentFocusSnapshot.rowKey = collectionKey
+                            onFocusedRowKeyChanged(null)
                             rowFocusedItemIndex[collectionKey] = itemIndex
                             if (uiState.classicFocusGradientEnabled) {
                                 focusedArtwork = homeRow.collection.folders.getOrNull(itemIndex)

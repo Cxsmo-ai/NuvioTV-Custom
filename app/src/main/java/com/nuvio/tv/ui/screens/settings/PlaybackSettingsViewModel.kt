@@ -492,6 +492,10 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setStreamAutoPlayRegex(regex)
     }
 
+    suspend fun setPostPlayRecommendationsEnabled(enabled: Boolean) {
+        playerSettingsDataStore.setPostPlayRecommendationsEnabled(enabled)
+    }
+
     suspend fun setStreamAutoPlayNextEpisodeEnabled(enabled: Boolean) {
         playerSettingsDataStore.setStreamAutoPlayNextEpisodeEnabled(enabled)
     }

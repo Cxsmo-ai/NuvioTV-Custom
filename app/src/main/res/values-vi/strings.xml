@@ -18,7 +18,7 @@
     <string name="web_home_catalogs">Danh mục và bộ sưu tập Trang chủ</string>
     <string name="web_no_catalogs">Không có danh mục Trang chủ nào</string>
     <string name="web_btn_save">Lưu thay đổi</string>
-    <string name="web_connection_lost">Kết nối đến TV đã mất</string>
+    <string name="web_connection_lost">Mất kết nối với TV</string>
     <string name="web_btn_remove">Xoá</string>
     <string name="web_badge_new">Mới</string>
     <string name="web_badge_disabled">Đã tắt</string>
@@ -29,7 +29,7 @@
     <string name="web_status_msg_waiting_tv">Vui lòng xác nhận thay đổi này trên TV để áp dụng.</string>
     <string name="web_status_changes_applied">Đã áp dụng thay đổi</string>
     <string name="web_status_msg_addon_updated">Cấu hình tiện ích của bạn đã được cập nhật trên TV.</string>
-    <string name="web_status_msg_repo_updated">Cấu hình kho tiện ích của bạn đã được cập nhật trên TV.</string>
+    <string name="web_status_msg_repo_updated">Cấu hình kho lưu trữ của bạn đã được cập nhật trên TV.</string>
     <string name="web_status_changes_rejected">Thay đổi bị từ chối</string>
     <string name="web_status_msg_changes_rejected">Các thay đổi đã bị từ chối trên TV. Danh sách của bạn đã được hoàn nguyên.</string>
     <string name="web_status_error">Đã xảy ra lỗi</string>
@@ -38,12 +38,12 @@
     <string name="web_status_timeout">Đã hết thời gian chờ</string>
     <string name="web_status_msg_timeout">Không nhận được phản hồi từ TV. Vui lòng thử lại.</string>
     <string name="web_status_msg_connection_lost">Không thể kết nối đến máy chủ TV. Các thay đổi có thể đã được áp dụng.</string>
-    <string name="web_manage_repos_title">Quản lý kho tiện ích</string>
-    <string name="web_manage_repos_subtitle">Quản lý các kho tiện ích của bạn</string>
-    <string name="web_add_repo_url">Thêm kho tiện ích từ URL</string>
+    <string name="web_manage_repos_title">Quản lý kho lưu trữ</string>
+    <string name="web_manage_repos_subtitle">Quản lý các kho lưu trữ của bạn</string>
+    <string name="web_add_repo_url">Thêm kho lưu trữ từ URL</string>
     <string name="web_installed">Đã cài đặt</string>
-    <string name="web_no_repos">Không có kho tiện ích nào đã cài đặt</string>
-    <string name="web_error_repo_exists">Kho tiện ích này đã có trong danh sách</string>
+    <string name="web_no_repos">Không có kho lưu trữ nào đã cài đặt</string>
+    <string name="web_error_repo_exists">Kho lưu trữ này đã có trong danh sách</string>
     <string name="web_manage_collections_title">Quản lý Bộ sưu tập</string>
     <string name="web_manage_collections_subtitle">Tạo và quản lý các bộ sưu tập tùy chỉnh của bạn</string>
     <string name="web_status_msg_collections_updated">Bộ sưu tập của bạn đã được cập nhật trên TV.</string>
@@ -52,7 +52,7 @@
     <string name="web_tab_collections">Bộ sưu tập</string>
     <string name="web_btn_enable_all">Bật tất cả</string>
     <string name="web_btn_disable_all">Tắt tất cả</string>
-    <string name="web_btn_show_all">Xem tất cả</string>
+    <string name="web_btn_show_all">Hiển thị tất cả</string>
     <string name="web_btn_hide_all">Ẩn tất cả</string>
     <string name="web_btn_new_collection">+ Bộ sưu tập mới</string>
     <string name="web_btn_export">Xuất</string>
@@ -136,23 +136,24 @@
     <string name="error_stream_tried_generic">Đã thử các tiện ích phát: %1$s. Không thể tải nguồn phát cho id=%2$s (type=%3$s).</string>
     <string name="error_stream_tried_issues">Đã thử các tiện ích phát: %1$s. Không thể tải nguồn xem chor id=%2$s (type=%3$s). Issues: %4$s.</string>
 
-    <string name="continue_watching">Xem tiếp</string>
+    <string name="continue_watching">Tiếp tục xem</string>
     <string name="cw_upcoming">Sắp chiếu</string>
     <string name="cw_next_up">Tiếp theo</string>
-    <string name="cw_next_up_short">Tiếp</string>
+    <string name="cw_next_up_short">Kế tiếp</string>
     <string name="cw_new_episode">Tập mới</string>
-    <string name="cw_new_episode_short">New</string>
+    <string name="cw_new_episode_short">Mới</string>
     <string name="cw_new_season">Mùa mới</string>
     <string name="cw_resume">Xem tiếp</string>
     <string name="cw_percent_watched">%1$d%% Đã xem</string>
-    <string name="cw_hours_min_left">Còn %1$dg %2$dp</string>
-    <string name="cw_min_left">Còn %1$dp</string>
+    <string name="cw_hours_min_left">Còn %1$dg %2$dph</string>
+    <string name="cw_min_left">Còn %1$dph</string>
     <string name="cw_almost_done">Sắp xong rồi</string>
     <string name="cw_airs_date">Phát sóng %1$s</string>
     <string name="cw_airs_today">Phát sóng hôm nay</string>
     <string name="cw_airs_tomorrow">Phát sóng ngày mai</string>
     <plurals name="cw_airs_in_days">
-        <item quantity="other">Phát sóng trong %d ngày nữa</item>
+        <item quantity="one">Phát sóng sau %d ngày nữa</item>
+        <item quantity="other">Phát sóng sau %d ngày nữa</item>
     </plurals>
     <!-- Short versions for compact card styles (wide/poster) -->
     <string name="cw_airs_date_short">%1$s</string>
@@ -184,10 +185,10 @@
     <string name="hero_play_trailer">Xem trailer</string>
     <string name="hero_press_back_trailer">Nhấn quay lại để thoát trailer</string>
     <string name="hero_synopsis_read_more">Đọc thêm</string>
-    <string name="hero_synopsis_dismiss_hint">Bấm quay lại để đóng</string>
-    <string name="cd_rating">Xếp hạng</string>
+    <string name="hero_synopsis_dismiss_hint">Nhấn quay lại để đóng</string>
+    <string name="cd_rating">Phân loại độ tuổi</string>
 
-    <string name="episodes_season">Phần %1$d</string>
+    <string name="episodes_season">Mùa %1$d</string>
     <string name="episodes_specials">Tập đặc biệt</string>
     <string name="episodes_episode">Tập</string>
     <string name="episodes_cd_watched">Đã xem</string>
@@ -227,8 +228,8 @@
     <string name="cast_role_creator">Tác giả</string>
     <string name="cast_role_director">Đạo diễn</string>
     <string name="cast_role_writer">Biên kịch</string>
-    <string name="detail_tab_ratings">Xếp hạng</string>
-    <string name="detail_tab_more_like_this">Có thể bạn thích</string>
+    <string name="detail_tab_ratings">Điểm đánh giá</string>
+    <string name="detail_tab_more_like_this">Nội dung tương tự</string>
     <string name="detail_tab_trailer">Trailer</string>
     <string name="detail_more_like_this_powered_by_tmdb">Gợi ý từ TMDB</string>
     <string name="detail_more_like_this_powered_by_trakt">Gợi ý từ Trakt</string>
@@ -261,8 +262,7 @@
     <string name="tmdb_entity_rail_recent">Mới nhất</string>
     <string name="tmdb_entity_rail_most_voted">Bình chọn nhiều nhất</string>
     <string name="collections_editor_tmdb_watch_region">Khu vực xem</string>
-    <string name="collections_editor_tmdb_watch_region_helper">Mã quốc gia ISO 3166-1 nơi nội dung có sẵn.
-Ví dụ: US, GB.</string>
+    <string name="collections_editor_tmdb_watch_region_helper">Mã quốc gia ISO 3166-1 nơi nội dung có sẵn. Ví dụ: US, GB.</string>
     <string name="collections_editor_tmdb_quick_watch_regions">Khu vực xem nhanh</string>
     <string name="collections_editor_tmdb_watch_providers">ID nền tảng</string>
     <string name="collections_editor_tmdb_watch_providers_helper">Sử dụng ID nền tảng xem của TMDB. Dùng dấu phẩy cho VÀ hoặc dấu gạch đứng cho HOẶC.</string>
@@ -317,7 +317,7 @@ Ví dụ: US, GB.</string>
     <string name="appearance_language_restart_hint">Khởi động lại ứng dụng để áp dụng ngôn ngữ mới.</string>
 
     <string name="appearance_font">Phông chữ</string>
-    <string name="appearance_font_subtitle">Chọn phông chữ yêu thích</string>
+    <string name="appearance_font_subtitle">Chọn phông chữ ưu tiên</string>
     <string name="appearance_font_dialog_title">Chọn phông chữ</string>
 
     <string name="appearance_title">Giao diện</string>
@@ -347,7 +347,7 @@ Ví dụ: US, GB.</string>
     <string name="settings_style_zen">Tối giản</string>
     <string name="settings_style_zen_desc">Bố cục đơn giản, phẳng</string>
     <string name="settings_style_horizon">Thanh trên cùng</string>
-    <string name="settings_style_horizon_desc">Thẻ điều hướng ở trên cùng</string>
+    <string name="settings_style_horizon_desc">Các thẻ điều hướng ở trên cùng</string>
     <string name="appearance_font_and_language">Phông chữ và ngôn ngữ</string>
     <string name="appearance_font_and_language_subtitle">Chọn phông chữ và ngôn ngữ cho toàn bộ ứng dụng</string>
     <string name="cd_selected">Đã chọn</string>
@@ -363,8 +363,8 @@ Ví dụ: US, GB.</string>
     <string name="about_privacy_policy">Chính sách quyền riêng tư</string>
     <string name="about_privacy_policy_subtitle">Xem chính sách quyền riêng tư của chúng tôi</string>
     <string name="support_nuvio_name">Tài trợ Nuvio</string>
-    <string name="about_supporters_contributors">Người tài trợ &amp; Người đóng góp</string>
-    <string name="about_supporters_contributors_subtitle">Vinh danh công khai và ghi công cho dự án</string>
+    <string name="about_supporters_contributors">Tài trợ Nuvio</string>
+    <string name="about_supporters_contributors_subtitle">Tài trợ dự án và xem danh sách ghi nhận những người đóng góp</string>
     <string name="about_licenses_attributions">Giấy phép &amp; Ghi công</string>
     <string name="about_licenses_attributions_subtitle">Nguồn dữ liệu, lời cảm ơn và giấy phép Android</string>
     <string name="licenses_attributions_title">Giấy phép &amp; Ghi công</string>
@@ -388,12 +388,12 @@ Ví dụ: US, GB.</string>
     <string name="licenses_attributions_mdblist_body">Nuvio sử dụng MDBList để cung cấp điểm đánh giá và dữ liệu từ các nhà cung cấp điểm số bên ngoài. Nuvio không liên kết hoặc được xác nhận bởi MDBList.</string>
     <string name="licenses_attributions_introdb_title">IntroDB</string>
     <string name="licenses_attributions_introdb_body">Nuvio sử dụng API IntroDB để cung cấp các mốc thời gian do cộng đồng đóng góp cho phần giới thiệu, tóm tắt, danh đề và xem trước, được dùng bởi các điều khiển bỏ qua. Nuvio không liên kết hoặc được xác nhận bởi IntroDB.</string>
-    <string name="licenses_attributions_imdb_title">IMDb Non-Commercial Datasets</string>
+    <string name="licenses_attributions_imdb_title">Bộ dữ liệu IMDb phi thương mại</string>
     <string name="licenses_attributions_imdb_body">Nuvio sử dụng Bộ dữ liệu phi thương mại của IMDb, bao gồm title.ratings.tsv.gz, để cung cấp điểm đánh giá và số lượt bình chọn trên IMDb. Thông tin do IMDb cung cấp (https://www.imdb.com). Được sử dụng với sự cho phép. Dữ liệu IMDb chỉ dành cho mục đích cá nhân và phi thương mại theo điều khoản của IMDb.</string>
     <string name="licenses_attributions_exoplayer_title">AndroidX Media3 ExoPlayer 1.8.0</string>
-    <string name="licenses_attributions_exoplayer_body">Được dùng làm trình phát lại trên Android. Được cấp phép theo Giấy phép Apache, Phiên bản 2.0.</string>
+    <string name="licenses_attributions_exoplayer_body">Được dùng làm lõi trình phát lại trên Android. Được cấp phép theo Giấy phép Apache, Phiên bản 2.0.</string>
     <string name="licenses_attributions_libmpv_title">libmpv / libmpv-android</string>
-    <string name="licenses_attributions_libmpv_body">Được dùng làm trình phát Android. Phần mã cầu nối libmpv-android được cấp phép theo Giấy phép MIT; mpv/libmpv và các thành phần gốc đi kèm vẫn tuân theo các điều khoản cấp phép ban đầu.</string>
+    <string name="licenses_attributions_libmpv_body">Được dùng làm lõi trình phát Android. Phần mã cầu nối libmpv-android được cấp phép theo Giấy phép MIT; mpv/libmpv và các thành phần gốc đi kèm vẫn tuân theo các điều khoản cấp phép ban đầu.</string>
 
     <!-- SettingsScreen categories -->
     <string name="settings_experience">Trải nghiệm</string>
@@ -405,11 +405,11 @@ Ví dụ: US, GB.</string>
     <string name="settings_layout">Bố cục</string>
     <string name="settings_layout_subtitle">Bố cục Trang chủ và kiểu poster</string>
     <string name="settings_content_discovery">Nội dung &amp; Khám phá</string>
-    <string name="settings_content_discovery_subtitle">Tiện ích, trình mở rộng, danh mục và nguồn tìm nội dung</string>
+    <string name="settings_content_discovery_subtitle">Tiện ích, trình mở rộng, danh mục và nguồn khám phá</string>
     <string name="settings_content_discovery_addons_subtitle">Quản lý tiện ích, thứ tự danh mục và bộ sưu tập</string>
-    <string name="settings_content_discovery_plugins_subtitle">Quản lý kho lưu trữ trình mở rộng và nhà cung cấp luồng phát</string>
+    <string name="settings_content_discovery_plugins_subtitle">Quản lý kho lưu trữ và nhà cung cấp luồng phát</string>
     <string name="settings_plugins">Trình mở rộng</string>
-    <string name="settings_plugins_subtitle">Kho lưu trữ trình mở rộng và nhà cung cấp</string>
+    <string name="settings_plugins_subtitle">Kho lưu trữ và nhà cung cấp</string>
     <string name="settings_integration">Tích hợp</string>
     <string name="settings_playback">Phát lại</string>
     <string name="settings_playback_subtitle">Trình phát, phụ đề và tự động phát</string>
@@ -426,7 +426,7 @@ Ví dụ: US, GB.</string>
     <string name="tracking_simkl_features_title">Tính năng Simkl</string>
     <string name="tracking_simkl_features_subtitle">Cài đặt riêng của Simkl</string>
     <string name="tracking_simkl_anime_id_title">Tùy chọn anime ID</string>
-    <string name="tracking_simkl_anime_id_subtitle">Kiểm soát cách nhận diện các mùa anime. Chọn MAL hoặc Kitsu để hiển thị mỗi mùa dưới dạng một mục riêng, thay vì gộp chúng theo một IMDb ID.</string>
+    <string name="tracking_simkl_anime_id_subtitle">Kiểm soát cách nhận diện các mùa anime. Chọn MAL hoặc Kitsu để hiển thị mỗi mùa dưới dạng một mục riêng thay vì gộp chúng theo một IMDb ID.</string>
     <string name="tracking_simkl_anime_id_imdb">Ưu tiên IMDb</string>
     <string name="tracking_simkl_anime_id_mal">Ưu tiên MyAnimeList</string>
     <string name="tracking_simkl_anime_id_kitsu">Ưu tiên Kitsu</string>
@@ -546,7 +546,7 @@ Ví dụ: US, GB.</string>
     <string name="advanced_section_cache">Bộ nhớ đệm</string>
     <string name="advanced_section_dv_diagnostics" translatable="false">DV Diagnostics</string>
     <string name="advanced_fast_horizontal_navigation">Điều hướng ngang nhanh</string>
-    <string name="advanced_fast_horizontal_navigation_subtitle">Tăng tốc độ lặp của D-pad trong các hàng nhưng vẫn bật tính năng giới hạn tốc độ lặp.</string>
+    <string name="advanced_fast_horizontal_navigation_subtitle">Tăng tốc độ lặp của phím điều hướng trong các hàng nhưng vẫn bật tính năng giới hạn tốc độ lặp.</string>
     <string name="advanced_nuvio_performance_mode">Bộ nhớ Tầng thấp ExoPlayer</string>
     <string name="advanced_nuvio_performance_mode_subtitle">Bật bộ cấp phát hệ thống hiệu năng cao, bộ nhớ ngoài vùng nhớ đống và tối ưu mạng để phát lại mượt hơn</string>
     <string name="buffer_device_ram_info">RAM thiết bị: %s</string>
@@ -561,7 +561,7 @@ Ví dụ: US, GB.</string>
     <string name="advanced_compose_highlighter">Bộ tô sáng Compose</string>
     <string name="advanced_compose_highlighter_subtitle">Nhấp nháy viền quanh các thành phần giao diện đang được tái cấu trúc để gỡ lỗi hiệu năng.</string>
     <string name="advanced_clear_cw_cache">Xoá bộ nhớ đệm Tiếp tục xem</string>
-    <string name="advanced_clear_cw_cache_subtitle">Xoá hình thu nhỏ, tiêu đề và dữ liệu bổ sung đã lưu trong bộ nhớ đệm của mục Tiếp tục xem.</string>
+    <string name="advanced_clear_cw_cache_subtitle">Xoá ảnh thu nhỏ, tiêu đề và dữ liệu bổ sung đã lưu trong bộ nhớ đệm của mục Tiếp tục xem.</string>
     <string name="advanced_clear_cw_cache_done">Đã xoá bộ nhớ đệm</string>
     <string name="advanced_remember_last_profile">Nhớ hồ sơ gần nhất</string>
     <string name="advanced_remember_last_profile_subtitle">Nhớ hồ sơ được chọn lần cuối khi khởi động</string>
@@ -579,7 +579,7 @@ Ví dụ: US, GB.</string>
     <string name="settings_tmdb_subtitle">Kiểm soát việc bổ sung siêu dữ liệu</string>
     <string name="settings_mdblist_subtitle">Nhà cung cấp điểm đánh giá bên ngoài</string>
     <string name="settings_animeskip_subtitle">Mốc thời gian bỏ qua phần mở đầu/kết thúc anime</string>
-    <string name="settings_debrid_subtitle">Nguồn tài khoản đám mây trải nghiệm</string>
+    <string name="settings_debrid_subtitle">Nguồn tài khoản đám mây thử nghiệm</string>
 
     <string name="playback_title">Cài đặt phát lại</string>
     <string name="playback_subtitle">Cấu hình trình phát lại video và tuỳ chọn phụ đề</string>
@@ -677,13 +677,13 @@ Ví dụ: US, GB.</string>
     <string name="playback_section_player">Trình phát &amp; Lựa chọn luồng</string>
     <string name="playback_section_player_desc">Tùy chọn trình phát, tự động phát và bộ lọc nguồn.</string>
     <string name="playback_player">Trình phát</string>
-    <string name="playback_player_internal">Tích hợp sẵn</string>
+    <string name="playback_player_internal">Bên trong</string>
     <string name="playback_player_external">Bên ngoài</string>
     <string name="playback_player_ask">Luôn hỏi</string>
-    <string name="playback_internal_player_engine">Trình phát tích hợp sẵn</string>
+    <string name="playback_internal_player_engine">Lõi trình phát bên trong</string>
     <string name="playback_engine_exoplayer">ExoPlayer</string>
     <string name="playback_engine_mvplayer">Libmpv (Beta)</string>
-    <string name="playback_auto_switch_internal_player_on_error">Tự động chuyển trình phát khi khởi động bị lỗi</string>
+    <string name="playback_auto_switch_internal_player_on_error">Tự động chuyển lõi trình phát khi khởi động bị lỗi</string>
     <string name="playback_auto_switch_internal_player_on_error_sub">Nếu khởi động luồng phát thất bại, tự động chuyển đổi giữa ExoPlayer và libmpv.</string>
     <string name="playback_external_forward_subtitles">Chuyển phụ đề sang trình phát bên ngoài</string>
     <string name="playback_external_forward_subtitles_sub">Tải phụ đề bằng ngôn ngữ ưu tiên từ các tiện ích rồi chuyển sang trình phát bên ngoài.</string>
@@ -736,17 +736,17 @@ Ví dụ: US, GB.</string>
     <string name="audio_advanced_section">Âm thanh nâng cao</string>
     <string name="audio_advanced_warning">Các cài đặt này có thể gây sự cố trên một số thiết bị. Chỉ thay đổi nếu bạn hiểu rõ bạn đang làm gì.</string>
     <string name="audio_number_of_channels">Số lượng kênh</string>
-    <string name="audio_number_of_channels_desc">Thiết lập bố trí loa được sử dụng để gộp kênh âm thanh bằng FFmpeg.</string>
+    <string name="audio_number_of_channels_desc">Thiết lập bố trí loa được sử dụng để hạ kênh âm thanh bằng FFmpeg.</string>
     <string name="audio_decoder_device_only">Chỉ dùng bộ giải mã thiết bị</string>
     <string name="audio_decoder_prefer_device">Ưu tiên bộ giải mã thiết bị</string>
     <string name="audio_decoder_prefer_app">Ưu tiên bộ giải mã ứng dụng (FFmpeg)</string>
     <string name="audio_decoder_priority">Thứ tự ưu tiên bộ giải mã</string>
-    <string name="audio_enable_downmix_title">Bật tính năng gộp kênh âm thanh</string>
-    <string name="audio_enable_downmix_subtitle">Sử dụng đường gộp kênh âm thanh của FFmpeg. Yêu cầu bật Ưu tiên bộ giải mã ứng dụng (FFmpeg). Khi tắt, âm thanh sẽ sử dụng lại đường xử lý trước đây của Android/thiết bị.</string>
+    <string name="audio_enable_downmix_title">Bật tính năng hạ kênh âm thanh</string>
+    <string name="audio_enable_downmix_subtitle">Sử dụng đường dẫn hạ kênh âm thanh của FFmpeg. Yêu cầu bật Ưu tiên bộ giải mã ứng dụng (FFmpeg). Khi tắt, âm thanh sẽ sử dụng lại đường dẫn xử lý trước đây của Android/thiết bị.</string>
     <string name="audio_tunneled">Phát trực tiếp qua phần cứng</string>
     <string name="audio_tunneled_sub">Đồng bộ âm thanh/video ở cấp phần cứng. Có thể cải thiện việc phát lại trên một số thiết bị Android TV</string>
     <string name="audio_force_optical_passthrough">Buộc chuyển mã AC-3 (Cổng quang/SPDIF)</string>
-    <string name="audio_force_optical_passthrough_sub">Chuyển mã các định dạng đa kênh (TrueHD, DTS, AAC, v.v.) sang Dolby Digital 5.1 theo thời gian thực cho kết nối Cổng quang/SPDIF.</string>
+    <string name="audio_force_optical_passthrough_sub">Chuyển mã các định dạng đa kênh (TrueHD, DTS, AAC...) sang Dolby Digital 5.1 theo thời gian thực cho kết nối Cổng quang/SPDIF.</string>
     <!-- DV7 Handling Mode -->
     <string name="dv7_handling_title">Xử lý Dolby Vision</string>
     <string name="dv7_handling_dialog_subtitle">Chọn cách xử lý luồng DV khi phát</string>
@@ -766,20 +766,20 @@ Ví dụ: US, GB.</string>
     <string name="audio_strip_hdr10plus_sub">Loại bỏ siêu dữ liệu động HDR10+ khỏi các luồng. Khi Chuyển đổi sang DV8.1 được bật, việc loại bỏ sẽ được thực hiện sau khi chuyển đổi.</string>
     <string name="audio_dv7_preserve_mapping_title">Giữ nguyên dữ liệu ánh xạ DV (DV7 sang DV8.1)</string>
     <string name="audio_dv7_preserve_mapping_sub">Giữ nguyên cách ánh xạ tông màu theo chủ ý ban đầu của nhà sáng tạo nhưng cần xử lý nhiều hơn một chút cho mỗi khung hình.</string>
-    <string name="dv7_libdovi_mode_caption" translatable="false">Conversion mode (auto-selected, do not change unless instructed). Pick one to force it; None uses auto. Active only when DV7 Handling is Convert to DV8.1.</string>
-    <string name="dv7_libdovi_mode_row_title" translatable="false">Conversion mode</string>
-    <string name="dv7_libdovi_mode_none_title" translatable="false">None</string>
-    <string name="dv7_libdovi_mode_none_sub" translatable="false">No override. Uses the automatically selected conversion mode.</string>
-    <string name="dv7_libdovi_mode_0_title" translatable="false">Mode 0 — Copy (no convert)</string>
-    <string name="dv7_libdovi_mode_0_sub" translatable="false">Parse the RPU and write it back untouched. No profile conversion.</string>
-    <string name="dv7_libdovi_mode_1_title" translatable="false">Mode 1 — MEL</string>
-    <string name="dv7_libdovi_mode_1_sub" translatable="false">Convert the RPU to be MEL (Minimum Enhancement Layer) compatible.</string>
-    <string name="dv7_libdovi_mode_2_title" translatable="false">Mode 2 — 8.1 (no-op mapping)</string>
-    <string name="dv7_libdovi_mode_2_sub" translatable="false">Convert to profile 8.1 with luma and chroma mapping set to no-op. The standard conversion.</string>
-    <string name="dv7_libdovi_mode_3_title" translatable="false">Mode 3 — Profile 5 to 8.1</string>
-    <string name="dv7_libdovi_mode_3_sub" translatable="false">Convert Profile 5 (DV5) streams to Profile 8.1. Same conversion the Convert DV5 to DV8.1 toggle uses.</string>
-    <string name="dv7_libdovi_mode_4_title" translatable="false">Mode 4 — 8.4 (static)</string>
-    <string name="dv7_libdovi_mode_4_sub" translatable="false">Convert to static profile 8.4.</string>
+    <string name="dv7_libdovi_mode_caption" translatable="false">Chế độ chuyển đổi (tự động chọn, không thay đổi trừ khi được hướng dẫn). Chọn một chế độ để buộc sử dụng; Không có dùng chế độ tự động. Chỉ hoạt động khi Xử lý DV7 là Chuyển đổi sang DV8.1.</string>
+    <string name="dv7_libdovi_mode_row_title" translatable="false">Chế độ chuyển đổi</string>
+    <string name="dv7_libdovi_mode_none_title" translatable="false">Không có</string>
+    <string name="dv7_libdovi_mode_none_sub" translatable="false">Không ghi đè. Sử dụng chế độ chuyển đổi được lựa chọn tự động.</string>
+    <string name="dv7_libdovi_mode_0_title" translatable="false">Chế độ 0 — Sao chép (không chuyển đổi)</string>
+    <string name="dv7_libdovi_mode_0_sub" translatable="false">Phân tích RPU rồi ghi lại nguyên trạng. Không chuyển đổi cấu hình.</string>
+    <string name="dv7_libdovi_mode_1_title" translatable="false">Chế độ 1 — MEL</string>
+    <string name="dv7_libdovi_mode_1_sub" translatable="false">Chuyển đổi RPU để tương thích với MEL (Lớp nâng cao tối thiểu).</string>
+    <string name="dv7_libdovi_mode_2_title" translatable="false">Chế độ 2 — 8.1 (ánh xạ bỏ qua)</string>
+    <string name="dv7_libdovi_mode_2_sub" translatable="false">Chuyển đổi sang cấu hình 8.1 với ánh xạ độ sáng và sắc độ được đặt ở chế độ không thao tác. Đây là chuyển đổi tiêu chuẩn.</string>
+    <string name="dv7_libdovi_mode_3_title" translatable="false">Chế độ 3 — Profile 5 sang 8.1</string>
+    <string name="dv7_libdovi_mode_3_sub" translatable="false">Chuyển đổi luồng Profile 5 (DV5) sang Profile 8.1. Tương tự như khi bật Chuyển đổi DV5 sang DV8.1.</string>
+    <string name="dv7_libdovi_mode_4_title" translatable="false">Chế độ 4 — 8.4 (tĩnh)</string>
+    <string name="dv7_libdovi_mode_4_sub" translatable="false">Chuyển đổi sang Profile 8.4 tĩnh.</string>
     <string name="audio_mpv_hwdec_title">Giải mã phần cứng (chỉ cho MPV))</string>
     <string name="audio_mpv_hwdec_dialog_subtitle">Chọn cách libmpv sử dụng bộ giải mã phần cứng.</string>
     <string name="audio_mpv_hwdec_legacy_direct_copy">Tương thích cũ (trực tiếp -&gt; sao chép)</string>
@@ -889,7 +889,7 @@ Ví dụ: US, GB.</string>
     <string name="autoplay_threshold_pct_desc">Hiển thị theo phần trăm thời lượng phát khi không có mốc thời gian đoạn kết.</string>
     <string name="autoplay_threshold_min_desc">Hiển thị trước khi tập phim kết thúc bao nhiêu phút khi không có mốc thời gian đoạn kết.</string>
     <string name="autoplay_regex_matches">Khớp với tên/tiêu đề/mô tả/tiện ích/url luồng. Ví dụ: 4K|2160p|Remux</string>
-    <string name="autoplay_regex_presets">Thiết lập sẵn</string>
+    <string name="autoplay_regex_presets">Mẫu có sẵn</string>
     <string name="autoplay_invalid_regex">Mẫu biểu thức chính quy không hợp lệ</string>
 
     <string name="layout_title">Cài đặt bố cục</string>
@@ -954,12 +954,20 @@ Ví dụ: US, GB.</string>
     <string name="layout_section_continue_watching_desc">Cài đặt cho mục Tiếp tục xem</string>
     <string name="layout_cw_enabled">Hiển thị mục Tiếp tục xem</string>
     <string name="layout_cw_enabled_sub">Hiển thị hàng Tiếp tục xem trên màn hình chính.</string>
-    <string name="layout_use_episode_thumbnails_cw">Dùng hình thu nhỏ của tập trong Tiếp tục xem.</string>
-    <string name="layout_use_episode_thumbnails_cw_sub">Dùng hình thu nhỏ của tập làm hình ảnh mặc định. Khi tắt, sẽ dùng phông nền.</string>
+    <string name="layout_use_episode_thumbnails_cw">Dùng ảnh thu nhỏ của tập trong Tiếp tục xem.</string>
+    <string name="layout_use_episode_thumbnails_cw_sub">Dùng ảnh thu nhỏ của tập làm hình ảnh mặc định. Khi tắt, sẽ dùng phông nền.</string>
     <string name="layout_blur_unwatched">Làm mờ tập chưa xem.</string>
     <string name="layout_blur_unwatched_sub">Làm mờ ảnh thu nhỏ các tập chưa xem để tránh tiết lộ nội dung.</string>
+    <string name="layout_episode_options_overlay">Lớp phủ tùy chọn tập phim</string>
+    <string name="layout_episode_options_overlay_sub">Chọn giao diện hiển thị khi nhấn giữ một tập phim.</string>
+    <string name="layout_episode_options_overlay_none">Không có</string>
+    <string name="layout_episode_options_overlay_none_desc">Sử dụng hiệu ứng chuyển màu toàn màn hình mà không có ảnh bìa tập phim.</string>
+    <string name="layout_episode_options_overlay_artwork">Ảnh bìa</string>
+    <string name="layout_episode_options_overlay_artwork_desc">Sử dụng bố cục toàn màn hình với ảnh bìa tập phim.</string>
+    <string name="layout_episode_options_overlay_blur">Làm mờ</string>
+    <string name="layout_episode_options_overlay_blur_desc">Sử dụng bố cục toàn màn hình với ảnh bìa tập phim được làm mờ.</string>
     <string name="layout_blur_cw_next_up">Làm mờ chưa xem trong Tiếp tục xem</string>
-    <string name="layout_blur_cw_next_up_sub">Làm mờ hình thu nhỏ tập tiếp theo trong Tiếp tục xem để tránh tiết lộ nội dung.</string>
+    <string name="layout_blur_cw_next_up_sub">Làm mờ ảnh thu nhỏ tập tiếp theo trong Tiếp tục xem để tránh tiết lộ nội dung.</string>
     <string name="layout_next_up_furthest_episode">Tiếp theo từ tập xa nhất</string>
     <string name="layout_next_up_furthest_episode_sub">Hiển thị tập tiếp theo dựa trên tập xa nhất đã xem. Tắt khi xem lại để dùng tập vừa xem gần nhất.</string>
     <string name="layout_show_unaired_next_up">Hiển thị tập tiếp theo chưa phát sóng</string>
@@ -1086,7 +1094,7 @@ Ví dụ: US, GB.</string>
     <string name="debrid_enable_subtitle">Yêu cầu dịch vụ liên kết cung cấp các liên kết phát được khi kết quả tìm kiếm cần đến. Điều này có thể sẽ thêm mục đó vào dịch vụ.</string>
     <string name="debrid_resolve_with">Phân giải bằng</string>
     <string name="debrid_resolve_with_description">Chọn tài khoản đã liên kết để xử lý liên kết phát được.</string>
-    <string name="debrid_add_key_first">Kết nối tài khoản trước</string>
+    <string name="debrid_add_key_first">Vui lòng kết nối tài khoản trước.</string>
     <string name="debrid_section_account">Tài khoản</string>
     <string name="debrid_section_instant_playback">Chuẩn bị liên kết</string>
     <string name="debrid_section_filters">Bộ lọc &amp; Sắp xếp</string>
@@ -1098,7 +1106,7 @@ Ví dụ: US, GB.</string>
     <string name="debrid_api_key_title">Torbox</string>
     <string name="debrid_api_key_subtitle">Kết nối tài khoản TorBox của bạn.</string>
     <string name="debrid_provider_description">Kết nối tài khoản %1$s của bạn</string>
-    <string name="debrid_provider_device_description">LLiên kết tài khoản %1$s của bạn trong trình duyệt.</string>
+    <string name="debrid_provider_device_description">Liên kết tài khoản %1$s của bạn trong trình duyệt.</string>
     <string name="debrid_api_key_dialog_title">Mã khóa API %1$s</string>
     <string name="debrid_api_key_dialog_subtitle">Nhập mã khóa API %1$s của bạn</string>
     <string name="debrid_api_key_dialog_placeholder">Nhập mã khóa API %1$s</string>
@@ -1241,15 +1249,15 @@ Ví dụ: US, GB.</string>
 
     <!-- Anime-Skip -->
     <string name="animeskip_title">Anime Skip</string>
-    <string name="animeskip_subtitle">Cấu hình Client ID Anime Skip để bỏ qua phần mở đầu/đoạn kết anime</string>
+    <string name="animeskip_subtitle">Cấu hình ID máy khách Anime Skip để bỏ qua phần mở đầu/đoạn kết anime</string>
     <string name="animeskip_enable_title">Bật Anime Skip</string>
     <string name="animeskip_enable_subtitle">Lấy mốc thời gian bỏ qua từ anime-skip.com</string>
-    <string name="animeskip_client_id_title">Client ID</string>
+    <string name="animeskip_client_id_title">ID máy khách</string>
     <string name="animeskip_client_id_subtitle">Cần thiết để lấy mốc thời gian từ anime-skip.com</string>
-    <string name="animeskip_dialog_title">Client ID Anime Skip</string>
-    <string name="animeskip_dialog_subtitle">Tạo Client ID tại anime-skip.com/account/settings</string>
-    <string name="animeskip_dialog_placeholder">Nhập Client ID</string>
-    <string name="animeskip_invalid_client_id">Client ID không hợp lệ</string>
+    <string name="animeskip_dialog_title">ID máy khách Anime Skip</string>
+    <string name="animeskip_dialog_subtitle">Tạo ID máy khách tại anime-skip.com/account/settings</string>
+    <string name="animeskip_dialog_placeholder">Nhập ID máy khách</string>
+    <string name="animeskip_invalid_client_id">ID máy khách không hợp lệ</string>
     <string name="action_clear">Xoá</string>
 
     <string name="tmdb_title">Bổ sung dữ liệu TMDB</string>
@@ -1436,7 +1444,7 @@ Ví dụ: US, GB.</string>
     <string name="profile_background_normal">Mặc định</string>
     <string name="profile_background_custom">Tùy chỉnh</string>
     <string name="profile_avatar_none_selected">Chưa chọn ảnh đại diện</string>
-    <string name="profile_avatar_focus_hint">Chọnảnh đại diện để xem tên</string>
+    <string name="profile_avatar_focus_hint">Chọn ảnh đại diện để xem tên</string>
     <string name="profile_avatar_category_all">Tất cả</string>
     <string name="profile_avatar_category_supporter">Người tài trợ</string>
     <string name="profile_avatar_category_anime">Anime</string>
@@ -1540,7 +1548,7 @@ Ví dụ: US, GB.</string>
     <string name="catalog_order_title">Sắp xếp lại danh mục Trang chủ</string>
     <string name="catalog_order_subtitle">Kiểm soát thứ tự hàng danh mục trên Trang chủ (Cổ điển + Hiện đại + Lưới).</string>
     <string name="catalog_order_follow_addons">Theo thứ tự của các tiện ích</string>
-    <string name="catalog_order_follow_addons_desc">Danh mục tuân theo thứ tự bản kê khai của tiện ích. Bộ sưu tập vẫn có thể di chuyển được giữa các tiện ích.</string>
+    <string name="catalog_order_follow_addons_desc">Danh mục tuân theo thứ tự bản khai của tiện ích. Bộ sưu tập vẫn có thể di chuyển được giữa các tiện ích.</string>
     <string name="catalog_order_empty">Chưa có danh mục Trang chủ nào.</string>
     <string name="catalog_order_disabled_on_home">Đã tắt trên Trang chủ</string>
     <string name="catalog_order_enable">Bật</string>
@@ -1563,14 +1571,14 @@ Ví dụ: US, GB.</string>
     <string name="p2p_consent_enable">Bật P2P</string>
     <string name="p2p_consent_cancel">Hủy</string>
     <string name="settings_p2p_title">Phát luồng P2P</string>
-    <string name="settings_p2p_subtitle">Cho phép phát trực tuyến ngang hàng(torrent)</string>
+    <string name="settings_p2p_subtitle">Cho phép phát trực tuyến ngang hàng (torrent)</string>
     <string name="settings_p2p_hide_stats_title">Ẩn thống kê torrent</string>
-    <string name="settings_p2p_hide_stats_subtitle">Ẩn bộ đệm, số lượng seed, peer và tốc độ tải trong khi tải và phát lại</string>
-    <string name="p2p_download_title">Đang tải xuống công cụ P2P</string>
+    <string name="settings_p2p_hide_stats_subtitle">Ẩn bộ đệm, số lượng seed, peer và tốc độ tải xuống trong khi tải và phát lại</string>
+    <string name="p2p_download_title">Đang tải xuống lõi P2P</string>
     <string name="p2p_download_subtitle">Đây là tải xuống một lần, cần thiết để phát luồng P2P.</string>
     <string name="stream_type_external">Bên ngoài</string>
     <string name="stream_player_picker_title">Dùng trình phát nào?</string>
-    <string name="stream_player_internal">Tích hợp sẵn</string>
+    <string name="stream_player_internal">Bên trong</string>
     <string name="stream_player_external">Bên ngoài</string>
     <string name="stream_filter_all">Tất cả</string>
     <string name="stream_episode_label">M%1$d T%2$d</string>
@@ -1588,7 +1596,7 @@ Ví dụ: US, GB.</string>
     <string name="player_loading_buffering">Đang tải bộ đệm…</string>
     <string name="player_loading_fallback_pcm_audio">Khởi tạo dải âm thanh thất bại – đang chuyển sang âm thanh PCM…</string>
     <string name="player_loading_fallback_hevc_decoder">Không thể khởi tạo bộ giải mã – đang chuyển sang bộ giải mã HEVC…</string>
-    <string name="player_engine_switching_title">Đang chuyển đổi công cụ trình phát</string>
+    <string name="player_engine_switching_title">Đang chuyển lõi trình phát</string>
     <string name="player_engine_switching_message">Không thể khởi động. Đang chuyển sang %1$s…</string>
     <string name="player_engine_switching_manual_message">Đang chuyển sang %1$s...</string>
     <string name="playback_show_loading_status">Hiển thị trạng thái tải</string>
@@ -1615,6 +1623,7 @@ Ví dụ: US, GB.</string>
     <string name="parental_severity_moderate">Vừa phải</string>
     <string name="parental_severity_mild">Nhẹ</string>
     <string name="player_ends_at">Kết thúc lúc %1$s</string>
+    <string name="player_live_watched">TRỰC TIẾP  %1$s</string>
     <string name="player_via">qua %1$s</string>
     <!-- Season/episode code shown in player UI (e.g. S01E02). %1$d = season, %2$d = episode. -->
     <string name="season_episode_format">M%1$d T%2$d</string>
@@ -1658,7 +1667,7 @@ Ví dụ: US, GB.</string>
     <string name="stream_info_source">Nguồn</string>
     <string name="stream_info_subtitle_source_addon">Tiện ích</string>
     <string name="stream_info_subtitle_source_embedded">Nhúng</string>
-    <string name="stream_info_player_engine">Trình phát lõi</string>
+    <string name="stream_info_player_engine">Lõi trình phát</string>
 
     <string name="sources_title">Nguồn</string>
     <string name="sources_reload">Tải lại</string>
@@ -1670,7 +1679,7 @@ Ví dụ: US, GB.</string>
     <string name="episodes_panel_back">Quay lại</string>
     <string name="episodes_panel_reload">Tải lại</string>
     <string name="episodes_panel_no_streams">Không tìm thấy luồng</string>
-    <string name="episodes_panel_no_episodes">Không có tập phim nào</string>
+    <string name="episodes_panel_no_episodes">Không có tập nào</string>
     <string name="episodes_panel_title">Tập phim</string>
     <string name="episodes_panel_streams_title">Luồng</string>
     <string name="player_speed_normal">Bình thường</string>
@@ -1695,12 +1704,12 @@ Ví dụ: US, GB.</string>
     <string name="audio_mix_range">Khoảng: %1$d dB đến %2$d dB</string>
     <string name="audio_mix_range_saved">Khoảng: %1$d dB đến %2$d dB (đã lưu)</string>
     <string name="audio_mix_unavailable">Khuếch đại không có sẵn trên thiết bị này</string>
-    <string name="audio_center_mix_label">Gộp kênh: Mức trộn kênh trung tâm</string>
+    <string name="audio_center_mix_label">Hạ kênh: Mức trộn kênh trung tâm</string>
     <string name="audio_center_mix_value_db">%1$d dB</string>
     <string name="audio_center_mix_help">Mức trộn kênh trung tâm tính bằng dB theo siêu dữ liệu hoặc mặc định (-3 dB)</string>
-    <string name="audio_center_mix_unavailable">Trộn kênh trung tâm chỉ khả dụng khi bật gộp kênh bằng FFmpeg.</string>
-    <string name="audio_maintain_original_audio_on_downmix_title">Giữ nguyên âm lượng gốc khi gộp kênh</string>
-    <string name="audio_maintain_original_audio_on_downmix_subtitle">Khi tắt, chuẩn hóa khi gộp kênh có thể làm giảm âm lượng tổng thể.</string>
+    <string name="audio_center_mix_unavailable">Trộn kênh trung tâm chỉ khả dụng khi bật hạ kênh âm thanh bằng FFmpeg.</string>
+    <string name="audio_maintain_original_audio_on_downmix_title">Giữ nguyên âm lượng gốc khi hạ kênh âm thanh</string>
+    <string name="audio_maintain_original_audio_on_downmix_subtitle">Khi tắt, chuẩn hóa khi hạ kênh âm thanh có thể làm giảm âm lượng tổng thể.</string>
 
     <string name="subtitle_dialog_title">Phụ đề</string>
     <string name="subtitle_no_builtin">Không có phụ đề tích hợp</string>
@@ -1828,6 +1837,21 @@ Ví dụ: US, GB.</string>
     <string name="genre_soap">Dài tập</string>
     <string name="genre_talk">Đối thoại</string>
     <string name="genre_war_politics">Chiến tranh &amp; Chính trị</string>
+    <string name="genre_anime">Anime</string>
+    <string name="genre_biography">Tiểu sử</string>
+    <string name="genre_children">Trẻ em</string>
+    <string name="genre_donghua">Hoạt hình Trung Quốc</string>
+    <string name="genre_game_show">Trò chơi truyền hình</string>
+    <string name="genre_holiday">Lễ hội</string>
+    <string name="genre_home_and_garden">Nhà cửa và Sân vườn</string>
+    <string name="genre_mini_series">Loạt phim ngắn</string>
+    <string name="genre_musical">Ca nhạc</string>
+    <string name="genre_none">Không có</string>
+    <string name="genre_short">Ngắn</string>
+    <string name="genre_special_interest">Sở thích đặc biệt</string>
+    <string name="genre_sporting_event">Sự kiện thể thao</string>
+    <string name="genre_superhero">Siêu anh hùng</string>
+    <string name="genre_suspense">Giật gân</string>
     <string name="library_sort_trakt_order">Thứ tự Trakt</string>
     <string name="library_sort_provider_order">Thứ tự nhà cung cấp</string>
     <string name="library_sort_added_desc">Đã thêm ↓</string>
@@ -1867,11 +1891,11 @@ Ví dụ: US, GB.</string>
     <string name="library_empty_local_title">Chưa có %1$s</string>
     <string name="library_empty_trakt_title">Chưa có %1$s trong danh sách này</string>
     <string name="library_empty_local_subtitle">Bắt đầu lưu mục yêu thích để xem ở đây</string>
-    <string name="library_empty_trakt_subtitle">Dùng + trong chi tiết để thêm vào danh sách theo dõi hoặc danh sách</string>
+    <string name="library_empty_trakt_subtitle">Sử dụng + trong chi tiết để thêm vào danh sách theo dõi hoặc danh sách</string>
     <string name="library_empty_trakt_not_auth_title">Trakt chưa được kết nối</string>
     <string name="library_empty_trakt_not_auth_subtitle">Kết nối tài khoản Trakt trong Cài đặt để xem thư viện Trakt của bạn</string>
     <string name="library_empty_simkl_title">Không có %1$s trong trạng thái này</string>
-    <string name="library_empty_simkl_subtitle">Nhấn + trong chi tiết để thêm mục vào trạng thái Simkl</string>
+    <string name="library_empty_simkl_subtitle">Sử dụng + trong chi tiết để thêm mục vào trạng thái Simkl</string>
     <string name="library_empty_simkl_not_auth_title">Simkl chưa được kết nối</string>
     <string name="library_empty_simkl_not_auth_subtitle">Kết nối tài khoản Simkl trong Cài đặt để xem thư viện Simkl của bạn</string>
     <string name="library_list_create_dialog_title">Tạo danh sách</string>
@@ -2028,7 +2052,7 @@ Ví dụ: US, GB.</string>
     <string name="sync_claim_linking">Đang liên kết\u2026</string>
 
     <string name="plugin_readonly_notice">Đang dùng trình mở rộng của hồ sơ chính và không thể thay đổi</string>
-    <string name="plugin_repositories_section">Kho lưu trữ trình mở rộng (%1$d)</string>
+    <string name="plugin_repositories_section">Kho lưu trữ (%1$d)</string>
     <string name="plugin_providers_section">Nhà cung cấp (%1$d)</string>
     <string name="plugin_title">Trình mở rộng</string>
     <string name="plugin_subtitle">Quản lý các trình thu thập dữ liệu và nhà cung cấp nguồn cục bộ</string>
@@ -2036,13 +2060,13 @@ Ví dụ: US, GB.</string>
     <string name="plugin_enable_plugins_subtitle">Sử dụng các trình mở rộng nhà cung cấp trong quá trình tìm kiếm luồng phát</string>
     <string name="plugin_group_by_repository_title">Nhóm các nhà cung cấp theo kho lưu trữ</string>
     <string name="plugin_group_by_repository_subtitle">Trong danh sách nguồn phát, hiển thị một nhà cung cấp cho mỗi kho lưu trữ thay vì từng nguồn</string>
-    <string name="plugin_add_repository">Thêm kho lưu trữ trình mở rộng</string>
+    <string name="plugin_add_repository">Thêm kho lưu trữ</string>
     <string name="plugin_add_btn">Thêm</string>
     <string name="plugin_manage_from_phone_title">Quản lý từ điện thoại</string>
-    <string name="plugin_manage_from_phone_subtitle">Quét mã QR để thêm hoặc xoá kho lưu trữ trình mở rộng từ điện thoại</string>
-    <string name="plugin_qr_instruction">Quét bằng điện thoại để quản lý kho lưu trữ trình mở rộng</string>
+    <string name="plugin_manage_from_phone_subtitle">Quét mã QR để thêm hoặc xoá kho lưu trữ từ điện thoại</string>
+    <string name="plugin_qr_instruction">Quét bằng điện thoại để quản lý kho lưu trữ</string>
     <string name="plugin_qr_close">Đóng</string>
-    <string name="plugin_confirm_title">Xác nhận thay đổi kho lưu trữ trình mở rộng</string>
+    <string name="plugin_confirm_title">Xác nhận thay đổi kho lưu trữ</string>
     <string name="plugin_confirm_subtitle">Những thay đổi sau đây được thực hiện từ điện thoại của bạn:</string>
     <string name="plugin_confirm_added">Đã thêm:</string>
     <string name="plugin_confirm_removed">Đã xoá:</string>
@@ -2064,7 +2088,7 @@ Ví dụ: US, GB.</string>
     <string name="plugin_providers_count">%1$d nhà cung cấp</string>
     <string name="plugin_enabled">Đã bật</string>
     <string name="plugin_disabled">Đã tắt</string>
-    <string name="plugin_no_repos">Chưa thêm kho lưu trữ trình mở rộng nào.\nThêm kho lưu trữ trình mở rộng để bắt đầu.</string>
+    <string name="plugin_no_repos">Chưa thêm kho lưu trữ nào.\nThêm kho lưu trữ để bắt đầu.</string>
     <string name="plugin_error_invalid_url">Vui lòng nhập URL hợp lệ</string>
     <string name="plugin_error_add_repo">Không thể thêm kho lưu trữ: %1$s</string>
     <string name="plugin_error_refresh">Không thể làm mới: %1$s</string>
@@ -2075,7 +2099,7 @@ Ví dụ: US, GB.</string>
 
     <string name="profile_selection_title">Ai đang xem?</string>
     <string name="profile_selection_subtitle">Chọn hồ sơ để tiếp tục</string>
-    <string name="profile_selection_hint">Dùng D-pad để chọn hồ sơ</string>
+    <string name="profile_selection_hint">Sử dụng phím điều hướng để chọn hồ sơ</string>
     <string name="profile_selection_empty">Không tìm thấy hồ sơ</string>
     <string name="profile_selection_primary_badge">CHÍNH</string>
     <string name="profile_selection_options_title">Tùy chọn hồ sơ</string>
@@ -2147,7 +2171,7 @@ Ví dụ: US, GB.</string>
     <string name="profile_edit_title_id">Chỉnh sửa hồ sơ %1$d</string>
 
     <!-- PlaybackAudioSettings -->
-    <string name="audio_passthrough_info">Truyền tải âm thanh trực tiếp (TrueHD, DTS, AC-3, v.v.) được tự động bật. Khi kết nối với bộ thu AV hoặc loa soundbar tương thích qua HDMI, âm thanh không nén sẽ được truyền nguyên dạng mà không cần qua giải mã.</string>
+    <string name="audio_passthrough_info">Truyền tải âm thanh trực tiếp (TrueHD, DTS, AC-3...) được tự động bật. Khi kết nối với bộ thu AV hoặc loa soundbar tương thích qua HDMI, âm thanh không nén sẽ được truyền nguyên dạng mà không cần qua giải mã.</string>
     <string name="audio_dv_title">DV7 → HEVC</string>
     <string name="audio_dv_sub">Ánh xạ Dolby Vision Profile 7 sang HEVC tiêu chuẩn cho các thiết bị không có phần cứng hỗ trợ Dolby Vision</string>
 
@@ -2255,7 +2279,7 @@ Ví dụ: US, GB.</string>
     <string name="cd_subtitles">Phụ đề</string>
     <string name="cd_audio_tracks">Âm thanh</string>
     <string name="cd_sources">Nguồn</string>
-    <string name="cd_switch_player_engine">Chuyển đổi trình phát</string>
+    <string name="cd_switch_player_engine">Chuyển lõi trình phát</string>
     <string name="cd_episodes">Tập phim</string>
     <string name="cd_playback_speed">Tốc độ phát lại</string>
     <string name="cd_aspect_ratio">Tỷ lệ khung hình</string>
@@ -2799,7 +2823,7 @@ Ví dụ: US, GB.</string>
     <string name="torrent_error_start_timeout">TorrServer đã không thể khởi động trong vòng %1$d giây</string>
 
     <!-- Player runtime: stream / external link errors -->
-    <string name="player_torrent_starting_engine">Đang khởi động bộ máy P2P…</string>
+    <string name="player_torrent_starting_engine">Đang khởi động lõi P2P…</string>
     <string name="player_torrent_rebuffer_status">Đã đệm %1$s</string>
     <string name="player_stream_error_invalid_external_url">URL bên ngoài không hợp lệ</string>
     <string name="player_stream_error_open_external_link_failed">Không thể mở liên kết bên ngoài</string>

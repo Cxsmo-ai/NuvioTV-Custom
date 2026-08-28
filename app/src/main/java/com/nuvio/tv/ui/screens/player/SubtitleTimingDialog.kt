@@ -308,7 +308,7 @@ private fun CueSelectionPanel(
         ) {
             itemsIndexed(
                 items = cues,
-                key = { _, cue -> "${cue.startTimeMs}:${cue.text.hashCode()}" }
+                key = { index, cue -> subtitleCueListItemKey(index, cue) }
             ) { index, cue ->
                 CueRow(
                     cue = cue,
@@ -403,7 +403,11 @@ private fun sanitizeCuePreviewText(text: String): String {
     return if (cleaned.isNotBlank()) cleaned else text.trim()
 }
 
-private fun selectAutoSyncVisibleCues(
+internal fun subtitleCueListItemKey(index: Int, cue: SubtitleSyncCue): String {
+    return "$index:${cue.startTimeMs}:${cue.endTimeMs}:${cue.text.hashCode()}"
+}
+
+internal fun selectAutoSyncVisibleCues(
     cues: List<SubtitleSyncCue>,
     anchorTimeMs: Long,
     marginMs: Long = 180_000L,

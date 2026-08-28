@@ -65,13 +65,14 @@ internal fun PlayerRuntimeController.applyMetaDetails(meta: Meta) {
     }
     val description = resolveDescription(meta)
 
+    recomputeNextEpisode(resetVisibility = false)
     _uiState.update { state ->
         state.copy(
             description = description ?: state.description,
-            castMembers = if (meta.castMembers.isNotEmpty()) meta.castMembers else state.castMembers
+            castMembers = if (meta.castMembers.isNotEmpty()) meta.castMembers else state.castMembers,
+            isNextEpisodeMetadataResolved = true
         )
     }
-    recomputeNextEpisode(resetVisibility = false)
 }
 
 internal fun PlayerRuntimeController.resolveDescription(meta: Meta): String? {
@@ -91,9 +92,8 @@ internal fun PlayerRuntimeController.updateEpisodeDescription() {
         video.season == currentSeason && video.episode == currentEpisode
     }?.overview
 
-    if (!overview.isNullOrBlank()) {
-        _uiState.update { it.copy(description = overview) }
-    }
+    // Always update description when switching episodes - clear stale description
+    _uiState.update { it.copy(description = overview) }
 
     // Push episode metadata to the MediaSession so Google Home shows the new episode.
     updateMediaSessionMetadata()
@@ -412,6 +412,7 @@ internal fun PlayerRuntimeController.maybePrefetchNextEpisodeForBinge(
 private const val BINGE_LOOKAHEAD_TRIGGER_MS = 6L * 60L * 1000L
 
 internal fun PlayerRuntimeController.evaluatePostPlayOverlayVisibility(positionMs: Long, durationMs: Long) {
+    if (_playbackTimeline.value.isLive) return
     maybePrefetchNextEpisodeForBinge(positionMs, durationMs)
     if (!hasRenderedFirstFrame) return
     // Short debrid/error clips must never arm next-episode auto-play (see #2819).
@@ -420,7 +421,7 @@ internal fun PlayerRuntimeController.evaluatePostPlayOverlayVisibility(positionM
     if (!_uiState.value.error.isNullOrBlank()) return
 
     val state = _uiState.value
-    if (state.nextEpisode == null || nextEpisodeVideo == null) {
+    if (state.nextEpisode?.hasAired != true || nextEpisodeVideo == null) {
         if (state.postPlayMode != null) {
             _uiState.update { it.copy(postPlayMode = null) }
         }

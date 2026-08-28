@@ -69,7 +69,8 @@ class TrailerService(
         title: String,
         year: String? = null,
         tmdbId: String? = null,
-        type: String? = null
+        type: String? = null,
+        ignoreUseTrailersGate: Boolean = false
     ): TrailerPlaybackSource? = withContext(Dispatchers.IO) {
         // Read both settings once up front. `useTrailers` (the TMDB-enrichment
         // "Disable Trailers" toggle) gates the TMDB->YouTube path only (#1647).
@@ -88,7 +89,9 @@ class TrailerService(
         // Nothing to surface when trailers are disabled AND the user hasn't opted
         // into IMDb: the only remaining source here is the (now-gated) TMDB->YouTube
         // path, so return no trailer. Preserves #1647 for the YouTube case.
-        if (!useTrailers && trailerSource != TrailerSource.IMDB) {
+        // Post-play recommendations bypass this gate because they have no
+        // meta-addon trailer to fall back on.
+        if (!ignoreUseTrailersGate && !useTrailers && trailerSource != TrailerSource.IMDB) {
             Log.d(TAG, "Trailers disabled in TMDB enrichment settings; skipping lookup")
             return@withContext null
         }

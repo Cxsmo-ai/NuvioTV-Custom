@@ -30,6 +30,7 @@ class TmdbEntityBrowseViewModel @Inject constructor(
     private val watchProgressRepository: com.nuvio.tv.domain.repository.WatchProgressRepository,
     private val mdbListWatchedService: com.nuvio.tv.data.repository.MDBListWatchedService,
     private val watchedSeriesStateHolder: com.nuvio.tv.data.local.WatchedSeriesStateHolder,
+    private val layoutPreferenceDataStore: com.nuvio.tv.data.local.LayoutPreferenceDataStore,
     val posterOptions: com.nuvio.tv.ui.components.posteroptions.PosterOptionsController,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -52,6 +53,9 @@ class TmdbEntityBrowseViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<TmdbEntityBrowseUiState>(TmdbEntityBrowseUiState.Loading)
     val uiState: StateFlow<TmdbEntityBrowseUiState> = _uiState.asStateFlow()
+
+    private val _posterCardCornerRadiusDp = MutableStateFlow(12)
+    val posterCardCornerRadiusDp: StateFlow<Int> = _posterCardCornerRadiusDp.asStateFlow()
 
     init {
         posterOptions.bind(viewModelScope)
@@ -76,6 +80,10 @@ class TmdbEntityBrowseViewModel @Inject constructor(
                     for (id in watched) siblings[id]?.let(::addAll)
                 }
             }.collect { ids -> _watchedSeriesIds.value = ids }
+        }
+        viewModelScope.launch {
+            layoutPreferenceDataStore.posterCardCornerRadiusDp
+                .collect { _posterCardCornerRadiusDp.value = it }
         }
     }
 

@@ -366,7 +366,9 @@ private fun TabbedGridContent(
         }
         currentTab.catalogRow != null -> {
             val items = currentTab.catalogRow.items
-            val posterCardStyle = PosterCardDefaults.Style
+            val posterCardStyle = PosterCardDefaults.Style.copy(
+                cornerRadius = uiState.posterCardCornerRadiusDp.dp
+            )
             val itemFocusRequesters = remember(uiState.selectedTabIndex) { mutableMapOf<String, FocusRequester>() }
             var lastFocusedItemKey by remember(
                 uiState.selectedTabIndex,

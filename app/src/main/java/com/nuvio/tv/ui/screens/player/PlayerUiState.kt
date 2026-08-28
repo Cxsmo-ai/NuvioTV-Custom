@@ -178,6 +178,7 @@ data class PlayerUiState(
     val skipIntervalDismissed: Boolean = false,
     // Next episode card
     val nextEpisode: NextEpisodeInfo? = null,
+    val isNextEpisodeMetadataResolved: Boolean = false,
     val postPlayMode: PostPlayMode? = null,
     val postPlayDismissedForCurrentEpisode: Boolean = false,
     val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL,
@@ -231,7 +232,11 @@ data class PlaybackTimelineState(
     val currentPosition: Long = 0L,
     val duration: Long = 0L,
     /** Position (ms) up to which the player has buffered ahead of the playhead. */
-    val bufferedPosition: Long = 0L
+    val bufferedPosition: Long = 0L,
+    /** True for live windows (Live TV / live HLS), not VOD HLS. */
+    val isLive: Boolean = false,
+    /** Wall-clock time spent playing the current live stream. */
+    val watchedDurationMs: Long = 0L
 )
 
 data class TrackInfo(

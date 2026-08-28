@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,6 +57,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -416,7 +417,8 @@ fun SettingsScreen(
                             )
                             Box(
                                 modifier = Modifier
-                                    .offset { IntOffset(pillLeft.roundToInt(), pillTop.roundToInt()) }
+                                    .align(AbsoluteAlignment.TopLeft)
+                                    .absoluteOffset { IntOffset(pillLeft.roundToInt(), pillTop.roundToInt()) }
                                     .size(
                                         width = with(density) { pillWidth.toDp() },
                                         height = with(density) { pillHeight.toDp() }
@@ -575,7 +577,8 @@ fun SettingsScreen(
                             )
                             Box(
                                 modifier = Modifier
-                                    .offset { IntOffset(bounds.left.roundToInt(), pillTop.roundToInt()) }
+                                    .align(AbsoluteAlignment.TopLeft)
+                                    .absoluteOffset { IntOffset(bounds.left.roundToInt(), pillTop.roundToInt()) }
                                     .size(
                                         width = with(density) { bounds.width.toDp() },
                                         height = with(density) { bounds.height.toDp() }

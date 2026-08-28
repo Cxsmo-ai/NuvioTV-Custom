@@ -357,6 +357,8 @@ class MetaDetailsViewModel @Inject constructor(
                 }
             }
     }
+    private val _posterCardCornerRadiusDp = MutableStateFlow(12)
+    val posterCardCornerRadiusDp: StateFlow<Int> = _posterCardCornerRadiusDp.asStateFlow()
 
     private val localizedContext: Context
         get() {
@@ -413,8 +415,13 @@ class MetaDetailsViewModel @Inject constructor(
         observeMovieWatched()
         observeRelatedWatchedStatus()
         observeBlurUnwatchedEpisodes()
+        observeEpisodeOptionsOverlayStyle()
         observeOverallRatingsVisibility()
         observeDetailImdbRatingsVisibility()
+        viewModelScope.launch {
+            layoutPreferenceDataStore.posterCardCornerRadiusDp
+                .collect { _posterCardCornerRadiusDp.value = it }
+        }
         observeShowFullReleaseDate()
         observeHideUnreleasedContent()
         loadMeta()
@@ -832,6 +839,22 @@ class MetaDetailsViewModel @Inject constructor(
                 _uiState.update { state ->
                     if (state.blurUnwatchedEpisodes == enabled) state else state.copy(blurUnwatchedEpisodes = enabled)
                 }
+                }
+        }
+    }
+
+    private fun observeEpisodeOptionsOverlayStyle() {
+        viewModelScope.launch {
+            layoutPreferenceDataStore.episodeOptionsOverlayStyle
+                .distinctUntilChanged()
+                .collectLatest { style ->
+                    _uiState.update { state ->
+                        if (state.episodeOptionsOverlayStyle == style) {
+                            state
+                        } else {
+                            state.copy(episodeOptionsOverlayStyle = style)
+                        }
+                    }
                 }
         }
     }

@@ -78,18 +78,18 @@ fun FocusMarqueeText(
         )
     }
 
-    if (focused) {
-        // basicMarquee scrolls according to LocalLayoutDirection, which reflects the app/UI
-        // locale (e.g. Hebrew -> Rtl) rather than this particular string's script. Override it
-        // per-text so an English title inside a Hebrew/Arabic UI still scrolls left (its own
-        // reading direction) instead of right, and vice versa for an RTL title in an LTR UI.
-        val marqueeDirection = remember(text) {
-            if (text.isRtl()) LayoutDirection.Rtl else LayoutDirection.Ltr
-        }
-        CompositionLocalProvider(LocalLayoutDirection provides marqueeDirection) {
-            marqueeText()
-        }
-    } else {
+    // Text alignment, ellipsis side, and basicMarquee's scroll direction all follow
+    // LocalLayoutDirection, which reflects the app/UI locale (e.g. Hebrew -> Rtl) rather than
+    // this particular string's script. Override it per-text so an English title inside a
+    // Hebrew/Arabic UI always rests and scrolls from the left (its own reading direction)
+    // instead of the right, and vice versa for an RTL title in an LTR UI. This is applied
+    // unconditionally (not just while focused) so the resting/ellipsized state already matches
+    // where the marquee will anchor once focused, and focusing never causes the title to jump
+    // from one side of the card to the other.
+    val textDirection = remember(text) {
+        if (text.isRtl()) LayoutDirection.Rtl else LayoutDirection.Ltr
+    }
+    CompositionLocalProvider(LocalLayoutDirection provides textDirection) {
         marqueeText()
     }
 }
