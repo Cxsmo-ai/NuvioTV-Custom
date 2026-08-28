@@ -15,11 +15,18 @@ import com.nuvio.tv.domain.model.LibraryListTab
 import com.nuvio.tv.domain.model.ListMembershipChanges
 import com.nuvio.tv.domain.model.ListMembershipSnapshot
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -77,17 +84,31 @@ class MDBListWatchlistDataSource @Inject constructor(
         return entries.distinctBy { it.id }
     }
 
+    /** Ids whose TMDB lookup completed this session (even when TMDB holds no
+     *  art for them), so confirmed-artless titles don't re-trigger hydration
+     *  passes. Misses and timeouts are deliberately NOT recorded - they stay
+     *  retryable on the next pass. */
+    private val completedLookups = ConcurrentHashMap.newKeySet<String>()
+
+    /** True when a poster is still owed and a completed lookup could supply it. */
+    fun needsHydration(entry: LibraryEntry): Boolean =
+        entry.poster.isNullOrBlank() && entry.tmdbId != null && entry.id !in completedLookups
+
     /**
      * Fills posters from TMDB in bounded chunks, calling [onProgress] with the
      * growing list after each chunk so the library fills in progressively.
      * Never discards partial work: a slow/failed lookup (per-item timeout) just
      * leaves that entry as-is. TMDB results are cached, so repeat calls are cheap.
+     *
+     * @return true when the pass finished with nothing left needing hydration
+     * (every remaining posterless entry either has no tmdb id or is confirmed
+     * artless); false when interrupted lookups should be retried later.
      */
     suspend fun hydratePostersProgressively(
         entries: List<LibraryEntry>,
         onProgress: (List<LibraryEntry>) -> Unit
-    ) {
-        if (entries.isEmpty()) return
+    ): Boolean {
+        if (entries.isEmpty()) return true
         val result = entries.toMutableList()
         val indexById = entries.withIndex().associate { (index, entry) -> entry.id to index }
         for (chunk in entries.chunked(HYDRATION_CHUNK)) {
@@ -101,6 +122,7 @@ class MDBListWatchlistDataSource @Inject constructor(
             hydrated.forEach { entry -> indexById[entry.id]?.let { result[it] = entry } }
             onProgress(result.toList())
         }
+        return result.none { needsHydration(it) }
     }
 
     private suspend fun hydratePoster(entry: LibraryEntry): LibraryEntry {
@@ -109,6 +131,8 @@ class MDBListWatchlistDataSource @Inject constructor(
         val art = runCatching {
             tmdbMetadataService.fetchPosterArt(tmdbId.toString(), ContentType.fromString(entry.type))
         }.getOrNull() ?: return entry
+        // The lookup answered (even if it holds no art) - no retry needed.
+        completedLookups.add(entry.id)
         return entry.copy(
             poster = art.poster ?: entry.poster,
             background = art.backdrop ?: entry.background,
@@ -174,11 +198,23 @@ class MDBListLibraryService @Inject constructor(
         val watchlistIds: Set<String> = emptySet(),
         val isLoading: Boolean = false,
         val loaded: Boolean = false,
-        val lastWatchlistedAt: String? = null
+        val lastWatchlistedAt: String? = null,
+        val hydrationComplete: Boolean = false
     )
 
     private val state = MutableStateFlow(State())
     private val refreshMutex = Mutex()
+
+    /** Owns poster hydration so it survives the UI collector that triggered the
+     *  refresh. Hydration used to run inline in [refresh] (inside the items
+     *  flow's onStart, i.e. in the collector's coroutine): navigating away
+     *  mid-fill cancelled it between chunks, and the AUTOMATIC stamp gate then
+     *  froze the half-hydrated snapshot until a user-initiated write. */
+    private val hydrationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** The single in-flight hydration pass. All reads/writes happen under
+     *  [refreshMutex]. */
+    private var hydrationJob: Job? = null
 
     private val watchlistTab = LibraryListTab(
         key = MDBLIST_WATCHLIST_KEY,
@@ -241,14 +277,26 @@ class MDBListLibraryService @Inject constructor(
     override suspend fun refresh(intent: TrackingRefreshIntent) {
         val apiKey = dataSource.apiKeyOrNull()
         if (apiKey == null) {
-            state.value = State()
+            refreshMutex.withLock {
+                hydrationJob?.cancelAndJoin()
+                state.value = State()
+            }
             return
         }
         refreshMutex.withLock {
             val current = state.value
             if (intent == TrackingRefreshIntent.AUTOMATIC && current.loaded) {
                 val stamp = runCatching { dataSource.lastWatchlistedAt(apiKey) }.getOrNull()
-                if (stamp != null && stamp == current.lastWatchlistedAt) return
+                if (stamp != null && stamp == current.lastWatchlistedAt) {
+                    // Watchlist unchanged - but resume hydration if an earlier
+                    // pass was interrupted (cancelled mid-way, or lookups timed
+                    // out/failed). The entries themselves are still current, so
+                    // no re-fetch is needed, and finished lookups are cached.
+                    if (!current.hydrationComplete && hydrationJob?.isActive != true) {
+                        startHydration(current.entries)
+                    }
+                    return
+                }
             }
             state.value = current.copy(isLoading = true)
             val fetched = runCatching { dataSource.fetchAll(apiKey) }.getOrNull()
@@ -257,19 +305,34 @@ class MDBListLibraryService @Inject constructor(
                 state.value = current.copy(isLoading = false)
                 return@withLock
             }
-            // Show the watchlist immediately (posterless), then fill posters in
-            // the background, updating state as each chunk completes.
+            // Stop any pass still filling the OLD snapshot before the new one
+            // is published, so a straggling progress update can't overwrite it.
+            hydrationJob?.cancelAndJoin()
+            // Publish the watchlist immediately (posterless), then fill posters
+            // in the background - detached from the caller, so the lifetime of
+            // whichever screen triggered the refresh cannot cut the fill short.
             state.value = State(
                 entries = fetched,
                 watchlistIds = fetched.map { it.id }.toSet(),
-                isLoading = true,
+                isLoading = false,
                 loaded = true,
-                lastWatchlistedAt = stamp ?: current.lastWatchlistedAt
+                lastWatchlistedAt = stamp ?: current.lastWatchlistedAt,
+                hydrationComplete = false
             )
-            dataSource.hydratePostersProgressively(fetched) { progress ->
+            startHydration(fetched)
+        }
+    }
+
+    /** Cancels any running hydration pass (its partial work is already
+     *  published per chunk and its lookups cached) and launches a fresh pass
+     *  in [hydrationScope]. Must be called under [refreshMutex]. */
+    private suspend fun startHydration(entries: List<LibraryEntry>) {
+        hydrationJob?.cancelAndJoin()
+        hydrationJob = hydrationScope.launch {
+            val complete = dataSource.hydratePostersProgressively(entries) { progress ->
                 state.value = state.value.copy(entries = progress)
             }
-            state.value = state.value.copy(isLoading = false)
+            if (complete) state.value = state.value.copy(hydrationComplete = true)
         }
     }
 
