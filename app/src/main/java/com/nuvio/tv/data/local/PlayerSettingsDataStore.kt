@@ -442,7 +442,7 @@ enum class StreamAutoPlaySource {
 }
 
 enum class PostPlayRecommendationSource {
-    AUTO, TRAKT, TMDB, KURATO_AI
+    AUTO, TRAKT, TMDB, KURATO_AI, BINGECAT_AI
 }
 
 enum class VodCacheSizeMode {

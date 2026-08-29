@@ -1320,6 +1320,11 @@ private fun PostPlayRecommendationSourceDialog(
             com.nuvio.tv.data.local.PostPlayRecommendationSource.KURATO_AI,
             stringResource(R.string.autoplay_post_play_recommendation_source_kurato),
             stringResource(R.string.autoplay_post_play_recommendation_source_sub)
+        ),
+        SettingsPickerOption(
+            com.nuvio.tv.data.local.PostPlayRecommendationSource.BINGECAT_AI,
+            stringResource(R.string.autoplay_post_play_recommendation_source_bingecat),
+            stringResource(R.string.autoplay_post_play_recommendation_source_sub)
         )
     )
     SettingsSingleChoiceDialog(

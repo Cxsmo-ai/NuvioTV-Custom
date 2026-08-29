@@ -922,6 +922,7 @@
     <string name="autoplay_post_play_recommendation_source_trakt">Trakt related titles</string>
     <string name="autoplay_post_play_recommendation_source_tmdb">TMDB similar titles</string>
     <string name="autoplay_post_play_recommendation_source_kurato">Kurato AI Discover (AIOStreams)</string>
+    <string name="autoplay_post_play_recommendation_source_bingecat">BingeCat AI Search</string>
     <string name="autoplay_next_episode">Auto-play Next Episode</string>
     <string name="autoplay_next_episode_sub">Start next episode automatically when prompt appears.</string>
     <string name="autoplay_next_episode_fallback">Fallback when binge group fails</string>

@@ -90,6 +90,66 @@ class PostPlayRecommendationStateTest {
 
         assertEquals("kurato-ai-discover-movie", match?.second?.id)
     }
+
+    @Test
+    fun `BingeCat query targets similar titles without episode wording`() {
+        val query = buildBingeCatRecommendationQuery(
+            meta = Meta(
+                id = "tt1196946",
+                type = ContentType.SERIES,
+                name = "The Mentalist",
+                poster = null,
+                posterShape = PosterShape.POSTER,
+                background = null,
+                logo = null,
+                description = null,
+                releaseInfo = "2008",
+                imdbRating = null,
+                genres = listOf("Crime", "Drama"),
+                runtime = null,
+                director = emptyList(),
+                cast = emptyList(),
+                videos = emptyList(),
+                country = null,
+                awards = null,
+                language = null,
+                links = emptyList()
+            ),
+            contentType = ContentType.SERIES
+        )
+
+        assertTrue(query.contains("TV shows", ignoreCase = true))
+        assertTrue(query.contains("The Mentalist"))
+        assertTrue(query.contains("Crime"))
+        assertFalse(query.contains("episode", ignoreCase = true))
+    }
+
+    @Test
+    fun `BingeCat catalog is found by its official catalog id`() {
+        val addon = Addon(
+            id = "com.aicat.test",
+            name = "BingeCat AI Assistant",
+            version = "1",
+            description = null,
+            logo = null,
+            baseUrl = "https://bingecat.example",
+            catalogs = listOf(
+                CatalogDescriptor(ContentType.MOVIE, id = "aicat_search_movie", name = "AI-Assisted Search")
+            ),
+            types = listOf(ContentType.MOVIE),
+            resources = emptyList()
+        )
+
+        val match = findBingeCatAiCatalog(listOf(addon), ContentType.MOVIE)
+
+        assertEquals("aicat_search_movie", match?.second?.id)
+    }
+
+    @Test
+    fun `BingeCat is not selected when it is not installed`() {
+        assertNull(findBingeCatAiCatalog(emptyList(), ContentType.SERIES))
+    }
+
     @Test
     fun `prefetches in final ten minutes`() {
         assertTrue(

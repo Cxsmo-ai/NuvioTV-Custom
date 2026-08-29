@@ -626,7 +626,23 @@ internal class PostPlayRecommendationController(
             null
         }
         val usesKurato = shouldTryKurato && kuratoCandidates != null
-        val candidates = kuratoCandidates ?: withTimeoutOrNull(10_000L) {
+        val shouldTryBingeCat = sourcePreference == PostPlayRecommendationSource.AUTO ||
+            sourcePreference == PostPlayRecommendationSource.BINGECAT_AI
+        val bingeCatCandidates = if (shouldTryBingeCat && kuratoCandidates == null) {
+            try {
+                withTimeoutOrNull(BINGECAT_RECOMMENDATION_TIMEOUT_MS) {
+                    loadBingeCatCandidates(meta, tmdbContentType)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+        } else {
+            null
+        }
+        val usesBingeCat = shouldTryBingeCat && bingeCatCandidates != null
+        val candidates = kuratoCandidates ?: bingeCatCandidates ?: withTimeoutOrNull(10_000L) {
             loadLegacyCandidates(meta, tmdbContentType, sourcePreference)
         }.orEmpty()
 
@@ -655,7 +671,7 @@ internal class PostPlayRecommendationController(
         return buildList {
             add(first)
             val remaining = filtered.asSequence().filterNot { it === first }
-            if (usesKurato) {
+            if (usesKurato || usesBingeCat) {
                 remaining.forEach(::add)
             } else {
                 remaining.take(MAX_POST_PLAY_RECOMMENDATIONS - 1).forEach(::add)
@@ -743,7 +759,89 @@ internal class PostPlayRecommendationController(
         return items.values.toList()
     }
 
+    private suspend fun loadBingeCatCandidates(
+        meta: Meta,
+        contentType: ContentType
+    ): List<MetaPreview>? {
+        val installedAddons = addonRepository.getInstalledAddons().first()
+        val match = findBingeCatAiCatalog(installedAddons, contentType) ?: return null
+        val (addon, catalog) = match
+        val pageSize = (catalog.pageSize ?: BINGECAT_DEFAULT_PAGE_SIZE)
+            .coerceIn(1, BINGECAT_MAX_PAGE_SIZE)
+        val query = buildBingeCatRecommendationQuery(meta, contentType)
+        val items = LinkedHashMap<String, MetaPreview>()
+        var pageStart = 0
+        var pageNumber = 0
+        while (pageNumber < BINGECAT_MAX_PAGES) {
+            val itemCountBeforePage = items.size
+            val offsets = (0 until BINGECAT_PAGE_WINDOW).map { pageStart + it * pageSize }
+            val pages = kotlinx.coroutines.coroutineScope {
+                offsets.map { skip ->
+                    async {
+                        fetchBingeCatCatalogPage(
+                            addon = addon,
+                            catalog = catalog,
+                            contentType = contentType,
+                            skip = skip,
+                            pageSize = pageSize,
+                            query = query
+                        )
+                    }
+                }.awaitAll()
+            }
+            pages.forEach { page ->
+                page.items.forEach { item ->
+                    items.putIfAbsent("${item.apiType}:${item.id}".lowercase(), item)
+                }
+            }
+            val shouldStop = items.size == itemCountBeforePage ||
+                pages.any { it.items.isEmpty() || !it.hasMore } ||
+                pages.any { it.items.size < pageSize }
+            if (shouldStop) break
+            pageStart += pageSize * BINGECAT_PAGE_WINDOW
+            pageNumber++
+        }
+        return items.values.toList()
+    }
+
     private suspend fun fetchKuratoCatalogPage(
+        addon: Addon,
+        catalog: CatalogDescriptor,
+        contentType: ContentType,
+        skip: Int,
+        pageSize: Int,
+        query: String
+    ): CatalogRow {
+        val emissions = catalogRepository.getCatalog(
+            addonBaseUrl = addon.baseUrl,
+            addonId = addon.id,
+            addonName = addon.displayName,
+            catalogId = catalog.id,
+            catalogName = catalog.name,
+            type = catalog.apiType,
+            skip = skip,
+            skipStep = pageSize,
+            extraArgs = mapOf("search" to query),
+            supportsSkip = true
+        ).toList()
+        val success = emissions.asReversed().firstOrNull { it is NetworkResult.Success<*> }
+        return (success as? NetworkResult.Success<*>)?.data as? CatalogRow ?:
+            CatalogRow(
+                addonId = addon.id,
+                addonName = addon.displayName,
+                addonBaseUrl = addon.baseUrl,
+                catalogId = catalog.id,
+                catalogName = catalog.name,
+                type = contentType,
+                rawType = catalog.rawType,
+                items = emptyList(),
+                hasMore = false,
+                supportsSkip = true,
+                skipStep = pageSize
+            )
+    }
+
+    private suspend fun fetchBingeCatCatalogPage(
         addon: Addon,
         catalog: CatalogDescriptor,
         contentType: ContentType,
@@ -900,6 +998,11 @@ private const val KURATO_MAX_PAGE_SIZE = 100
 private const val KURATO_PAGE_WINDOW = 4
 private const val KURATO_MAX_PAGES = 12
 private const val KURATO_RECOMMENDATION_TIMEOUT_MS = 15_000L
+private const val BINGECAT_DEFAULT_PAGE_SIZE = 50
+private const val BINGECAT_MAX_PAGE_SIZE = 100
+private const val BINGECAT_PAGE_WINDOW = 4
+private const val BINGECAT_MAX_PAGES = 12
+private const val BINGECAT_RECOMMENDATION_TIMEOUT_MS = 15_000L
 private const val RECOMMENDATION_PREFETCH_BEHIND = 1
 private const val RECOMMENDATION_PREFETCH_AHEAD = 4
 
@@ -918,6 +1021,23 @@ internal fun buildKuratoRecommendationQuery(meta: Meta, contentType: ContentType
         ?.let { " Focus on similar tone and genres such as $it." }
         .orEmpty()
     return "Recommend $kind similar to \"$title\".$genreHint Return titles only, not episodes."
+}
+
+internal fun buildBingeCatRecommendationQuery(meta: Meta, contentType: ContentType): String {
+    val title = meta.name.trim().ifBlank { "this title" }
+    val kind = if (contentType == ContentType.SERIES) "TV shows" else "movies"
+    val genres = meta.genres
+        .asSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .distinct()
+        .take(3)
+        .toList()
+    val genreHint = genres.takeIf { it.isNotEmpty() }
+        ?.joinToString(", ")
+        ?.let { " with a similar tone and genres such as $it" }
+        .orEmpty()
+    return "${kind} like \"$title\"$genreHint"
 }
 
 internal fun findKuratoAiCatalog(
@@ -947,6 +1067,40 @@ internal fun findKuratoAiCatalog(
         .mapNotNull { addon ->
             addon.catalogs.firstOrNull { catalog ->
                 catalog.id.contains("kurato-ai-discover", ignoreCase = true) &&
+                    resolvePostPlayContentType(catalog.apiType, catalog.type) == contentType
+            }?.let { addon to it }
+        }
+        .firstOrNull()
+}
+
+internal fun findBingeCatAiCatalog(
+    addons: List<Addon>,
+    contentType: ContentType
+): Pair<Addon, CatalogDescriptor>? {
+    val expectedCatalogId = if (contentType == ContentType.SERIES) {
+        "aicat_search_series"
+    } else {
+        "aicat_search_movie"
+    }
+    val enabledAddons = addons.asSequence().filter { it.enabled }.toList()
+    val preferredAddons = enabledAddons.sortedByDescending { addon ->
+        if (addon.id.contains("aicat", ignoreCase = true) ||
+            addon.id.contains("bingecat", ignoreCase = true) ||
+            addon.name.contains("bingecat", ignoreCase = true) ||
+            addon.displayName.contains("bingecat", ignoreCase = true)
+        ) 1 else 0
+    }
+    preferredAddons.forEach { addon ->
+        val exact = addon.catalogs.firstOrNull { catalog ->
+            catalog.id.equals(expectedCatalogId, ignoreCase = true) &&
+                resolvePostPlayContentType(catalog.apiType, catalog.type) == contentType
+        }
+        if (exact != null) return addon to exact
+    }
+    return preferredAddons
+        .mapNotNull { addon ->
+            addon.catalogs.firstOrNull { catalog ->
+                catalog.id.contains("aicat_search", ignoreCase = true) &&
                     resolvePostPlayContentType(catalog.apiType, catalog.type) == contentType
             }?.let { addon to it }
         }

@@ -424,6 +424,8 @@ private fun postPlayRecommendationSourceLabel(source: PostPlayRecommendationSour
         stringResource(R.string.autoplay_post_play_recommendation_source_tmdb)
     PostPlayRecommendationSource.KURATO_AI ->
         stringResource(R.string.autoplay_post_play_recommendation_source_kurato)
+    PostPlayRecommendationSource.BINGECAT_AI ->
+        stringResource(R.string.autoplay_post_play_recommendation_source_bingecat)
 }
 
 private fun formatHalfStepValue(value: Float): String {
