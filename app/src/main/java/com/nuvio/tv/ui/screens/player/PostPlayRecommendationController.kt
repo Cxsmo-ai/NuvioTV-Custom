@@ -713,8 +713,7 @@ internal class PostPlayRecommendationController(
         val query = buildKuratoRecommendationQuery(meta, contentType)
         val items = LinkedHashMap<String, MetaPreview>()
         var pageStart = 0
-        var pageNumber = 0
-        while (pageNumber < KURATO_MAX_PAGES) {
+        while (true) {
             val itemCountBeforePage = items.size
             val offsets = (0 until KURATO_PAGE_WINDOW).map { pageStart + it * pageSize }
             val pages = kotlinx.coroutines.coroutineScope {
@@ -741,7 +740,6 @@ internal class PostPlayRecommendationController(
                 pages.any { it.items.size < pageSize }
             if (shouldStop) break
             pageStart += pageSize * KURATO_PAGE_WINDOW
-            pageNumber++
         }
         return items.values.toList()
     }
@@ -758,8 +756,7 @@ internal class PostPlayRecommendationController(
         val query = buildBingeCatRecommendationQuery(meta, contentType)
         val items = LinkedHashMap<String, MetaPreview>()
         var pageStart = 0
-        var pageNumber = 0
-        while (pageNumber < BINGECAT_MAX_PAGES) {
+        while (true) {
             val itemCountBeforePage = items.size
             val offsets = (0 until BINGECAT_PAGE_WINDOW).map { pageStart + it * pageSize }
             val pages = kotlinx.coroutines.coroutineScope {
@@ -786,7 +783,6 @@ internal class PostPlayRecommendationController(
                 pages.any { it.items.size < pageSize }
             if (shouldStop) break
             pageStart += pageSize * BINGECAT_PAGE_WINDOW
-            pageNumber++
         }
         return items.values.toList()
     }
@@ -982,12 +978,10 @@ internal class PostPlayRecommendationController(
 private const val KURATO_DEFAULT_PAGE_SIZE = 50
 private const val KURATO_MAX_PAGE_SIZE = 100
 private const val KURATO_PAGE_WINDOW = 4
-private const val KURATO_MAX_PAGES = 12
 private const val KURATO_RECOMMENDATION_TIMEOUT_MS = 15_000L
 private const val BINGECAT_DEFAULT_PAGE_SIZE = 50
 private const val BINGECAT_MAX_PAGE_SIZE = 100
 private const val BINGECAT_PAGE_WINDOW = 4
-private const val BINGECAT_MAX_PAGES = 12
 private const val BINGECAT_RECOMMENDATION_TIMEOUT_MS = 15_000L
 private const val RECOMMENDATION_PREFETCH_BEHIND = 1
 private const val RECOMMENDATION_PREFETCH_AHEAD = 4
