@@ -23,7 +23,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "My Application"
+rootProject.name = "NuvioTV Custom"
 include(":app")
 include(":baselineprofile")
 include(":ffmpeg-decoder-downmix")

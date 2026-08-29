@@ -147,14 +147,12 @@ android {
         buildConfigField("String", "SPONSOR_NAMES", buildConfigString(sponsorNames))
 
         // In-app updater (GitHub Releases)
-        buildConfigField("String", "GITHUB_OWNER", "\"tapframe\"")
-        buildConfigField("String", "GITHUB_REPO", "\"NuvioTV\"")
-        // nt3: the feed above still points at the official repo (tapframe →
-        // NuvioMedia via GitHub redirect), so fork builds must not run the
-        // checker — it offers official releases over nt builds. Flip to true
-        // once the feed is repointed at the fork's own releases with an
-        // nt-aware version comparison.
-        buildConfigField("boolean", "UPDATE_CHECK_ENABLED", "false")
+        buildConfigField("String", "GITHUB_OWNER", "\"Cxsmo-ai\"")
+        buildConfigField("String", "GITHUB_REPO", "\"NuvioTV-Custom\"")
+        // Keep update checks pointed at this fork's own releases. The fork
+        // uses a distinct repository so upstream releases are never offered
+        // as updates to a custom build.
+        buildConfigField("boolean", "UPDATE_CHECK_ENABLED", "true")
     }
 
     flavorDimensions += "distribution"

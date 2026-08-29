@@ -1,8 +1,16 @@
 
+# NuvioTV Custom
+
+An independently maintained Android TV fork of [ysosrs123/NuvioTV-Fork](https://github.com/ysosrs123/NuvioTV-Fork), with the upstream project kept as the compatibility baseline and additional features maintained for the Cxsmo AIOStreams ecosystem.
+
+[![Android CI](https://github.com/Cxsmo-ai/NuvioTV-Custom/actions/workflows/android-ci.yml/badge.svg)](https://github.com/Cxsmo-ai/NuvioTV-Custom/actions/workflows/android-ci.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+
 ## About
 
-This is a **personal fork** of [NuvioTV](https://github.com/NuvioMedia/NuvioTV) for test builds,
-fixes, modifications, and optimisation. **It isn't for general use, and no support is provided.**
+This is a **personal fork** of [ysosrs123/NuvioTV-Fork](https://github.com/ysosrs123/NuvioTV-Fork),
+itself derived from [NuvioTV](https://github.com/NuvioMedia/NuvioTV), for test builds, fixes,
+modifications, and optimisation. **It isn't for general use, and no support is provided.**
 
 The focus is **speed, efficiency, and optimised playback of high-bitrate 4K remux video and
 lossless bitstream audio** -- the kind of content (100 GB+ remuxes, TrueHD/DTS-HD MA/Atmos/DTS:X
@@ -20,6 +28,18 @@ This fork is a set of targeted optimisations layered on top of their work, not a
 ---
 
 ## What this fork adds
+
+The fork-specific features are documented in [docs/custom-fork-features.md](docs/custom-fork-features.md).
+In addition to the playback and library work below, this fork includes:
+
+- **Post-play recommendation source selection** -- choose Auto, Trakt, TMDB, Kurato AI, or BingeCat AI.
+- **Kurato and BingeCat discovery** -- the app detects their installed Stremio catalogs, including when they are exposed through AIOStreams, and uses their full paginated result set rather than a four-item rail.
+- **Metadata-aware trailers** -- post-play trailers use the same all-addon metadata routing as Nuvio's detail/player screens, then fall back to addon-supplied, TMDB, or IMDb trailer sources.
+- **Progressive AIOStreams scraping** -- the stream screen can consume cumulative NDJSON snapshots from the forked AIOStreams progressive endpoint, so usable results appear while slower addons continue.
+- **Unlocked user scrape timeout** -- the user-facing timeout choices include instant, bounded, and unlimited modes; internal safety bounds remain in place to prevent a dead UI.
+
+Progressive scraping requires the matching [Cxsmo-ai/AIOStreams](https://github.com/Cxsmo-ai/AIOStreams)
+fork and its `client=nuvio-progressive` endpoint. A normal AIOStreams manifest remains supported.
 
 Optimisation and playback-quality work, most of it aimed at high-bitrate remux and lossless audio.
 The short version: streams start faster, buffer deeper, stall less, and you can *see* that your

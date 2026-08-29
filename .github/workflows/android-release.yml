@@ -205,12 +205,37 @@ jobs:
         if: inputs.mode != 'dry-run'
         run: ./gradlew :app:assembleFullRelease --stacktrace
 
+      - name: Normalize release APK names
+        if: inputs.mode != 'dry-run'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          apk_dir="app/build/outputs/apk/full/release"
+          shopt -s nullglob
+          apks=("${apk_dir}"/*.apk)
+          if (( ${#apks[@]} == 0 )); then
+            echo "No release APKs were produced." >&2
+            exit 1
+          fi
+
+          for apk in "${apks[@]}"; do
+            abi="universal"
+            case "$(basename "${apk}")" in
+              *armeabi-v7a*) abi="armeabi-v7a" ;;
+              *arm64-v8a*) abi="arm64-v8a" ;;
+              *x86_64*) abi="x86_64" ;;
+              *x86*) abi="x86" ;;
+            esac
+            mv -- "${apk}" "${apk_dir}/NuvioTV-Custom-${RELEASE_VERSION}-${abi}.apk"
+          done
+
       - name: Upload build artifacts
         if: inputs.mode != 'dry-run'
         uses: actions/upload-artifact@v6
         with:
           name: nuviotv-${{ steps.release.outputs.version }}-full-release
-          path: app/build/outputs/apk/full/release/*.apk
+          path: app/build/outputs/apk/full/release/NuvioTV-Custom-*.apk
           if-no-files-found: error
 
       - name: Create GitHub release
@@ -221,7 +246,7 @@ jobs:
           RELEASE_TITLE: ${{ steps.release.outputs.title }}
           RELEASE_TARGET: ${{ steps.release.outputs.current_bump }}
         run: |
-          mapfile -t release_apks < <(find app/build/outputs/apk/full/release -maxdepth 1 -type f -name '*.apk' -print | sort)
+          mapfile -t release_apks < <(find app/build/outputs/apk/full/release -maxdepth 1 -type f -name 'NuvioTV-Custom-*.apk' -print | sort)
           if (( ${#release_apks[@]} == 0 )); then
             echo "No release APKs were produced." >&2
             exit 1
