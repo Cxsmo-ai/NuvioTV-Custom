@@ -8,9 +8,10 @@ An independently maintained Android TV fork of [ysosrs123/NuvioTV-Fork](https://
 
 ## About
 
-This is a **personal fork** of [ysosrs123/NuvioTV-Fork](https://github.com/ysosrs123/NuvioTV-Fork),
-itself derived from [NuvioTV](https://github.com/NuvioMedia/NuvioTV), for test builds, fixes,
-modifications, and optimisation. **It isn't for general use, and no support is provided.**
+This is a **publicly available fork** of [ysosrs123/NuvioTV-Fork](https://github.com/ysosrs123/NuvioTV-Fork),
+itself derived from [NuvioTV](https://github.com/NuvioMedia/NuvioTV), with fixes, modifications,
+and optimisation maintained for the Cxsmo AIOStreams ecosystem. Support is provided for this
+custom fork through its repository issue tracker and release discussions.
 
 The focus is **speed, efficiency, and optimised playback of high-bitrate 4K remux video and
 lossless bitstream audio** -- the kind of content (100 GB+ remuxes, TrueHD/DTS-HD MA/Atmos/DTS:X

@@ -1,6 +1,7 @@
 # NuvioTV Custom 0.8.10-beta-nt2
 
-This is the first repository release for the NuvioTV Custom fork. It is based on
+This is the first public release for the NuvioTV Custom fork. Support is provided through the
+repository issue tracker and release discussions. It is based on
 [ysosrs123/NuvioTV-Fork](https://github.com/ysosrs123/NuvioTV-Fork) and includes the
 custom post-play recommendation and AIOStreams integration documented in
 [docs/custom-fork-features.md](docs/custom-fork-features.md).
@@ -21,11 +22,12 @@ The release workflow publishes ABI-specific assets with these names:
 - `NuvioTV-Custom-0.8.10-beta-nt2-armeabi-v7a.apk`
 - `NuvioTV-Custom-0.8.10-beta-nt2-arm64-v8a.apk`
 
-The `armeabi-v7a` build is intended for the current Android TV test device. The arm64 build is
-provided for compatible Android TV hardware. Progressive scraping requires the matching
+The `armeabi-v7a` build is for 32-bit ARM Android TV devices. The arm64 build is provided for
+compatible 64-bit ARM Android TV hardware. Progressive scraping requires the matching
 [Cxsmo-ai/AIOStreams](https://github.com/Cxsmo-ai/AIOStreams) fork.
 
 ## Upgrade notes
 
-This fork uses the existing `com.nuvio.tv.test.debug` application identity for the current test
-channel. Install the ABI matching the device. Do not install both APKs on one device.
+Install the APK whose ABI matches the device. Do not install both APKs on one device. The
+progressive scraping features require the matching Cxsmo AIOStreams fork; standard AIOStreams
+manifests remain supported without that integration.

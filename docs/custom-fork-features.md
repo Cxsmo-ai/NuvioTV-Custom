@@ -1,7 +1,8 @@
 # NuvioTV Custom Fork Features
 
-This repository is based on [ysosrs123/NuvioTV-Fork](https://github.com/ysosrs123/NuvioTV-Fork).
-Upstream code, license notices, and attribution remain in place. The following describes the
+This public repository is based on [ysosrs123/NuvioTV-Fork](https://github.com/ysosrs123/NuvioTV-Fork).
+Upstream code, license notices, and attribution remain in place. Support for this custom fork is
+provided through its issue tracker and release discussions. The following describes the
 additional work maintained in this fork.
 
 ## Post-play recommendations
@@ -45,14 +46,13 @@ coroutine, or UI safety guards.
 
 ## Build variants and APK naming
 
-The `fullBenchmark` variant is intended for local validation and device testing. Release automation
-builds the signed `fullRelease` variant. Release assets use explicit ABI names:
+The public release channel uses explicit ABI-specific APK names:
 
 - `NuvioTV-Custom-<version>-armeabi-v7a.apk`
 - `NuvioTV-Custom-<version>-arm64-v8a.apk`
 
-Do not commit signed APKs, keystores, local properties, API keys, or private manifest URLs. APKs are
-uploaded as GitHub Release assets by the release workflow.
+Do not commit signed APKs, keystores, local properties, API keys, or private manifest URLs. Public
+APKs are uploaded as GitHub Release assets by the release workflow.
 
 ## Compatibility and attribution
 
