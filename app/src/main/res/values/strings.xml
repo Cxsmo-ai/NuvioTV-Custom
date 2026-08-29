@@ -1870,7 +1870,6 @@
     <string name="player_post_play_play">Play</string>
     <string name="player_post_play_previous_recommendation">Previous recommendation</string>
     <string name="player_post_play_next_recommendation">Next recommendation</string>
-    <string name="player_post_play_recommendation_results">%1$d recommendations</string>
     <string name="player_post_play_return_to_player">Return to player</string>
     <string name="player_post_play_trailer_countdown">Trailer in %1$d</string>
     <string name="player_post_play_trailer_playing">Trailer playing</string>

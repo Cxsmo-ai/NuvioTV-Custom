@@ -181,12 +181,6 @@ internal class PostPlayRecommendationController(
         selectRecommendation(1)
     }
 
-    fun selectRecommendationIndex(index: Int) {
-        val state = _uiState.value
-        if (index !in recommendationCandidates.indices || index == state.recommendationIndex) return
-        selectRecommendationAt(index)
-    }
-
     fun returnToPlayer() {
         val state = _uiState.value
         val returnedState = state.returnToPlayer()
@@ -364,7 +358,6 @@ internal class PostPlayRecommendationController(
             _uiState.update {
                 it.copy(
                     recommendation = recommendation,
-                    recommendationPreviews = candidates,
                     recommendationIndex = 0,
                     recommendationCount = candidates.size,
                     isLoadingRecommendation = false,
@@ -625,7 +618,6 @@ internal class PostPlayRecommendationController(
         } else {
             null
         }
-        val usesKurato = shouldTryKurato && kuratoCandidates != null
         val shouldTryBingeCat = sourcePreference == PostPlayRecommendationSource.AUTO ||
             sourcePreference == PostPlayRecommendationSource.BINGECAT_AI
         val bingeCatCandidates = if (shouldTryBingeCat && kuratoCandidates == null) {
@@ -641,7 +633,6 @@ internal class PostPlayRecommendationController(
         } else {
             null
         }
-        val usesBingeCat = shouldTryBingeCat && bingeCatCandidates != null
         val candidates = kuratoCandidates ?: bingeCatCandidates ?: withTimeoutOrNull(10_000L) {
             loadLegacyCandidates(meta, tmdbContentType, sourcePreference)
         }.orEmpty()
@@ -671,11 +662,7 @@ internal class PostPlayRecommendationController(
         return buildList {
             add(first)
             val remaining = filtered.asSequence().filterNot { it === first }
-            if (usesKurato || usesBingeCat) {
-                remaining.forEach(::add)
-            } else {
-                remaining.take(MAX_POST_PLAY_RECOMMENDATIONS - 1).forEach(::add)
-            }
+            remaining.forEach(::add)
         }
     }
 
@@ -992,7 +979,6 @@ internal class PostPlayRecommendationController(
     }
 }
 
-private const val MAX_POST_PLAY_RECOMMENDATIONS = 4
 private const val KURATO_DEFAULT_PAGE_SIZE = 50
 private const val KURATO_MAX_PAGE_SIZE = 100
 private const val KURATO_PAGE_WINDOW = 4

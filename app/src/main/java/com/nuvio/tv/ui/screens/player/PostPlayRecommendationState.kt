@@ -39,8 +39,6 @@ data class PostPlayRecommendation(
 @Immutable
 data class PostPlayRecommendationUiState(
     val recommendation: PostPlayRecommendation? = null,
-    /** Lightweight cards for the complete fetched result set; detail metadata remains lazy. */
-    val recommendationPreviews: List<MetaPreview> = emptyList(),
     val recommendationIndex: Int = 0,
     val recommendationCount: Int = 0,
     val isLoadingRecommendation: Boolean = false,

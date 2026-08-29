@@ -1061,10 +1061,6 @@ class PlayerViewModel @Inject constructor(
         postPlayRecommendationController.showNextRecommendation()
     }
 
-    fun selectPostPlayRecommendation(index: Int) {
-        postPlayRecommendationController.selectRecommendationIndex(index)
-    }
-
     fun returnToPlayerFromPostPlay() {
         postPlayRecommendationController.returnToPlayer()
     }
