@@ -1549,6 +1549,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                             if (readyTransition.nextState.hasRenderedFirstFrame && isTunneledPlayback) {
                                 hasRenderedFirstFrame = true
                                 cancelStartupWatchdog()
+                                retractStartupTimeoutErrorAfterFirstFrame()
                             }
                             when (val action = readyTransition.action) {
                                 is PlayerStartupPlaybackPolicy.ReadyAction.TunneledFirstReady -> {
@@ -1723,6 +1724,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                         val isFirstFrame = !hasRenderedFirstFrame  // capture BEFORE flipping
                         hasRenderedFirstFrame = true
                         cancelStartupWatchdog()
+                        retractStartupTimeoutErrorAfterFirstFrame()
                         mediaSourceFactory.unlockStartupPrefetch()
                         // NuvioTV fork (Task A): pre-populate the source list in the
                         // background once playback is healthy, so a mid-play failover

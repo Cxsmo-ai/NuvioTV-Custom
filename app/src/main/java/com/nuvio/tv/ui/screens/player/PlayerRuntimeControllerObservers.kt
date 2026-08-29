@@ -835,6 +835,34 @@ internal fun PlayerRuntimeController.scheduleStartupWatchdog() {
     }
 }
 
+/**
+ * nt4: the startup watchdog deliberately does not stop the player, so a
+ * slow-but-healthy start can render its first frame after the watchdog has
+ * already surfaced the startup-timeout error — leaving a stale error screen
+ * over running playback that nothing ever cleared. The rendered frame is
+ * ground truth: retract exactly that error. Any other error (a real decode
+ * failure racing the frame) is left untouched.
+ */
+internal fun PlayerRuntimeController.retractStartupTimeoutErrorAfterFirstFrame() {
+    val startupTimeoutMessage = context.getString(com.nuvio.tv.R.string.player_error_startup_timeout)
+    var retracted = false
+    _uiState.update {
+        if (it.error == startupTimeoutMessage) {
+            retracted = true
+            it.copy(error = null)
+        } else {
+            it
+        }
+    }
+    if (retracted) {
+        Log.w(
+            PlayerRuntimeController.TAG,
+            "STARTUP_WATCHDOG: first frame rendered after fire; retracting startup-timeout error"
+        )
+        com.nuvio.tv.core.util.TtffTrace.mark("startup_watchdog_retracted")
+    }
+}
+
 /** Tiny skip past the buffered edge to force Media3 to cancel the in-flight Range request. */
 private val STALL_WATCHDOG_SKIP_PAST_BUFFERED_MS = PlayerStallWatchdogPolicy.SKIP_PAST_BUFFERED_MS
 
