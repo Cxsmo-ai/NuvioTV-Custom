@@ -72,6 +72,7 @@ import com.nuvio.tv.data.local.PlayerSettings
 import com.nuvio.tv.data.local.NextEpisodeThresholdMode
 import com.nuvio.tv.data.local.StreamAutoPlayMode
 import com.nuvio.tv.data.local.StreamAutoPlaySource
+import com.nuvio.tv.data.local.PostPlayRecommendationSource
 import com.nuvio.tv.ui.components.NuvioDialog
 import kotlin.math.roundToInt
 import java.util.Locale
@@ -85,6 +86,7 @@ internal fun LazyListScope.autoPlaySettingsItems(
     onShowRegexDialog: () -> Unit,
     onShowNextEpisodeThresholdModeDialog: () -> Unit,
     onShowReuseLastLinkCacheDialog: () -> Unit,
+    onShowPostPlayRecommendationSourceDialog: () -> Unit,
     onOpenConnectedServices: (() -> Unit)? = null,
     onSetPostPlayRecommendationsEnabled: (Boolean) -> Unit,
     onSetStreamAutoPlayNextEpisodeEnabled: (Boolean) -> Unit,
@@ -189,6 +191,18 @@ internal fun LazyListScope.autoPlaySettingsItems(
             onCheckedChange = onSetPostPlayRecommendationsEnabled,
             onFocused = onItemFocused
         )
+    }
+
+    if (playerSettings.postPlayRecommendationsEnabled) {
+        item(key = "post_play_recommendation_source") {
+            NavigationSettingsItem(
+                icon = Icons.Default.Recommend,
+                title = stringResource(R.string.autoplay_post_play_recommendation_source),
+                subtitle = postPlayRecommendationSourceLabel(playerSettings.postPlayRecommendationSource),
+                onClick = onShowPostPlayRecommendationSourceDialog,
+                onFocused = onItemFocused
+            )
+        }
     }
 
     item(key = "autoplay_eager_ready") {
@@ -398,6 +412,18 @@ internal fun LazyListScope.autoPlaySettingsItems(
             )
         }
     }
+}
+
+@Composable
+private fun postPlayRecommendationSourceLabel(source: PostPlayRecommendationSource): String = when (source) {
+    PostPlayRecommendationSource.AUTO ->
+        stringResource(R.string.autoplay_post_play_recommendation_source_auto)
+    PostPlayRecommendationSource.TRAKT ->
+        stringResource(R.string.autoplay_post_play_recommendation_source_trakt)
+    PostPlayRecommendationSource.TMDB ->
+        stringResource(R.string.autoplay_post_play_recommendation_source_tmdb)
+    PostPlayRecommendationSource.KURATO_AI ->
+        stringResource(R.string.autoplay_post_play_recommendation_source_kurato)
 }
 
 private fun formatHalfStepValue(value: Float): String {

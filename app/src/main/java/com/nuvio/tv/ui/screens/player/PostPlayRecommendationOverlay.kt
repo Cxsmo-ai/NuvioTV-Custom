@@ -21,6 +21,7 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -35,6 +36,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -73,6 +76,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
@@ -116,6 +121,7 @@ fun PostPlayRecommendationOverlay(
     onTrailerEnded: () -> Unit,
     onPreviousRecommendation: () -> Unit,
     onNextRecommendation: () -> Unit,
+    onSelectRecommendation: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val recommendation = state.recommendation ?: return
@@ -282,7 +288,7 @@ fun PostPlayRecommendationOverlay(
                     .fillMaxWidth(0.52f)
                     .padding(
                         start = NuvioTheme.spacing.screen.overscanHorizontal,
-                        bottom = NuvioTheme.spacing.screen.overscanVertical
+                        bottom = NuvioTheme.spacing.screen.overscanVertical + 132.dp
                     ),
                 horizontalAlignment = Alignment.Start
             ) {
@@ -431,6 +437,18 @@ fun PostPlayRecommendationOverlay(
                     }
                 }
             }
+
+            if (state.recommendationPreviews.size > 1) {
+                PostPlayRecommendationRail(
+                    previews = state.recommendationPreviews,
+                    selectedIndex = state.recommendationIndex,
+                    onSelect = onSelectRecommendation,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = NuvioTheme.spacing.screen.overscanVertical)
+                )
+            }
         }
     }
 
@@ -455,6 +473,97 @@ fun PostPlayRecommendationOverlay(
                 onDismiss = { showSynopsisOverlay = false }
             )
         }
+}
+
+@Composable
+private fun PostPlayRecommendationRail(
+    previews: List<com.nuvio.tv.domain.model.MetaPreview>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = stringResource(R.string.player_post_play_recommendation_results, previews.size),
+            style = MaterialTheme.typography.labelMedium,
+            color = NuvioTheme.extendedColors.textSecondary,
+            modifier = Modifier.padding(horizontal = NuvioTheme.spacing.screen.overscanHorizontal)
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = NuvioTheme.spacing.screen.overscanHorizontal),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(116.dp)
+        ) {
+            itemsIndexed(
+                items = previews,
+                key = { index, item -> "post_play_${item.apiType}:${item.id}:$index" }
+            ) { index, preview ->
+                val shape = RoundedCornerShape(8.dp)
+                Card(
+                    onClick = { onSelect(index) },
+                    modifier = Modifier
+                        .width(82.dp)
+                        .height(108.dp),
+                    shape = CardDefaults.shape(shape = shape),
+                    colors = CardDefaults.colors(
+                        containerColor = NuvioTheme.colors.BackgroundCard,
+                        focusedContainerColor = NuvioTheme.colors.BackgroundCard
+                    ),
+                    border = CardDefaults.border(
+                        focusedBorder = Border(
+                            border = NuvioTheme.focusRing.border(2.dp),
+                            shape = shape
+                        ),
+                        pressedBorder = Border(
+                            border = NuvioTheme.focusRing.border(2.dp),
+                            shape = shape
+                        )
+                    )
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        val image = preview.poster ?: preview.landscapePoster ?: preview.background
+                        if (!image.isNullOrBlank()) {
+                            AsyncImage(
+                                model = image,
+                                contentDescription = preview.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .background(Color.Black.copy(alpha = 0.78f))
+                                .padding(horizontal = 5.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = preview.name,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (index == selectedIndex) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Transparent)
+                                    .border(
+                                        width = 2.dp,
+                                        color = NuvioTheme.colors.Secondary,
+                                        shape = shape
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

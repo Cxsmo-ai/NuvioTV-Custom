@@ -8,6 +8,7 @@ import com.nuvio.tv.data.local.InternalPlayerEngine
 import com.nuvio.tv.data.local.Dv7HandlingMode
 import com.nuvio.tv.data.local.PlayerSettings
 import com.nuvio.tv.data.local.PlayerSettingsDataStore
+import com.nuvio.tv.data.local.PostPlayRecommendationSource
 import com.nuvio.tv.data.local.PlayerPreference
 import com.nuvio.tv.core.player.LastPlaybackDiagnostics
 import com.nuvio.tv.data.local.FrameRateMatchingMode
@@ -494,6 +495,10 @@ class PlaybackSettingsViewModel @Inject constructor(
 
     suspend fun setPostPlayRecommendationsEnabled(enabled: Boolean) {
         playerSettingsDataStore.setPostPlayRecommendationsEnabled(enabled)
+    }
+
+    suspend fun setPostPlayRecommendationSource(source: PostPlayRecommendationSource) {
+        playerSettingsDataStore.setPostPlayRecommendationSource(source)
     }
 
     suspend fun setStreamAutoPlayNextEpisodeEnabled(enabled: Boolean) {

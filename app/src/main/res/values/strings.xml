@@ -916,6 +916,12 @@
     <string name="autoplay_quality_rules_subtitle">Filters, sorting and release-group tiers in Connected Services.</string>
     <string name="autoplay_post_play_recommendations">Post-play Recommendations</string>
     <string name="autoplay_post_play_recommendations_sub">Show recommended movies and series when playback reaches the end.</string>
+    <string name="autoplay_post_play_recommendation_source">Recommendation source</string>
+    <string name="autoplay_post_play_recommendation_source_sub">Choose where post-play recommendations come from.</string>
+    <string name="autoplay_post_play_recommendation_source_auto">Automatic (Trakt or TMDB)</string>
+    <string name="autoplay_post_play_recommendation_source_trakt">Trakt related titles</string>
+    <string name="autoplay_post_play_recommendation_source_tmdb">TMDB similar titles</string>
+    <string name="autoplay_post_play_recommendation_source_kurato">Kurato AI Discover (AIOStreams)</string>
     <string name="autoplay_next_episode">Auto-play Next Episode</string>
     <string name="autoplay_next_episode_sub">Start next episode automatically when prompt appears.</string>
     <string name="autoplay_next_episode_fallback">Fallback when binge group fails</string>
@@ -1863,6 +1869,7 @@
     <string name="player_post_play_play">Play</string>
     <string name="player_post_play_previous_recommendation">Previous recommendation</string>
     <string name="player_post_play_next_recommendation">Next recommendation</string>
+    <string name="player_post_play_recommendation_results">%1$d recommendations</string>
     <string name="player_post_play_return_to_player">Return to player</string>
     <string name="player_post_play_trailer_countdown">Trailer in %1$d</string>
     <string name="player_post_play_trailer_playing">Trailer playing</string>

@@ -145,6 +145,7 @@ fun PlaybackSettingsContent(
     var showStreamRegexDialog by remember { mutableStateOf(false) }
     var showNextEpisodeThresholdModeDialog by remember { mutableStateOf(false) }
     var showReuseLastLinkCacheDialog by remember { mutableStateOf(false) }
+    var showPostPlayRecommendationSourceDialog by remember { mutableStateOf(false) }
     var showPlayerPreferenceDialog by remember { mutableStateOf(false) }
     var showInternalPlayerEngineDialog by remember { mutableStateOf(false) }
     var showP2pConsentDialog by remember { mutableStateOf(false) }
@@ -169,6 +170,7 @@ fun PlaybackSettingsContent(
         showStreamRegexDialog = false
         showNextEpisodeThresholdModeDialog = false
         showReuseLastLinkCacheDialog = false
+        showPostPlayRecommendationSourceDialog = false
         showPlayerPreferenceDialog = false
         showInternalPlayerEngineDialog = false
         showP2pConsentDialog = false
@@ -223,8 +225,14 @@ fun PlaybackSettingsContent(
                 onShowStreamRegexDialog = { openDialog { showStreamRegexDialog = true } },
                 onShowNextEpisodeThresholdModeDialog = { openDialog { showNextEpisodeThresholdModeDialog = true } },
                 onShowReuseLastLinkCacheDialog = { openDialog { showReuseLastLinkCacheDialog = true } },
+                onShowPostPlayRecommendationSourceDialog = {
+                    openDialog { showPostPlayRecommendationSourceDialog = true }
+                },
                 onSetPostPlayRecommendationsEnabled = { enabled ->
                     coroutineScope.launch { viewModel.setPostPlayRecommendationsEnabled(enabled) }
+                },
+                onSetPostPlayRecommendationSource = { source ->
+                    coroutineScope.launch { viewModel.setPostPlayRecommendationSource(source) }
                 },
                 onSetStreamAutoPlayNextEpisodeEnabled = { enabled ->
                     coroutineScope.launch { viewModel.setStreamAutoPlayNextEpisodeEnabled(enabled) }
@@ -515,6 +523,7 @@ fun PlaybackSettingsContent(
         showStreamRegexDialog = showStreamRegexDialog,
         showNextEpisodeThresholdModeDialog = showNextEpisodeThresholdModeDialog,
         showReuseLastLinkCacheDialog = showReuseLastLinkCacheDialog,
+        showPostPlayRecommendationSourceDialog = showPostPlayRecommendationSourceDialog,
         onSetPlayerPreference = { preference ->
             coroutineScope.launch { viewModel.setPlayerPreference(preference) }
         },
@@ -571,6 +580,9 @@ fun PlaybackSettingsContent(
         onSetStreamAutoPlayRegex = { regex ->
             coroutineScope.launch { viewModel.setStreamAutoPlayRegex(regex) }
         },
+        onSetPostPlayRecommendationSource = { source ->
+            coroutineScope.launch { viewModel.setPostPlayRecommendationSource(source) }
+        },
         onSetStreamAutoPlaySelectedAddons = { selected ->
             coroutineScope.launch { viewModel.setStreamAutoPlaySelectedAddons(selected) }
         },
@@ -598,7 +610,8 @@ fun PlaybackSettingsContent(
         onDismissStreamAutoPlayAddonSelectionDialog = ::dismissAllDialogs,
         onDismissStreamAutoPlayPluginSelectionDialog = ::dismissAllDialogs,
         onDismissNextEpisodeThresholdModeDialog = ::dismissAllDialogs,
-        onDismissReuseLastLinkCacheDialog = ::dismissAllDialogs
+        onDismissReuseLastLinkCacheDialog = ::dismissAllDialogs,
+        onDismissPostPlayRecommendationSourceDialog = ::dismissAllDialogs
     )
 
     if (showP2pConsentDialog) {

@@ -3,7 +3,10 @@ package com.nuvio.tv.ui.screens.player
 import com.nuvio.tv.core.tmdb.TmdbEnrichment
 import com.nuvio.tv.data.local.PlayerSettings
 import com.nuvio.tv.domain.model.ContentType
+import com.nuvio.tv.domain.model.Addon
+import com.nuvio.tv.domain.model.CatalogDescriptor
 import com.nuvio.tv.domain.model.MetaPreview
+import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.PosterShape
 import com.nuvio.tv.domain.model.TmdbSettings
 import org.junit.Assert.assertEquals
@@ -13,6 +16,59 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PostPlayRecommendationStateTest {
+    @Test
+    fun `Kurato query uses the root title and content type`() {
+        val query = buildKuratoRecommendationQuery(
+            meta = Meta(
+                id = "tt1196946",
+                type = ContentType.SERIES,
+                name = "The Mentalist",
+                poster = null,
+                posterShape = PosterShape.POSTER,
+                background = null,
+                logo = null,
+                description = null,
+                releaseInfo = "2008",
+                imdbRating = null,
+                genres = listOf("Crime", "Drama"),
+                runtime = null,
+                director = emptyList(),
+                cast = emptyList(),
+                videos = emptyList(),
+                country = null,
+                awards = null,
+                language = null,
+                links = emptyList()
+            ),
+            contentType = ContentType.SERIES
+        )
+
+        assertTrue(query.contains("TV shows", ignoreCase = true))
+        assertTrue(query.contains("The Mentalist"))
+        assertTrue(query.contains("Crime"))
+        assertTrue(query.contains("not episodes", ignoreCase = true))
+    }
+
+    @Test
+    fun `Kurato catalog selection prefers the exact AIOStreams AI catalog`() {
+        val addon = Addon(
+            id = "org.aiostreams.kurato",
+            name = "Kurato",
+            version = "1",
+            description = null,
+            logo = null,
+            baseUrl = "https://kurato.example",
+            catalogs = listOf(
+                CatalogDescriptor(ContentType.SERIES, id = "kurato-ai-discover-series", name = "AI Discover Series")
+            ),
+            types = listOf(ContentType.SERIES),
+            resources = emptyList()
+        )
+
+        val match = findKuratoAiCatalog(listOf(addon), ContentType.SERIES)
+
+        assertEquals("kurato-ai-discover-series", match?.second?.id)
+    }
     @Test
     fun `prefetches in final ten minutes`() {
         assertTrue(

@@ -304,6 +304,8 @@ data class PlayerSettings(
     val streamAutoPlayRegex: String = "",
     // Fork: default OFF until validated against the passthrough audio lifecycle.
     val postPlayRecommendationsEnabled: Boolean = false,
+    /** Provider used by the post-play recommendation overlay. AUTO preserves legacy behavior. */
+    val postPlayRecommendationSource: PostPlayRecommendationSource = PostPlayRecommendationSource.AUTO,
     val streamAutoPlayNextEpisodeEnabled: Boolean = false,
     val streamAutoPlayNextEpisodeFallbackEnabled: Boolean = true,
     val streamAutoPlayPreferBingeGroupForNextEpisode: Boolean = true,
@@ -437,6 +439,10 @@ enum class StreamAutoPlayMode {
 
 enum class StreamAutoPlaySource {
     ALL_SOURCES, INSTALLED_ADDONS_ONLY, ENABLED_PLUGINS_ONLY
+}
+
+enum class PostPlayRecommendationSource {
+    AUTO, TRAKT, TMDB, KURATO_AI
 }
 
 enum class VodCacheSizeMode {
@@ -624,6 +630,7 @@ class PlayerSettingsDataStore @Inject constructor(
     private val streamAutoPlaySelectedPluginsKey = stringSetPreferencesKey("stream_auto_play_selected_plugins")
     private val streamAutoPlayRegexKey = stringPreferencesKey("stream_auto_play_regex")
     private val postPlayRecommendationsEnabledKey = booleanPreferencesKey("post_play_recommendations_enabled")
+    private val postPlayRecommendationSourceKey = stringPreferencesKey("post_play_recommendation_source")
     private val streamAutoPlayNextEpisodeEnabledKey = booleanPreferencesKey("stream_auto_play_next_episode_enabled")
     private val streamAutoPlayNextEpisodeFallbackEnabledKey = booleanPreferencesKey("stream_auto_play_next_episode_fallback_enabled")
     private val streamAutoPlayPreferBingeGroupForNextEpisodeKey = booleanPreferencesKey("stream_auto_play_prefer_bingegroup_next_episode")
@@ -1010,6 +1017,10 @@ class PlayerSettingsDataStore @Inject constructor(
                 streamAutoPlaySelectedPlugins = prefs[streamAutoPlaySelectedPluginsKey] ?: emptySet(),
                 streamAutoPlayRegex = prefs[streamAutoPlayRegexKey] ?: "",
                 postPlayRecommendationsEnabled = prefs[postPlayRecommendationsEnabledKey] ?: false,
+                postPlayRecommendationSource = prefs[postPlayRecommendationSourceKey]?.let {
+                    runCatching { PostPlayRecommendationSource.valueOf(it) }
+                        .getOrDefault(PostPlayRecommendationSource.AUTO)
+                } ?: PostPlayRecommendationSource.AUTO,
                 streamAutoPlayNextEpisodeEnabled = prefs[streamAutoPlayNextEpisodeEnabledKey] ?: false,
                 streamAutoPlayNextEpisodeFallbackEnabled = prefs[streamAutoPlayNextEpisodeFallbackEnabledKey] ?: true,
                 streamAutoPlayPreferBingeGroupForNextEpisode =
@@ -1427,6 +1438,12 @@ class PlayerSettingsDataStore @Inject constructor(
     suspend fun setPostPlayRecommendationsEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[postPlayRecommendationsEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setPostPlayRecommendationSource(source: PostPlayRecommendationSource) {
+        store().edit { prefs ->
+            prefs[postPlayRecommendationSourceKey] = source.name
         }
     }
 

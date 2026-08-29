@@ -9,6 +9,7 @@ import com.nuvio.tv.core.util.isUnreleased
 import com.nuvio.tv.data.local.LayoutPreferenceDataStore
 import com.nuvio.tv.data.local.MDBListSettingsDataStore
 import com.nuvio.tv.data.local.MoreLikeThisSourcePreference
+import com.nuvio.tv.data.local.PostPlayRecommendationSource
 import com.nuvio.tv.data.local.PlayerSettingsDataStore
 import com.nuvio.tv.data.local.TmdbSettingsDataStore
 import com.nuvio.tv.data.local.TrailerSettingsDataStore
@@ -20,6 +21,12 @@ import com.nuvio.tv.data.repository.TraktRelatedService
 import com.nuvio.tv.data.trailer.TrailerService
 import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.MetaPreview
+import com.nuvio.tv.domain.model.Addon
+import com.nuvio.tv.domain.model.CatalogDescriptor
+import com.nuvio.tv.domain.model.ContentType
+import com.nuvio.tv.domain.model.CatalogRow
+import com.nuvio.tv.domain.repository.AddonRepository
+import com.nuvio.tv.domain.repository.CatalogRepository
 import com.nuvio.tv.domain.repository.MetaRepository
 import com.nuvio.tv.domain.repository.WatchProgressRepository
 import java.time.LocalDate
@@ -36,13 +43,17 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal class PostPlayRecommendationController(
     private val playbackController: PlayerRuntimeController,
     private val playerSettingsDataStore: PlayerSettingsDataStore,
     private val metaRepository: MetaRepository,
+    private val catalogRepository: CatalogRepository,
+    private val addonRepository: AddonRepository,
     private val tmdbService: TmdbService,
     private val tmdbMetadataService: TmdbMetadataService,
     private val tmdbSettingsDataStore: TmdbSettingsDataStore,
@@ -168,6 +179,12 @@ internal class PostPlayRecommendationController(
 
     fun showNextRecommendation() {
         selectRecommendation(1)
+    }
+
+    fun selectRecommendationIndex(index: Int) {
+        val state = _uiState.value
+        if (index !in recommendationCandidates.indices || index == state.recommendationIndex) return
+        selectRecommendationAt(index)
     }
 
     fun returnToPlayer() {
@@ -336,7 +353,6 @@ internal class PostPlayRecommendationController(
             autoPlayTrailerEnabled = postPlayTrailerPlaybackEnabled && runCatching {
                 trailerSettingsDataStore.settings.first().enabled
             }.getOrDefault(true)
-            candidates.indices.forEach(::startCandidateResolution)
             val resolvedCandidate = awaitCandidateResolution(0)
             if (resolvedCandidate == null) {
                 clearRecommendationPipeline()
@@ -348,6 +364,7 @@ internal class PostPlayRecommendationController(
             _uiState.update {
                 it.copy(
                     recommendation = recommendation,
+                    recommendationPreviews = candidates,
                     recommendationIndex = 0,
                     recommendationCount = candidates.size,
                     isLoadingRecommendation = false,
@@ -363,7 +380,11 @@ internal class PostPlayRecommendationController(
     private fun prefetchRecommendationDetails(preferences: RatingPreferences) {
         recommendationPrefetchJob?.cancel()
         recommendationPrefetchJob = scope.launch {
-            recommendationCandidates.indices.forEach { index ->
+            val selectedIndex = _uiState.value.recommendationIndex
+            val prefetchIndices = (selectedIndex - RECOMMENDATION_PREFETCH_BEHIND..selectedIndex +
+                RECOMMENDATION_PREFETCH_AHEAD)
+                .filter { it in recommendationCandidates.indices }
+            prefetchIndices.forEach { index ->
                 launch {
                     val resolvedCandidate = awaitCandidateResolution(index) ?: return@launch
                     cacheRecommendation(index, resolvedCandidate, preferences)
@@ -408,6 +429,12 @@ internal class PostPlayRecommendationController(
         val state = _uiState.value
         if (!state.isVisible || state.isChangingRecommendation) return
         val targetIndex = state.recommendationIndex + offset
+        selectRecommendationAt(targetIndex)
+    }
+
+    private fun selectRecommendationAt(targetIndex: Int) {
+        val state = _uiState.value
+        if (!state.isVisible || state.isChangingRecommendation) return
         if (targetIndex !in recommendationCandidates.indices) return
 
         postEndCountdownJob?.cancel()
@@ -580,32 +607,25 @@ internal class PostPlayRecommendationController(
             apiType = playbackController.contentType,
             fallback = meta.type
         ) ?: return emptyList()
-        val candidates = withTimeoutOrNull(10_000L) {
-            val sourcePreference = traktSettingsDataStore.moreLikeThisSource.first()
-            val traktAuthenticated = traktAuthDataStore.isAuthenticated.first()
-            if (sourcePreference == MoreLikeThisSourcePreference.TRAKT && traktAuthenticated) {
-                runCatching {
-                    traktRelatedService.getRelated(
-                        meta = meta,
-                        fallbackItemId = playbackController.contentId,
-                        fallbackItemType = playbackController.contentType
-                    )
-                }.getOrDefault(emptyList())
-            } else {
-                val settings = tmdbSettingsDataStore.settings.first()
-                if (!settings.enabled || !settings.useMoreLikeThis) return@withTimeoutOrNull emptyList()
-                val lookupType = tmdbContentType.toApiString(playbackController.contentType)
-                val tmdbId = tmdbService.ensureTmdbId(meta.id, lookupType)
-                    ?: playbackController.contentId?.let { tmdbService.ensureTmdbId(it, lookupType) }
-                    ?: return@withTimeoutOrNull emptyList()
-                runCatching {
-                    tmdbMetadataService.fetchMoreLikeThis(
-                        tmdbId = tmdbId,
-                        contentType = tmdbContentType,
-                        language = settings.language
-                    )
-                }.getOrDefault(emptyList())
+        val sourcePreference = playerSettingsDataStore.playerSettings
+            .first()
+            .postPlayRecommendationSource
+        val kuratoCandidates = if (sourcePreference == PostPlayRecommendationSource.KURATO_AI) {
+            try {
+                withTimeoutOrNull(KURATO_RECOMMENDATION_TIMEOUT_MS) {
+                    loadKuratoCandidates(meta, tmdbContentType)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
             }
+        } else {
+            null
+        }
+        val usesKurato = sourcePreference == PostPlayRecommendationSource.KURATO_AI && kuratoCandidates != null
+        val candidates = kuratoCandidates ?: withTimeoutOrNull(10_000L) {
+            loadLegacyCandidates(meta, tmdbContentType, sourcePreference)
         }.orEmpty()
 
         val hideUnreleased = layoutPreferenceDataStore.hideUnreleasedContent.first()
@@ -632,11 +652,130 @@ internal class PostPlayRecommendationController(
             ?: return emptyList()
         return buildList {
             add(first)
-            filtered.asSequence()
-                .filterNot { it === first }
-                .take(MAX_POST_PLAY_RECOMMENDATIONS - 1)
-                .forEach(::add)
+            val remaining = filtered.asSequence().filterNot { it === first }
+            if (usesKurato) {
+                remaining.forEach(::add)
+            } else {
+                remaining.take(MAX_POST_PLAY_RECOMMENDATIONS - 1).forEach(::add)
+            }
         }
+    }
+
+    private suspend fun loadLegacyCandidates(
+        meta: Meta,
+        contentType: ContentType,
+        sourcePreference: PostPlayRecommendationSource
+    ): List<MetaPreview> {
+        val traktAuthenticated = traktAuthDataStore.isAuthenticated.first()
+        if (sourcePreference != PostPlayRecommendationSource.TMDB &&
+            (sourcePreference == PostPlayRecommendationSource.TRAKT ||
+                traktSettingsDataStore.moreLikeThisSource.first() == MoreLikeThisSourcePreference.TRAKT) &&
+            traktAuthenticated
+        ) {
+            return runCatching {
+                traktRelatedService.getRelated(
+                    meta = meta,
+                    fallbackItemId = playbackController.contentId,
+                    fallbackItemType = playbackController.contentType
+                )
+            }.getOrDefault(emptyList())
+        }
+
+        val settings = tmdbSettingsDataStore.settings.first()
+        if (!settings.enabled || !settings.useMoreLikeThis) return emptyList()
+        val lookupType = contentType.toApiString(playbackController.contentType)
+        val tmdbId = tmdbService.ensureTmdbId(meta.id, lookupType)
+            ?: playbackController.contentId?.let { tmdbService.ensureTmdbId(it, lookupType) }
+            ?: return emptyList()
+        return runCatching {
+            tmdbMetadataService.fetchMoreLikeThis(
+                tmdbId = tmdbId,
+                contentType = contentType,
+                language = settings.language
+            )
+        }.getOrDefault(emptyList())
+    }
+
+    private suspend fun loadKuratoCandidates(
+        meta: Meta,
+        contentType: ContentType
+    ): List<MetaPreview>? {
+        val installedAddons = addonRepository.getInstalledAddons().first()
+        val match = findKuratoAiCatalog(installedAddons, contentType) ?: return null
+        val (addon, catalog) = match
+        val pageSize = (catalog.pageSize ?: KURATO_DEFAULT_PAGE_SIZE)
+            .coerceIn(1, KURATO_MAX_PAGE_SIZE)
+        val query = buildKuratoRecommendationQuery(meta, contentType)
+        val items = LinkedHashMap<String, MetaPreview>()
+        var pageStart = 0
+        var pageNumber = 0
+        while (pageNumber < KURATO_MAX_PAGES) {
+            val itemCountBeforePage = items.size
+            val offsets = (0 until KURATO_PAGE_WINDOW).map { pageStart + it * pageSize }
+            val pages = kotlinx.coroutines.coroutineScope {
+                offsets.map { skip ->
+                    async {
+                        fetchKuratoCatalogPage(
+                            addon = addon,
+                            catalog = catalog,
+                            contentType = contentType,
+                            skip = skip,
+                            pageSize = pageSize,
+                            query = query
+                        )
+                    }
+                }.awaitAll()
+            }
+            pages.forEach { page ->
+                page.items.forEach { item ->
+                    items.putIfAbsent("${item.apiType}:${item.id}".lowercase(), item)
+                }
+            }
+            val shouldStop = items.size == itemCountBeforePage ||
+                pages.any { it.items.isEmpty() || !it.hasMore } ||
+                pages.any { it.items.size < pageSize }
+            if (shouldStop) break
+            pageStart += pageSize * KURATO_PAGE_WINDOW
+            pageNumber++
+        }
+        return items.values.toList()
+    }
+
+    private suspend fun fetchKuratoCatalogPage(
+        addon: Addon,
+        catalog: CatalogDescriptor,
+        contentType: ContentType,
+        skip: Int,
+        pageSize: Int,
+        query: String
+    ): CatalogRow {
+        val emissions = catalogRepository.getCatalog(
+            addonBaseUrl = addon.baseUrl,
+            addonId = addon.id,
+            addonName = addon.displayName,
+            catalogId = catalog.id,
+            catalogName = catalog.name,
+            type = catalog.apiType,
+            skip = skip,
+            skipStep = pageSize,
+            extraArgs = mapOf("search" to query),
+            supportsSkip = true
+        ).toList()
+        val success = emissions.asReversed().firstOrNull { it is NetworkResult.Success<*> }
+        return (success as? NetworkResult.Success<*>)?.data as? CatalogRow ?:
+            CatalogRow(
+                addonId = addon.id,
+                addonName = addon.displayName,
+                addonBaseUrl = addon.baseUrl,
+                catalogId = catalog.id,
+                catalogName = catalog.name,
+                type = contentType,
+                rawType = catalog.rawType,
+                items = emptyList(),
+                hasMore = false,
+                supportsSkip = true,
+                skipStep = pageSize
+            )
     }
 
     private suspend fun resolveCandidate(candidate: MetaPreview): ResolvedCandidate {
@@ -754,5 +893,62 @@ internal class PostPlayRecommendationController(
 }
 
 private const val MAX_POST_PLAY_RECOMMENDATIONS = 4
+private const val KURATO_DEFAULT_PAGE_SIZE = 50
+private const val KURATO_MAX_PAGE_SIZE = 100
+private const val KURATO_PAGE_WINDOW = 4
+private const val KURATO_MAX_PAGES = 12
+private const val KURATO_RECOMMENDATION_TIMEOUT_MS = 15_000L
+private const val RECOMMENDATION_PREFETCH_BEHIND = 1
+private const val RECOMMENDATION_PREFETCH_AHEAD = 4
+
+internal fun buildKuratoRecommendationQuery(meta: Meta, contentType: ContentType): String {
+    val title = meta.name.trim().ifBlank { "this title" }
+    val kind = if (contentType == ContentType.SERIES) "TV shows" else "movies"
+    val genres = meta.genres
+        .asSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .distinct()
+        .take(3)
+        .toList()
+    val genreHint = genres.takeIf { it.isNotEmpty() }
+        ?.joinToString(", ")
+        ?.let { " Focus on similar tone and genres such as $it." }
+        .orEmpty()
+    return "Recommend $kind similar to \"$title\".$genreHint Return titles only, not episodes."
+}
+
+internal fun findKuratoAiCatalog(
+    addons: List<Addon>,
+    contentType: ContentType
+): Pair<Addon, CatalogDescriptor>? {
+    val expectedCatalogId = if (contentType == ContentType.SERIES) {
+        "kurato-ai-discover-series"
+    } else {
+        "kurato-ai-discover-movie"
+    }
+    val addonCandidates = addons.asSequence()
+        .filter { it.enabled }
+        .filter { addon ->
+            addon.id.equals("org.aiostreams.kurato", ignoreCase = true) ||
+                addon.name.contains("kurato", ignoreCase = true) ||
+                addon.displayName.contains("kurato", ignoreCase = true)
+        }
+    addonCandidates.forEach { addon ->
+        val exact = addon.catalogs.firstOrNull { catalog ->
+            catalog.id.equals(expectedCatalogId, ignoreCase = true) &&
+                resolvePostPlayContentType(catalog.apiType, catalog.type) == contentType
+        }
+        if (exact != null) return addon to exact
+    }
+    return addonCandidates
+        .mapNotNull { addon ->
+            addon.catalogs.firstOrNull { catalog ->
+                catalog.id.contains("kurato-ai-discover", ignoreCase = true) &&
+                    resolvePostPlayContentType(catalog.apiType, catalog.type) == contentType
+            }?.let { addon to it }
+        }
+        .firstOrNull()
+}
 
 private fun String.normalizedId(): String = trim().lowercase()

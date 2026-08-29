@@ -36,6 +36,7 @@ import com.nuvio.tv.data.repository.MDBListRepository
 import com.nuvio.tv.data.repository.SkipIntroRepository
 import com.nuvio.tv.data.repository.TraktEpisodeMappingService
 import com.nuvio.tv.domain.repository.AddonRepository
+import com.nuvio.tv.domain.repository.CatalogRepository
 import com.nuvio.tv.domain.repository.MetaRepository
 import com.nuvio.tv.domain.repository.StreamRepository
 import com.nuvio.tv.domain.repository.WatchProgressRepository
@@ -65,6 +66,7 @@ class PlayerViewModel @Inject constructor(
     private val metaRepository: MetaRepository,
     private val streamRepository: StreamRepository,
     private val addonRepository: AddonRepository,
+    private val catalogRepository: CatalogRepository,
     private val pluginManager: PluginManager,
     private val subtitleRepository: com.nuvio.tv.domain.repository.SubtitleRepository,
     private val parentalGuideRepository: ParentalGuideRepository,
@@ -160,6 +162,8 @@ class PlayerViewModel @Inject constructor(
         playbackController = controller,
         playerSettingsDataStore = playerSettingsDataStore,
         metaRepository = metaRepository,
+        catalogRepository = catalogRepository,
+        addonRepository = addonRepository,
         tmdbService = tmdbService,
         tmdbMetadataService = tmdbMetadataService,
         tmdbSettingsDataStore = tmdbSettingsDataStore,
@@ -1055,6 +1059,10 @@ class PlayerViewModel @Inject constructor(
 
     fun showNextPostPlayRecommendation() {
         postPlayRecommendationController.showNextRecommendation()
+    }
+
+    fun selectPostPlayRecommendation(index: Int) {
+        postPlayRecommendationController.selectRecommendationIndex(index)
     }
 
     fun returnToPlayerFromPostPlay() {

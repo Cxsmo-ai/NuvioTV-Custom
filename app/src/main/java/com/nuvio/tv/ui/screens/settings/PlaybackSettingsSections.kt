@@ -135,8 +135,10 @@ internal fun PlaybackSettingsSections(
     onShowStreamRegexDialog: () -> Unit,
     onShowNextEpisodeThresholdModeDialog: () -> Unit,
     onShowReuseLastLinkCacheDialog: () -> Unit,
+    onShowPostPlayRecommendationSourceDialog: () -> Unit,
     onOpenConnectedServices: (() -> Unit)? = null,
     onSetPostPlayRecommendationsEnabled: (Boolean) -> Unit,
+    onSetPostPlayRecommendationSource: (com.nuvio.tv.data.local.PostPlayRecommendationSource) -> Unit,
     onSetStreamAutoPlayNextEpisodeEnabled: (Boolean) -> Unit,
     onSetStreamAutoPlayNextEpisodeFallbackEnabled: (Boolean) -> Unit,
     onSetStreamAutoPlayPreferBingeGroupForNextEpisode: (Boolean) -> Unit,
@@ -585,6 +587,7 @@ internal fun PlaybackSettingsSections(
                 onShowRegexDialog = onShowStreamRegexDialog,
                 onShowNextEpisodeThresholdModeDialog = onShowNextEpisodeThresholdModeDialog,
                 onShowReuseLastLinkCacheDialog = onShowReuseLastLinkCacheDialog,
+                onShowPostPlayRecommendationSourceDialog = onShowPostPlayRecommendationSourceDialog,
                 onOpenConnectedServices = onOpenConnectedServices,
                 onSetPostPlayRecommendationsEnabled = onSetPostPlayRecommendationsEnabled,
                 onSetStreamAutoPlayNextEpisodeEnabled = onSetStreamAutoPlayNextEpisodeEnabled,
@@ -1076,6 +1079,7 @@ internal fun PlaybackSettingsDialogsHost(
     showStreamRegexDialog: Boolean,
     showNextEpisodeThresholdModeDialog: Boolean,
     showReuseLastLinkCacheDialog: Boolean,
+    showPostPlayRecommendationSourceDialog: Boolean,
     onSetPlayerPreference: (PlayerPreference) -> Unit,
     onDismissPlayerPreferenceDialog: () -> Unit,
     onSetInternalPlayerEngine: (InternalPlayerEngine) -> Unit,
@@ -1096,6 +1100,7 @@ internal fun PlaybackSettingsDialogsHost(
     onSetStreamAutoPlaySource: (com.nuvio.tv.data.local.StreamAutoPlaySource) -> Unit,
     onSetNextEpisodeThresholdMode: (com.nuvio.tv.data.local.NextEpisodeThresholdMode) -> Unit,
     onSetStreamAutoPlayRegex: (String) -> Unit,
+    onSetPostPlayRecommendationSource: (com.nuvio.tv.data.local.PostPlayRecommendationSource) -> Unit,
     onSetStreamAutoPlaySelectedAddons: (Set<String>) -> Unit,
     onSetStreamAutoPlaySelectedPlugins: (Set<String>) -> Unit,
     onSetReuseLastLinkCacheHours: (Int) -> Unit,
@@ -1117,7 +1122,8 @@ internal fun PlaybackSettingsDialogsHost(
     onDismissStreamAutoPlayAddonSelectionDialog: () -> Unit,
     onDismissStreamAutoPlayPluginSelectionDialog: () -> Unit,
     onDismissNextEpisodeThresholdModeDialog: () -> Unit,
-    onDismissReuseLastLinkCacheDialog: () -> Unit
+    onDismissReuseLastLinkCacheDialog: () -> Unit,
+    onDismissPostPlayRecommendationSourceDialog: () -> Unit
 ) {
     if (showPlayerPreferenceDialog) {
         PlayerPreferenceDialog(
@@ -1217,6 +1223,17 @@ internal fun PlaybackSettingsDialogsHost(
         onDismissNextEpisodeThresholdModeDialog = onDismissNextEpisodeThresholdModeDialog,
         onDismissReuseLastLinkCacheDialog = onDismissReuseLastLinkCacheDialog
     )
+
+    if (showPostPlayRecommendationSourceDialog) {
+        PostPlayRecommendationSourceDialog(
+            currentSource = playerSettings.postPlayRecommendationSource,
+            onSourceSelected = { source ->
+                onSetPostPlayRecommendationSource(source)
+                onDismissPostPlayRecommendationSourceDialog()
+            },
+            onDismiss = onDismissPostPlayRecommendationSourceDialog
+        )
+    }
 }
 
 @Composable
@@ -1274,5 +1291,44 @@ private fun InternalPlayerEngineDialog(
         onDismiss = onDismiss,
         width = 420.dp,
         maxHeight = 320.dp
+    )
+}
+
+@Composable
+private fun PostPlayRecommendationSourceDialog(
+    currentSource: com.nuvio.tv.data.local.PostPlayRecommendationSource,
+    onSourceSelected: (com.nuvio.tv.data.local.PostPlayRecommendationSource) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf(
+        SettingsPickerOption(
+            com.nuvio.tv.data.local.PostPlayRecommendationSource.AUTO,
+            stringResource(R.string.autoplay_post_play_recommendation_source_auto),
+            stringResource(R.string.autoplay_post_play_recommendation_source_sub)
+        ),
+        SettingsPickerOption(
+            com.nuvio.tv.data.local.PostPlayRecommendationSource.TRAKT,
+            stringResource(R.string.autoplay_post_play_recommendation_source_trakt),
+            stringResource(R.string.autoplay_post_play_recommendation_source_sub)
+        ),
+        SettingsPickerOption(
+            com.nuvio.tv.data.local.PostPlayRecommendationSource.TMDB,
+            stringResource(R.string.autoplay_post_play_recommendation_source_tmdb),
+            stringResource(R.string.autoplay_post_play_recommendation_source_sub)
+        ),
+        SettingsPickerOption(
+            com.nuvio.tv.data.local.PostPlayRecommendationSource.KURATO_AI,
+            stringResource(R.string.autoplay_post_play_recommendation_source_kurato),
+            stringResource(R.string.autoplay_post_play_recommendation_source_sub)
+        )
+    )
+    SettingsSingleChoiceDialog(
+        title = stringResource(R.string.autoplay_post_play_recommendation_source),
+        options = options,
+        selectedValue = currentSource,
+        onOptionSelected = onSourceSelected,
+        onDismiss = onDismiss,
+        width = 520.dp,
+        maxHeight = 420.dp
     )
 }
