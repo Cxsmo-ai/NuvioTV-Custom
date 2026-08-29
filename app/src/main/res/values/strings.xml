@@ -2804,6 +2804,8 @@
     <string name="player_error_torrent">Torrent error: %1$s</string>
     <string name="player_error_playback_fallback">Playback error</string>
     <string name="player_error_startup_timeout">Playback did not start — the video decoder may not be responding. A device restart usually clears this. Press back to return and try again, or pick a different stream.</string>
+    <string name="player_error_startup_video_track_unsupported">Playback did not start — this device cannot play the video format of this stream. Press back and pick a different stream.</string>
+    <string name="player_error_startup_no_stream_data">Playback did not start — the stream did not deliver data in time. The source may be slow or unavailable. Press back to try again, or pick a different stream.</string>
     <!-- Subtitle timing recovery -->
     <string name="subtitle_timing_file_no_lines">No subtitle lines were found in this file.</string>
     <string name="subtitle_timing_load_lines_failed">Failed to load subtitle lines.</string>

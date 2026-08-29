@@ -842,17 +842,44 @@ internal fun PlayerRuntimeController.scheduleStartupWatchdog() {
                 Player.STATE_ENDED -> "ENDED"
                 else -> livePlayer.playbackState.toString()
             }
+            // nt5 (c, rev2): say something true. Four-way, gated first on
+            // whether onTracksChanged has run at all (hasScannedTextTracksOnce
+            // is set at the end of updateAvailableTracks, reset per stream):
+            //  - tracks never read -> the container headers never arrived;
+            //    a source problem at real fire timings, not a decoder one.
+            //  - tracks read, video present but unselected -> format rejected.
+            //  - tracks read, no video group -> trackless stream; same source-
+            //    facing message, distinct log token (carry-forward: own string).
+            //  - tracks read, video selected, no frame -> the genuine wedge;
+            //    the original decoder message is finally accurate.
+            val fireReason = when {
+                !hasScannedTextTracksOnce -> "tracks_not_read"
+                currentStreamHasVideoTrack && !currentVideoTrackSelected -> "video_track_unsupported"
+                !currentStreamHasVideoTrack -> "no_video_track"
+                else -> "decoder_unresponsive"
+            }
+            val fireMessage = when (fireReason) {
+                "video_track_unsupported" ->
+                    context.getString(com.nuvio.tv.R.string.player_error_startup_video_track_unsupported)
+                "tracks_not_read", "no_video_track" ->
+                    context.getString(com.nuvio.tv.R.string.player_error_startup_no_stream_data)
+                else ->
+                    context.getString(com.nuvio.tv.R.string.player_error_startup_timeout)
+            }
             Log.w(
                 PlayerRuntimeController.TAG,
                 "STARTUP_WATCHDOG: no first frame ${elapsedMs}ms " +
                     "after starting_stream (state=$stateName bufferedAheadMs=${bufferedAheadMs} " +
-                    "pos=${livePlayer.currentPosition}); surfacing error"
+                    "pos=${livePlayer.currentPosition} reason=$fireReason " +
+                    "scannedTracks=$hasScannedTextTracksOnce hasVideoTrack=$currentStreamHasVideoTrack " +
+                    "videoSelected=$currentVideoTrackSelected); " +
+                    "surfacing error"
             )
             com.nuvio.tv.core.util.TtffTrace.mark("startup_watchdog_fired")
             _uiState.update {
                 if (it.error == null) {
                     it.copy(
-                        error = context.getString(com.nuvio.tv.R.string.player_error_startup_timeout),
+                        error = fireMessage,
                         showLoadingOverlay = false
                     )
                 } else {
@@ -873,10 +900,16 @@ internal fun PlayerRuntimeController.scheduleStartupWatchdog() {
  * failure racing the frame) is left untouched.
  */
 internal fun PlayerRuntimeController.retractStartupTimeoutErrorAfterFirstFrame() {
-    val startupTimeoutMessage = context.getString(com.nuvio.tv.R.string.player_error_startup_timeout)
+    // nt5 (c): the watchdog can now surface three different messages; a late
+    // first frame disproves all of them equally, so retract whichever fired.
+    val startupWatchdogMessages = setOf(
+        context.getString(com.nuvio.tv.R.string.player_error_startup_timeout),
+        context.getString(com.nuvio.tv.R.string.player_error_startup_video_track_unsupported),
+        context.getString(com.nuvio.tv.R.string.player_error_startup_no_stream_data),
+    )
     var retracted = false
     _uiState.update {
-        if (it.error == startupTimeoutMessage) {
+        if (it.error != null && it.error in startupWatchdogMessages) {
             retracted = true
             it.copy(error = null)
         } else {
