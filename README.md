@@ -41,6 +41,8 @@ In addition to the playback and library work below, this fork includes:
 
 Progressive scraping requires the matching [Cxsmo-ai/AIOStreams](https://github.com/Cxsmo-ai/AIOStreams)
 fork and its `client=nuvio-progressive` endpoint. A normal AIOStreams manifest remains supported.
+See the [progressive scraping video example](https://www.reddit.com/r/Nuvio/s/DSBDbVt2MY) for the
+intended source-list behavior as results arrive.
 
 Optimisation and playback-quality work, most of it aimed at high-bitrate remux and lossless audio.
 The short version: streams start faster, buffer deeper, stall less, and you can *see* that your

@@ -25,6 +25,8 @@ The release workflow publishes ABI-specific assets with these names:
 The `armeabi-v7a` build is for 32-bit ARM Android TV devices. The arm64 build is provided for
 compatible 64-bit ARM Android TV hardware. Progressive scraping requires the matching
 [Cxsmo-ai/AIOStreams](https://github.com/Cxsmo-ai/AIOStreams) fork.
+See the [progressive scraping video example](https://www.reddit.com/r/Nuvio/s/DSBDbVt2MY) for the
+intended behavior while additional sources arrive.
 
 ## Upgrade notes
 

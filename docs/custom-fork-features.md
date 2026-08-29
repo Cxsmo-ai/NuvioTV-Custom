@@ -37,6 +37,8 @@ list as new snapshots arrive, and keeps the normal manifest path available as a 
 
 The progressive path is an integration contract between these two repositories; it is not expected
 to work against an unrelated AIOStreams build that does not implement the endpoint.
+For a visual example of the intended progressive source-list behavior, see the
+[Nuvio progressive scraping video](https://www.reddit.com/r/Nuvio/s/DSBDbVt2MY).
 
 ## Scrape timeout controls
 
