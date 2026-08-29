@@ -805,32 +805,61 @@ internal fun PlayerRuntimeController.cancelStartupWatchdog() {
 internal fun PlayerRuntimeController.scheduleStartupWatchdog() {
     cancelStartupWatchdog()
     startupWatchdogJob = scope.launch {
-        delay(PlayerRuntimeController.STARTUP_WATCHDOG_TIMEOUT_MS)
-        if (hasRenderedFirstFrame) return@launch
-        val livePlayer = _exoPlayer ?: return@launch
-        val stateName = when (livePlayer.playbackState) {
-            Player.STATE_IDLE -> "IDLE"
-            Player.STATE_BUFFERING -> "BUFFERING"
-            Player.STATE_READY -> "READY"
-            Player.STATE_ENDED -> "ENDED"
-            else -> livePlayer.playbackState.toString()
-        }
-        Log.w(
-            PlayerRuntimeController.TAG,
-            "STARTUP_WATCHDOG: no first frame ${PlayerRuntimeController.STARTUP_WATCHDOG_TIMEOUT_MS}ms " +
-                "after starting_stream (state=$stateName buffered=${livePlayer.bufferedPosition} " +
-                "pos=${livePlayer.currentPosition}); surfacing error"
-        )
-        com.nuvio.tv.core.util.TtffTrace.mark("startup_watchdog_fired")
-        _uiState.update {
-            if (it.error == null) {
-                it.copy(
-                    error = context.getString(com.nuvio.tv.R.string.player_error_startup_timeout),
-                    showLoadingOverlay = false
+        // nt5 (b, rev2): extend-with-ceiling on buffered-AHEAD growth.
+        // rev1 compared absolute bufferedPosition against a 0 baseline, which
+        // misfires on every resume (position opens at the resume offset) and
+        // measures the timeline, not data flow. totalBufferedDuration is the
+        // buffered-ahead amount in ms -- a delta, resume-safe by construction
+        // (the analytics layer already treats it as buffered-ahead). If it
+        // grew since the last check and another full interval fits inside the
+        // ceiling, re-arm instead of firing.
+        val armedAtMs = System.currentTimeMillis()
+        var lastBufferedAheadMs = 0L
+        while (isActive) {
+            delay(PlayerRuntimeController.STARTUP_WATCHDOG_TIMEOUT_MS)
+            if (hasRenderedFirstFrame) return@launch
+            val livePlayer = _exoPlayer ?: return@launch
+            val elapsedMs = System.currentTimeMillis() - armedAtMs
+            val bufferedAheadMs = livePlayer.totalBufferedDuration.coerceAtLeast(0L)
+            val anotherIntervalFits =
+                elapsedMs + PlayerRuntimeController.STARTUP_WATCHDOG_TIMEOUT_MS <=
+                    PlayerRuntimeController.STARTUP_WATCHDOG_CEILING_MS
+            if (bufferedAheadMs > lastBufferedAheadMs && anotherIntervalFits) {
+                Log.w(
+                    PlayerRuntimeController.TAG,
+                    "STARTUP_WATCHDOG: no first frame ${elapsedMs}ms after starting_stream " +
+                        "but buffered-ahead growing (${lastBufferedAheadMs}ms -> ${bufferedAheadMs}ms); " +
+                        "extending (ceiling=${PlayerRuntimeController.STARTUP_WATCHDOG_CEILING_MS}ms)"
                 )
-            } else {
-                it
+                com.nuvio.tv.core.util.TtffTrace.mark("startup_watchdog_extended")
+                lastBufferedAheadMs = bufferedAheadMs
+                continue
             }
+            val stateName = when (livePlayer.playbackState) {
+                Player.STATE_IDLE -> "IDLE"
+                Player.STATE_BUFFERING -> "BUFFERING"
+                Player.STATE_READY -> "READY"
+                Player.STATE_ENDED -> "ENDED"
+                else -> livePlayer.playbackState.toString()
+            }
+            Log.w(
+                PlayerRuntimeController.TAG,
+                "STARTUP_WATCHDOG: no first frame ${elapsedMs}ms " +
+                    "after starting_stream (state=$stateName bufferedAheadMs=${bufferedAheadMs} " +
+                    "pos=${livePlayer.currentPosition}); surfacing error"
+            )
+            com.nuvio.tv.core.util.TtffTrace.mark("startup_watchdog_fired")
+            _uiState.update {
+                if (it.error == null) {
+                    it.copy(
+                        error = context.getString(com.nuvio.tv.R.string.player_error_startup_timeout),
+                        showLoadingOverlay = false
+                    )
+                } else {
+                    it
+                }
+            }
+            return@launch
         }
     }
 }

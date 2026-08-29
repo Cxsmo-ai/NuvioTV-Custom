@@ -131,6 +131,10 @@ class PlayerRuntimeController(
         // previously produced an infinite spinner with no error. Margin: worst
         // legitimate observed first frame is ~14.5 s from press (nt32 TTFF baselines).
         internal const val STARTUP_WATCHDOG_TIMEOUT_MS = 20_000L
+        // nt5: hard ceiling for extend-on-buffered-progress. Checks land at
+        // 20/40/60 s; a re-arm is only granted if another full interval fits
+        // inside the ceiling, so 60 s is the latest possible fire.
+        internal const val STARTUP_WATCHDOG_CEILING_MS = 60_000L
         internal const val MAX_TIMEOUT_RECOVERY_ATTEMPTS = 2
         internal const val ADDON_SUBTITLE_TRACK_ID_PREFIX = "nuvio-addon-sub:"
     }
