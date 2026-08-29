@@ -19,6 +19,7 @@ import com.nuvio.tv.data.local.WatchedSeriesStateHolder
 import com.nuvio.tv.data.repository.MDBListRepository
 import com.nuvio.tv.data.repository.TraktRelatedService
 import com.nuvio.tv.data.trailer.TrailerService
+import com.nuvio.tv.data.trailer.TrailerPlaybackSource
 import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.MetaPreview
 import com.nuvio.tv.domain.model.Addon
@@ -500,7 +501,21 @@ internal class PostPlayRecommendationController(
                 val recommendation = recommendationCache[index] ?: return@launch
                 val trailerSource = try {
                     withTimeoutOrNull(15_000L) {
-                        trailerService.getTrailerPlaybackSource(
+                        // Catalog providers such as Kurato and BingeCat can return
+                        // an already-selected YouTube trailer on the preview itself.
+                        // Prefer that source so the post-play hero exposes Trailer
+                        // even when the provider does not expose a usable Meta route
+                        // or TMDB cannot map the provider's id.
+                        val trailerMeta = loadTrailerMetadata(
+                            candidate = candidate,
+                            existingMeta = resolvedCandidate.meta
+                        )
+                        resolveAddonTrailerSource(
+                            candidate = candidate,
+                            meta = trailerMeta,
+                            title = recommendation.title,
+                            year = recommendation.releaseInfo
+                        ) ?: trailerService.getTrailerPlaybackSource(
                             title = recommendation.title,
                             year = recommendation.releaseInfo,
                             tmdbId = recommendation.tmdbId,
@@ -663,6 +678,86 @@ internal class PostPlayRecommendationController(
             add(first)
             val remaining = filtered.asSequence().filterNot { it === first }
             remaining.forEach(::add)
+        }
+    }
+
+    /**
+     * Resolve trailers supplied by the selected catalog before doing a global
+     * title/TMDB lookup. This is important for addon-owned recommendation
+     * catalogs: their catalog response can contain a valid trailer while their
+     * Meta endpoint is absent, incomplete, or uses a provider-specific id.
+     */
+    private suspend fun resolveAddonTrailerSource(
+        candidate: MetaPreview,
+        meta: Meta?,
+        title: String,
+        year: String?
+    ): TrailerPlaybackSource? {
+        val trailerValues = sequenceOf(
+            meta?.trailerYtIds.orEmpty().asSequence(),
+            meta?.trailers.orEmpty().asSequence().mapNotNull { it.ytId },
+            candidate.trailerYtIds.asSequence(),
+            candidate.trailers.asSequence().mapNotNull { it.ytId }
+        )
+            .flatten()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .mapNotNull(::normalizeAddonTrailerUrl)
+            .toList()
+
+        for (youtubeUrl in trailerValues) {
+            val source = trailerService.getTrailerPlaybackSourceFromYouTubeUrl(
+                youtubeUrl = youtubeUrl,
+                title = title,
+                year = year
+            )
+            if (source != null) return source
+        }
+        return null
+    }
+
+    /**
+     * Follow the same all-addon metadata routing used by Nuvio's detail/player
+     * screens when the catalog item itself did not carry trailer data. This
+     * keeps Kurato/BingeCat recommendations compatible with the user's active
+     * metadata addon instead of making their addon the metadata authority.
+     */
+    private suspend fun loadTrailerMetadata(
+        candidate: MetaPreview,
+        existingMeta: Meta?
+    ): Meta? {
+        val hasTrailerData = existingMeta?.trailerYtIds.orEmpty().isNotEmpty() ||
+            existingMeta?.trailers.orEmpty().any { !it.ytId.isNullOrBlank() }
+        if (hasTrailerData || candidate.trailerYtIds.isNotEmpty() || candidate.trailers.any { !it.ytId.isNullOrBlank() }) {
+            return existingMeta
+        }
+
+        return withTimeoutOrNull(8_000L) {
+            when (
+                val result = metaRepository.getMetaFromAllAddons(
+                    type = candidate.apiType,
+                    id = candidate.id
+                ).first { it !is NetworkResult.Loading }
+            ) {
+                is NetworkResult.Success -> result.data
+                else -> existingMeta
+            }
+        } ?: existingMeta
+    }
+
+    private fun normalizeAddonTrailerUrl(value: String): String? {
+        if (value.matches(Regex("^[a-zA-Z0-9_-]{11}$"))) {
+            return "https://www.youtube.com/watch?v=$value"
+        }
+
+        val normalized = value.trim()
+        if (!normalized.startsWith("https://") && !normalized.startsWith("http://")) {
+            return null
+        }
+        val lower = normalized.lowercase()
+        return normalized.takeIf {
+            lower.contains("youtube.com/") || lower.contains("youtu.be/")
         }
     }
 
