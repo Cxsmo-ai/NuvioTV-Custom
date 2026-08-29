@@ -918,7 +918,7 @@
     <string name="autoplay_post_play_recommendations_sub">Show recommended movies and series when playback reaches the end.</string>
     <string name="autoplay_post_play_recommendation_source">Recommendation source</string>
     <string name="autoplay_post_play_recommendation_source_sub">Choose where post-play recommendations come from.</string>
-    <string name="autoplay_post_play_recommendation_source_auto">Automatic (Trakt or TMDB)</string>
+    <string name="autoplay_post_play_recommendation_source_auto">Automatic (Kurato, Trakt, or TMDB)</string>
     <string name="autoplay_post_play_recommendation_source_trakt">Trakt related titles</string>
     <string name="autoplay_post_play_recommendation_source_tmdb">TMDB similar titles</string>
     <string name="autoplay_post_play_recommendation_source_kurato">Kurato AI Discover (AIOStreams)</string>

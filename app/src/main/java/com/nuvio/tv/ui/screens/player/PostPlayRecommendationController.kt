@@ -610,7 +610,9 @@ internal class PostPlayRecommendationController(
         val sourcePreference = playerSettingsDataStore.playerSettings
             .first()
             .postPlayRecommendationSource
-        val kuratoCandidates = if (sourcePreference == PostPlayRecommendationSource.KURATO_AI) {
+        val shouldTryKurato = sourcePreference == PostPlayRecommendationSource.AUTO ||
+            sourcePreference == PostPlayRecommendationSource.KURATO_AI
+        val kuratoCandidates = if (shouldTryKurato) {
             try {
                 withTimeoutOrNull(KURATO_RECOMMENDATION_TIMEOUT_MS) {
                     loadKuratoCandidates(meta, tmdbContentType)
@@ -623,7 +625,7 @@ internal class PostPlayRecommendationController(
         } else {
             null
         }
-        val usesKurato = sourcePreference == PostPlayRecommendationSource.KURATO_AI && kuratoCandidates != null
+        val usesKurato = shouldTryKurato && kuratoCandidates != null
         val candidates = kuratoCandidates ?: withTimeoutOrNull(10_000L) {
             loadLegacyCandidates(meta, tmdbContentType, sourcePreference)
         }.orEmpty()
@@ -927,21 +929,21 @@ internal fun findKuratoAiCatalog(
     } else {
         "kurato-ai-discover-movie"
     }
-    val addonCandidates = addons.asSequence()
-        .filter { it.enabled }
-        .filter { addon ->
-            addon.id.equals("org.aiostreams.kurato", ignoreCase = true) ||
-                addon.name.contains("kurato", ignoreCase = true) ||
-                addon.displayName.contains("kurato", ignoreCase = true)
-        }
-    addonCandidates.forEach { addon ->
+    val enabledAddons = addons.asSequence().filter { it.enabled }.toList()
+    val preferredAddons = enabledAddons.sortedByDescending { addon ->
+        if (addon.id.equals("org.aiostreams.kurato", ignoreCase = true) ||
+            addon.name.contains("kurato", ignoreCase = true) ||
+            addon.displayName.contains("kurato", ignoreCase = true)
+        ) 1 else 0
+    }
+    preferredAddons.forEach { addon ->
         val exact = addon.catalogs.firstOrNull { catalog ->
             catalog.id.equals(expectedCatalogId, ignoreCase = true) &&
                 resolvePostPlayContentType(catalog.apiType, catalog.type) == contentType
         }
         if (exact != null) return addon to exact
     }
-    return addonCandidates
+    return preferredAddons
         .mapNotNull { addon ->
             addon.catalogs.firstOrNull { catalog ->
                 catalog.id.contains("kurato-ai-discover", ignoreCase = true) &&

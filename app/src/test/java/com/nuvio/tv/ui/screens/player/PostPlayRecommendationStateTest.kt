@@ -69,6 +69,27 @@ class PostPlayRecommendationStateTest {
 
         assertEquals("kurato-ai-discover-series", match?.second?.id)
     }
+
+    @Test
+    fun `Kurato catalog is found when exposed by the main AIOStreams addon`() {
+        val addon = Addon(
+            id = "org.aiostreams",
+            name = "AIOStreams",
+            version = "1",
+            description = null,
+            logo = null,
+            baseUrl = "https://aiostreams.example",
+            catalogs = listOf(
+                CatalogDescriptor(ContentType.MOVIE, id = "kurato-ai-discover-movie", name = "Kurato AI Movies")
+            ),
+            types = listOf(ContentType.MOVIE),
+            resources = emptyList()
+        )
+
+        val match = findKuratoAiCatalog(listOf(addon), ContentType.MOVIE)
+
+        assertEquals("kurato-ai-discover-movie", match?.second?.id)
+    }
     @Test
     fun `prefetches in final ten minutes`() {
         assertTrue(
