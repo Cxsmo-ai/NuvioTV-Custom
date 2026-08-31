@@ -152,6 +152,7 @@ import com.nuvio.tv.domain.model.CosmeticEntitlement
 import com.nuvio.tv.domain.model.DiscoverLocation
 import com.nuvio.tv.domain.model.ExperienceMode
 import com.nuvio.tv.domain.model.MemberAccess
+import com.nuvio.tv.domain.model.NavigationMenuPosition
 import com.nuvio.tv.domain.model.SettingsUiStyle
 import com.nuvio.tv.domain.model.resolveAppTheme
 import com.nuvio.tv.domain.deeplink.AppDeepLink
@@ -220,6 +221,7 @@ private data class MainUiPrefs(
     val sidebarCollapsed: Boolean = false,
     val modernSidebarEnabled: Boolean = false,
     val modernSidebarBlurPref: Boolean = false,
+    val navigationMenuPosition: NavigationMenuPosition = NavigationMenuPosition.SIDE,
     val discoverLocation: DiscoverLocation? = null,
     val smoothBringIntoViewEnabled: Boolean = true,
     val fastHorizontalNavigationEnabled: Boolean = false,
@@ -522,8 +524,9 @@ class MainActivity : ComponentActivity() {
                     themeAndExperienceFlow,
                     layoutAndFeaturesFlow,
                     extraFeaturesFlow,
-                    layoutPreferenceDataStore.cardDepthStyle
-                ) { themePrefs, layoutPrefs, extraPrefs, cardDepthStyle ->
+                    layoutPreferenceDataStore.cardDepthStyle,
+                    layoutPreferenceDataStore.navigationMenuPosition
+                ) { themePrefs, layoutPrefs, extraPrefs, cardDepthStyle, navigationMenuPosition ->
                     themePrefs.copy(
                         hasChosenLayout = layoutPrefs.hasChosenLayout,
                         sidebarCollapsed = layoutPrefs.sidebarCollapsed,
@@ -535,7 +538,8 @@ class MainActivity : ComponentActivity() {
                         fastHorizontalNavigationEnabled = extraPrefs.fastHorizontalNavigationEnabled,
                         composeHighlighterEnabled = extraPrefs.composeHighlighterEnabled,
                         settingsUiStyle = extraPrefs.settingsUiStyle,
-                        cardDepthStyle = cardDepthStyle
+                        cardDepthStyle = cardDepthStyle,
+                        navigationMenuPosition = navigationMenuPosition
                     )
                 }
             }
@@ -980,18 +984,14 @@ class MainActivity : ComponentActivity() {
                         onFeedbackShown = updateViewModel::consumeFeedbackMessage
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
-                            if (modernSidebarEnabled) {
-                                ModernSidebarScaffold(
+                            when (mainUiPrefs.navigationMenuPosition) {
+                                NavigationMenuPosition.TOP -> TopNavigationScaffold(
                                     navController = navController,
                                     startDestination = startDestination,
                                     currentRoute = currentRoute,
                                     rootRoutes = rootRoutes,
                                     drawerItems = drawerItems,
                                     selectedDrawerRoute = selectedDrawerRoute,
-                                    selectedDrawerItem = selectedDrawerItem,
-                                    sidebarCollapsed = sidebarCollapsed,
-                                    modernSidebarBlurEnabled = modernSidebarBlurEnabled,
-                                    hideBuiltInHeaders = hideBuiltInHeadersForFloatingPill,
                                     activeProfileName = activeProfile?.name ?: "",
                                     activeProfileColorHex = activeProfile?.avatarColorHex ?: "#1E88E5",
                                     activeProfileAvatarImageUrl = activeProfileAvatarImageUrl,
@@ -1003,27 +1003,52 @@ class MainActivity : ComponentActivity() {
                                         finishAndRemoveTask()
                                     }
                                 )
-                            } else {
-                                LegacySidebarScaffold(
-                                    navController = navController,
-                                    startDestination = startDestination,
-                                    currentRoute = currentRoute,
-                                    rootRoutes = rootRoutes,
-                                    drawerItems = drawerItems,
-                                    selectedDrawerRoute = selectedDrawerRoute,
-                                    sidebarCollapsed = sidebarCollapsed,
-                                    hideBuiltInHeaders = false,
-                                    activeProfileName = activeProfile?.name ?: "",
-                                    activeProfileColorHex = activeProfile?.avatarColorHex ?: "#1E88E5",
-                                    activeProfileAvatarImageUrl = activeProfileAvatarImageUrl,
-                                    showProfileSelector = activeProfile != null,
-                                    onSwitchProfile = { hasSelectedProfileThisSession = false },
-                                    onNavigate = { optimisticRoute = it },
-                                    onExitApp = {
-                                        finishAffinity()
-                                        finishAndRemoveTask()
-                                    }
-                                )
+
+                                NavigationMenuPosition.SIDE -> if (modernSidebarEnabled) {
+                                    ModernSidebarScaffold(
+                                        navController = navController,
+                                        startDestination = startDestination,
+                                        currentRoute = currentRoute,
+                                        rootRoutes = rootRoutes,
+                                        drawerItems = drawerItems,
+                                        selectedDrawerRoute = selectedDrawerRoute,
+                                        selectedDrawerItem = selectedDrawerItem,
+                                        sidebarCollapsed = sidebarCollapsed,
+                                        modernSidebarBlurEnabled = modernSidebarBlurEnabled,
+                                        hideBuiltInHeaders = hideBuiltInHeadersForFloatingPill,
+                                        activeProfileName = activeProfile?.name ?: "",
+                                        activeProfileColorHex = activeProfile?.avatarColorHex ?: "#1E88E5",
+                                        activeProfileAvatarImageUrl = activeProfileAvatarImageUrl,
+                                        showProfileSelector = activeProfile != null,
+                                        onSwitchProfile = { hasSelectedProfileThisSession = false },
+                                        onNavigate = { optimisticRoute = it },
+                                        onExitApp = {
+                                            finishAffinity()
+                                            finishAndRemoveTask()
+                                        }
+                                    )
+                                } else {
+                                    LegacySidebarScaffold(
+                                        navController = navController,
+                                        startDestination = startDestination,
+                                        currentRoute = currentRoute,
+                                        rootRoutes = rootRoutes,
+                                        drawerItems = drawerItems,
+                                        selectedDrawerRoute = selectedDrawerRoute,
+                                        sidebarCollapsed = sidebarCollapsed,
+                                        hideBuiltInHeaders = false,
+                                        activeProfileName = activeProfile?.name ?: "",
+                                        activeProfileColorHex = activeProfile?.avatarColorHex ?: "#1E88E5",
+                                        activeProfileAvatarImageUrl = activeProfileAvatarImageUrl,
+                                        showProfileSelector = activeProfile != null,
+                                        onSwitchProfile = { hasSelectedProfileThisSession = false },
+                                        onNavigate = { optimisticRoute = it },
+                                        onExitApp = {
+                                            finishAffinity()
+                                            finishAndRemoveTask()
+                                        }
+                                    )
+                                }
                             }
 
                             val autoNextOverlay by externalPlaybackTracker.autoNextOverlay.collectAsState()
@@ -2103,7 +2128,7 @@ private fun CollapsedSidebarPill(
     }
 }
 
-private fun navigateToDrawerRoute(
+internal fun navigateToDrawerRoute(
     navController: NavHostController,
     currentRoute: String?,
     targetRoute: String

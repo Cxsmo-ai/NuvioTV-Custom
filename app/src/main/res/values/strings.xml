@@ -995,6 +995,11 @@
     <string name="layout_modern_sidebar_sub">Enable floating sidebar navigation.</string>
     <string name="layout_modern_sidebar_blur">Modern Sidebar Blur</string>
     <string name="layout_modern_sidebar_blur_sub">Toggle blur effect for modern sidebar surfaces.</string>
+    <string name="layout_navigation_position">Navigation Menu Position</string>
+    <string name="layout_navigation_position_sub">Choose whether Nuvio navigation appears at the side or across the top.</string>
+    <string name="layout_navigation_side">Side</string>
+    <string name="layout_navigation_top">Top</string>
+    <string name="action_exit_app">Exit Nuvio</string>
     <string name="layout_fullscreen_hero_backdrop">Fullscreen Hero Backdrop</string>
     <string name="layout_fullscreen_hero_backdrop_sub">Expand the hero backdrop to fill the entire screen.</string>
     <string name="layout_classic_focus_gradient">Focused Item Gradient</string>

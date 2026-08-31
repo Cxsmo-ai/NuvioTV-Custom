@@ -86,6 +86,7 @@ import com.nuvio.tv.domain.model.EpisodeOptionsOverlayStyle
 import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
 import com.nuvio.tv.domain.model.HomeLayout
 import com.nuvio.tv.domain.model.HomeImdbRatingsVisibility
+import com.nuvio.tv.domain.model.NavigationMenuPosition
 import com.nuvio.tv.ui.components.CardCwStylePreview
 import com.nuvio.tv.ui.components.NuvioDialog
 import com.nuvio.tv.ui.components.PosterCwStylePreview
@@ -312,42 +313,51 @@ fun LayoutSettingsContent(
                     focusRequester = homeContentHeaderFocus,
                     onFocused = { focusedSection = LayoutSettingsSection.HOME_CONTENT }
                 ) {
-                    if (!uiState.modernSidebarEnabled) {
-                        CompactToggleRow(
-                            title = stringResource(R.string.layout_collapse_sidebar),
-                            subtitle = stringResource(R.string.layout_collapse_sidebar_sub),
-                            checked = uiState.sidebarCollapsedByDefault,
-                            onToggle = {
-                                viewModel.onEvent(
-                                    LayoutSettingsEvent.SetSidebarCollapsed(!uiState.sidebarCollapsedByDefault)
-                                )
-                            },
-                            onFocused = { focusedSection = LayoutSettingsSection.HOME_CONTENT }
-                        )
-                    }
-                    CompactToggleRow(
-                        title = stringResource(R.string.layout_modern_sidebar),
-                        subtitle = stringResource(R.string.layout_modern_sidebar_sub),
-                        checked = uiState.modernSidebarEnabled,
-                        onToggle = {
-                            viewModel.onEvent(
-                                LayoutSettingsEvent.SetModernSidebarEnabled(!uiState.modernSidebarEnabled)
-                            )
+                    NavigationMenuPositionRow(
+                        selectedPosition = uiState.navigationMenuPosition,
+                        onPositionSelected = { position ->
+                            viewModel.onEvent(LayoutSettingsEvent.SetNavigationMenuPosition(position))
                         },
                         onFocused = { focusedSection = LayoutSettingsSection.HOME_CONTENT }
                     )
-                    if (uiState.modernSidebarEnabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    if (uiState.navigationMenuPosition == NavigationMenuPosition.SIDE) {
+                        if (!uiState.modernSidebarEnabled) {
+                            CompactToggleRow(
+                                title = stringResource(R.string.layout_collapse_sidebar),
+                                subtitle = stringResource(R.string.layout_collapse_sidebar_sub),
+                                checked = uiState.sidebarCollapsedByDefault,
+                                onToggle = {
+                                    viewModel.onEvent(
+                                        LayoutSettingsEvent.SetSidebarCollapsed(!uiState.sidebarCollapsedByDefault)
+                                    )
+                                },
+                                onFocused = { focusedSection = LayoutSettingsSection.HOME_CONTENT }
+                            )
+                        }
                         CompactToggleRow(
-                            title = stringResource(R.string.layout_modern_sidebar_blur),
-                            subtitle = stringResource(R.string.layout_modern_sidebar_blur_sub),
-                            checked = uiState.modernSidebarBlurEnabled,
+                            title = stringResource(R.string.layout_modern_sidebar),
+                            subtitle = stringResource(R.string.layout_modern_sidebar_sub),
+                            checked = uiState.modernSidebarEnabled,
                             onToggle = {
                                 viewModel.onEvent(
-                                    LayoutSettingsEvent.SetModernSidebarBlurEnabled(!uiState.modernSidebarBlurEnabled)
+                                    LayoutSettingsEvent.SetModernSidebarEnabled(!uiState.modernSidebarEnabled)
                                 )
                             },
                             onFocused = { focusedSection = LayoutSettingsSection.HOME_CONTENT }
                         )
+                        if (uiState.modernSidebarEnabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            CompactToggleRow(
+                                title = stringResource(R.string.layout_modern_sidebar_blur),
+                                subtitle = stringResource(R.string.layout_modern_sidebar_blur_sub),
+                                checked = uiState.modernSidebarBlurEnabled,
+                                onToggle = {
+                                    viewModel.onEvent(
+                                        LayoutSettingsEvent.SetModernSidebarBlurEnabled(!uiState.modernSidebarBlurEnabled)
+                                    )
+                                },
+                                onFocused = { focusedSection = LayoutSettingsSection.HOME_CONTENT }
+                            )
+                        }
                     }
                     DiscoverLocationRow(
                         selectedLocation = uiState.discoverLocation,
@@ -1280,6 +1290,45 @@ private fun ModernTrailerPlaybackTargetRow(
                 onClick = {
                     onTargetSelected(FocusedPosterTrailerPlaybackTarget.HERO_MEDIA)
                 },
+                onFocused = onFocused
+            )
+        }
+    }
+}
+
+@Composable
+private fun NavigationMenuPositionRow(
+    selectedPosition: NavigationMenuPosition,
+    onPositionSelected: (NavigationMenuPosition) -> Unit,
+    onFocused: () -> Unit
+) {
+    Text(
+        text = stringResource(R.string.layout_navigation_position),
+        style = MaterialTheme.typography.labelLarge,
+        color = NuvioTheme.colors.TextSecondary
+    )
+    Text(
+        text = stringResource(R.string.layout_navigation_position_sub),
+        style = MaterialTheme.typography.bodySmall,
+        color = NuvioTheme.colors.TextTertiary
+    )
+    LazyRow(
+        contentPadding = PaddingValues(end = NuvioTheme.spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
+    ) {
+        item(key = "navigation_position_side") {
+            SettingsChoiceChip(
+                label = stringResource(R.string.layout_navigation_side),
+                selected = selectedPosition == NavigationMenuPosition.SIDE,
+                onClick = { onPositionSelected(NavigationMenuPosition.SIDE) },
+                onFocused = onFocused
+            )
+        }
+        item(key = "navigation_position_top") {
+            SettingsChoiceChip(
+                label = stringResource(R.string.layout_navigation_top),
+                selected = selectedPosition == NavigationMenuPosition.TOP,
+                onClick = { onPositionSelected(NavigationMenuPosition.TOP) },
                 onFocused = onFocused
             )
         }

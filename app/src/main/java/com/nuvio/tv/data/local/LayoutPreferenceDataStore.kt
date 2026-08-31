@@ -30,6 +30,7 @@ import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
 import com.nuvio.tv.domain.model.DetailImdbRatingsVisibility
 import com.nuvio.tv.domain.model.HomeLayout
 import com.nuvio.tv.domain.model.HomeImdbRatingsVisibility
+import com.nuvio.tv.domain.model.NavigationMenuPosition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,6 +43,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 import javax.inject.Singleton
+
+internal fun parseNavigationMenuPosition(stored: String?): NavigationMenuPosition =
+    stored
+        ?.let { value -> runCatching { NavigationMenuPosition.valueOf(value) }.getOrNull() }
+        ?: NavigationMenuPosition.SIDE
 
 @Singleton
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -77,6 +83,7 @@ class LayoutPreferenceDataStore @Inject constructor(
     private val modernSidebarEnabledKey = booleanPreferencesKey("modern_sidebar_enabled")
     private val legacyModernSidebarEnabledKey = booleanPreferencesKey("glass_sidepanel_enabled")
     private val modernSidebarBlurEnabledKey = booleanPreferencesKey("modern_sidebar_blur_enabled")
+    private val navigationMenuPositionKey = stringPreferencesKey("navigation_menu_position")
     private val modernLandscapePostersEnabledKey = booleanPreferencesKey("modern_landscape_posters_enabled")
     private val heroSectionEnabledKey = booleanPreferencesKey("hero_section_enabled")
     private val posterLabelsEnabledKey = booleanPreferencesKey("poster_labels_enabled")
@@ -232,6 +239,10 @@ class LayoutPreferenceDataStore @Inject constructor(
 
     val modernSidebarBlurEnabled: Flow<Boolean> = profileFlow { prefs ->
         prefs[modernSidebarBlurEnabledKey] ?: false
+    }
+
+    val navigationMenuPosition: Flow<NavigationMenuPosition> = profileFlow { prefs ->
+        parseNavigationMenuPosition(prefs[navigationMenuPositionKey])
     }
 
     val modernLandscapePostersEnabled: Flow<Boolean> = profileFlow { prefs ->
@@ -530,6 +541,12 @@ class LayoutPreferenceDataStore @Inject constructor(
     suspend fun setModernSidebarBlurEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[modernSidebarBlurEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setNavigationMenuPosition(position: NavigationMenuPosition) {
+        store().edit { prefs ->
+            prefs[navigationMenuPositionKey] = position.name
         }
     }
 

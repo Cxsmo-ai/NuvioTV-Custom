@@ -26,6 +26,7 @@ import com.nuvio.tv.domain.model.EpisodeOptionsOverlayStyle
 import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
 import com.nuvio.tv.domain.model.HomeLayout
 import com.nuvio.tv.domain.model.HomeImdbRatingsVisibility
+import com.nuvio.tv.domain.model.NavigationMenuPosition
 import com.nuvio.tv.domain.model.enabledAddons
 import com.nuvio.tv.domain.repository.AddonRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -47,6 +48,7 @@ data class LayoutSettingsUiState(
     val sidebarCollapsedByDefault: Boolean = false,
     val modernSidebarEnabled: Boolean = false,
     val modernSidebarBlurEnabled: Boolean = false,
+    val navigationMenuPosition: NavigationMenuPosition = NavigationMenuPosition.SIDE,
     val modernLandscapePostersEnabled: Boolean = false,
     val modernHeroFullScreenBackdropEnabled: Boolean = false,
     val heroSectionEnabled: Boolean = true,
@@ -99,6 +101,7 @@ sealed class LayoutSettingsEvent {
     data class SetSidebarCollapsed(val collapsed: Boolean) : LayoutSettingsEvent()
     data class SetModernSidebarEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetModernSidebarBlurEnabled(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetNavigationMenuPosition(val position: NavigationMenuPosition) : LayoutSettingsEvent()
     data class SetModernLandscapePostersEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetModernHeroFullScreenBackdropEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetHeroSectionEnabled(val enabled: Boolean) : LayoutSettingsEvent()
@@ -210,6 +213,11 @@ class LayoutSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             layoutPreferenceDataStore.modernSidebarBlurEnabled.distinctUntilChanged().collectLatest { enabled ->
                 updateUiStateIfChanged { it.copy(modernSidebarBlurEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            layoutPreferenceDataStore.navigationMenuPosition.distinctUntilChanged().collectLatest { position ->
+                updateUiStateIfChanged { it.copy(navigationMenuPosition = position) }
             }
         }
         viewModelScope.launch {
@@ -405,6 +413,7 @@ class LayoutSettingsViewModel @Inject constructor(
             is LayoutSettingsEvent.SetSidebarCollapsed -> setSidebarCollapsed(event.collapsed)
             is LayoutSettingsEvent.SetModernSidebarEnabled -> setModernSidebarEnabled(event.enabled)
             is LayoutSettingsEvent.SetModernSidebarBlurEnabled -> setModernSidebarBlurEnabled(event.enabled)
+            is LayoutSettingsEvent.SetNavigationMenuPosition -> setNavigationMenuPosition(event.position)
             is LayoutSettingsEvent.SetModernLandscapePostersEnabled -> setModernLandscapePostersEnabled(event.enabled)
             is LayoutSettingsEvent.SetModernHeroFullScreenBackdropEnabled -> setModernHeroFullScreenBackdropEnabled(event.enabled)
             is LayoutSettingsEvent.SetHeroSectionEnabled -> setHeroSectionEnabled(event.enabled)
@@ -556,6 +565,13 @@ class LayoutSettingsViewModel @Inject constructor(
         if (_uiState.value.modernSidebarBlurEnabled == enabled) return
         viewModelScope.launch {
             layoutPreferenceDataStore.setModernSidebarBlurEnabled(enabled)
+        }
+    }
+
+    private fun setNavigationMenuPosition(position: NavigationMenuPosition) {
+        if (_uiState.value.navigationMenuPosition == position) return
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setNavigationMenuPosition(position)
         }
     }
 
