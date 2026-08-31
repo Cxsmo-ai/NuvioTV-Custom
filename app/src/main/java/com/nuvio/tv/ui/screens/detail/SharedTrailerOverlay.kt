@@ -59,6 +59,7 @@ fun SharedTrailerOverlay(
     title: String,
     trailerUrl: String?,
     trailerAudioUrl: String?,
+    muted: Boolean = false,
     isLoading: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
@@ -179,6 +180,7 @@ fun SharedTrailerOverlay(
                     trailerAudioUrl = trailerAudioUrl,
                     isPlaying = true,
                     isPaused = isPaused,
+                    muted = muted,
                     seekRequestToken = seekToken,
                     seekDeltaMs = seekDeltaMs,
                     onProgressChanged = { position, duration ->

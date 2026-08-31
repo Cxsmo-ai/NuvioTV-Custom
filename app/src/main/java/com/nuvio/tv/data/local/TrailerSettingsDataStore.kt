@@ -26,13 +26,15 @@ class TrailerSettingsDataStore @Inject constructor(
     private val enabledKey = booleanPreferencesKey("trailer_enabled")
     private val delaySecondsKey = intPreferencesKey("trailer_delay_seconds")
     private val sourceKey = stringPreferencesKey("trailer_source")
+    private val detailAudioEnabledKey = booleanPreferencesKey("detail_trailer_audio_enabled")
 
     val settings: Flow<TrailerSettings> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { prefs ->
             TrailerSettings(
                 enabled = prefs[enabledKey] ?: false,
                 delaySeconds = prefs[delaySecondsKey] ?: 7,
-                source = TrailerSource.fromKey(prefs[sourceKey])
+                source = TrailerSource.fromKey(prefs[sourceKey]),
+                detailAudioEnabled = prefs[detailAudioEnabledKey] ?: true
             )
         }
     }
@@ -48,12 +50,18 @@ class TrailerSettingsDataStore @Inject constructor(
     suspend fun setSource(source: TrailerSource) {
         store().edit { it[sourceKey] = source.name }
     }
+
+    suspend fun setDetailAudioEnabled(enabled: Boolean) {
+        store().edit { it[detailAudioEnabledKey] = enabled }
+    }
 }
 
 data class TrailerSettings(
     val enabled: Boolean = false,
     val delaySeconds: Int = 7,
-    val source: TrailerSource = TrailerSource.YOUTUBE
+    val source: TrailerSource = TrailerSource.YOUTUBE,
+    /** Whether detail-page trailers, including manually opened trailers, play audio. */
+    val detailAudioEnabled: Boolean = true
 )
 
 /** Which source resolves hero/detail trailers. YOUTUBE is the default; IMDB is opt-in. */
@@ -66,4 +74,3 @@ enum class TrailerSource {
             values().firstOrNull { it.name.equals(raw, ignoreCase = true) } ?: YOUTUBE
     }
 }
-

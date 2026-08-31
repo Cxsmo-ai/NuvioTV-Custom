@@ -507,6 +507,20 @@ fun LayoutSettingsContent(
                                 },
                                 onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
                             )
+
+                            CompactToggleRow(
+                                title = stringResource(R.string.audio_trailer_sound),
+                                subtitle = stringResource(R.string.audio_trailer_sound_sub),
+                                checked = uiState.detailPageTrailerAudioEnabled,
+                                onToggle = {
+                                    viewModel.onEvent(
+                                        LayoutSettingsEvent.SetDetailPageTrailerAudioEnabled(
+                                            !uiState.detailPageTrailerAudioEnabled
+                                        )
+                                    )
+                                },
+                                onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
+                            )
                         }
                     }
 

@@ -744,6 +744,8 @@
     <string name="audio_autoplay_trailers">Auto-play Trailers</string>
     <string name="audio_autoplay_trailers_sub">Automatically play trailers on detail and post-play screens</string>
     <string name="audio_trailer_delay">Trailer Delay</string>
+    <string name="audio_trailer_sound">Play Detail Trailers With Sound</string>
+    <string name="audio_trailer_sound_sub">Allow audio for trailers played on detail pages, including manual trailer playback.</string>
     <string name="audio_section">Audio</string>
     <string name="audio_lang_default">Default (media file)</string>
     <string name="audio_lang_device">Device language</string>

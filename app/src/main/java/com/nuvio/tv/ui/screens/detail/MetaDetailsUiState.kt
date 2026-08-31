@@ -38,6 +38,7 @@ data class MetaDetailsUiState(
     val trailerUrl: String? = null,
     val trailerAudioUrl: String? = null,
     val isTrailerPlaying: Boolean = false,
+    val detailTrailerAudioEnabled: Boolean = true,
     val isTrailerLoading: Boolean = false,
     val showTrailerControls: Boolean = false,
     val hideLogoDuringTrailer: Boolean = false,

@@ -75,6 +75,7 @@ data class LayoutSettingsUiState(
     val detailPageTrailerButtonEnabled: Boolean = true,
     val detailPageTrailerAutoplayEnabled: Boolean = true,
     val detailPageTrailerAutoplayDelaySeconds: Int = 7,
+    val detailPageTrailerAudioEnabled: Boolean = true,
     val imdbTrailersEnabled: Boolean = false,
     val preferExternalMetaAddonDetail: Boolean = false,
     val hideUnreleasedContent: Boolean = false,
@@ -132,6 +133,7 @@ sealed class LayoutSettingsEvent {
     data class SetDetailPageTrailerButtonEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetDetailPageTrailerAutoplayEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetDetailPageTrailerAutoplayDelaySeconds(val seconds: Int) : LayoutSettingsEvent()
+    data class SetDetailPageTrailerAudioEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetImdbTrailersEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetPreferExternalMetaAddonDetail(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetHideUnreleasedContent(val enabled: Boolean) : LayoutSettingsEvent()
@@ -341,6 +343,7 @@ class LayoutSettingsViewModel @Inject constructor(
                     it.copy(
                         detailPageTrailerAutoplayEnabled = settings.enabled,
                         detailPageTrailerAutoplayDelaySeconds = settings.delaySeconds,
+                        detailPageTrailerAudioEnabled = settings.detailAudioEnabled,
                         imdbTrailersEnabled = settings.source == TrailerSource.IMDB
                     )
                 }
@@ -433,6 +436,7 @@ class LayoutSettingsViewModel @Inject constructor(
             is LayoutSettingsEvent.SetDetailPageTrailerButtonEnabled -> setDetailPageTrailerButtonEnabled(event.enabled)
             is LayoutSettingsEvent.SetDetailPageTrailerAutoplayEnabled -> setDetailPageTrailerAutoplayEnabled(event.enabled)
             is LayoutSettingsEvent.SetDetailPageTrailerAutoplayDelaySeconds -> setDetailPageTrailerAutoplayDelaySeconds(event.seconds)
+            is LayoutSettingsEvent.SetDetailPageTrailerAudioEnabled -> setDetailPageTrailerAudioEnabled(event.enabled)
             is LayoutSettingsEvent.SetImdbTrailersEnabled -> setImdbTrailersEnabled(event.enabled)
             is LayoutSettingsEvent.SetPreferExternalMetaAddonDetail -> setPreferExternalMetaAddonDetail(event.enabled)
             is LayoutSettingsEvent.SetHideUnreleasedContent -> setHideUnreleasedContent(event.enabled)
@@ -714,6 +718,13 @@ class LayoutSettingsViewModel @Inject constructor(
         if (_uiState.value.detailPageTrailerAutoplayDelaySeconds == seconds) return
         viewModelScope.launch {
             trailerSettingsDataStore.setDelaySeconds(seconds)
+        }
+    }
+
+    private fun setDetailPageTrailerAudioEnabled(enabled: Boolean) {
+        if (_uiState.value.detailPageTrailerAudioEnabled == enabled) return
+        viewModelScope.launch {
+            trailerSettingsDataStore.setDetailAudioEnabled(enabled)
         }
     }
 

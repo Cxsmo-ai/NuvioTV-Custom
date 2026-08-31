@@ -557,6 +557,13 @@ class MetaDetailsViewModel @Inject constructor(
             trailerSettingsDataStore.settings.collectLatest { settings ->
                 trailerAutoplayEnabled = settings.enabled
                 trailerDelayMs = settings.delaySeconds * 1000L
+                _uiState.update { state ->
+                    if (state.detailTrailerAudioEnabled == settings.detailAudioEnabled) {
+                        state
+                    } else {
+                        state.copy(detailTrailerAudioEnabled = settings.detailAudioEnabled)
+                    }
+                }
                 if (!settings.enabled) {
                     idleTimerJob?.cancel()
                 }
@@ -3158,7 +3165,10 @@ class MetaDetailsViewModel @Inject constructor(
         isPlayButtonFocused = false
 
         if (shouldStopAutoTrailer) {
-            trailerHasPlayed = true
+            // An interaction dismisses this preview, but it must not permanently
+            // opt the user out. Returning to the play target and remaining idle
+            // for the configured delay should start a fresh preview again.
+            trailerHasPlayed = false
             setTrailerPlaybackState(
                 isPlaying = false,
                 showControls = false,
@@ -3173,7 +3183,7 @@ class MetaDetailsViewModel @Inject constructor(
         dismissSharedTrailerOverlay()
         val state = _uiState.value
         if (state.isTrailerPlaying && !state.showTrailerControls) {
-            trailerHasPlayed = true
+            trailerHasPlayed = false
             setTrailerPlaybackState(isPlaying = false, showControls = false, hideLogo = false)
         }
     }
