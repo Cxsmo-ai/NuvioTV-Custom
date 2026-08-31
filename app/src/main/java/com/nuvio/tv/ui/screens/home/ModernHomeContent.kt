@@ -80,6 +80,11 @@ import com.nuvio.tv.ui.components.LoadingIndicator
 import com.nuvio.tv.ui.components.ContinueWatchingOptionsDialog
 import com.nuvio.tv.LocalSidebarExpanded
 import com.nuvio.tv.LocalContentFocusRequester
+import com.nuvio.tv.LocalTopHeroFocusRequester
+import com.nuvio.tv.LocalTopNavFocusRequester
+import com.nuvio.tv.LocalTopNavigationActive
+import com.nuvio.tv.LocalTopNavigationSafeInset
+import com.nuvio.tv.LocalTopNavigationFocused
 import com.nuvio.tv.ui.util.LocalRecompositionHighlighterEnabled
 import com.nuvio.tv.ui.util.StableRef
 import com.nuvio.tv.ui.util.asStable
@@ -141,6 +146,11 @@ fun ModernHomeContent(
     val defaultBringIntoViewSpec = LocalBringIntoViewSpec.current
     val sidebarExpanded = LocalSidebarExpanded.current
     val isSidebarExpanded = remember(sidebarExpanded) { derivedStateOf { sidebarExpanded } }
+    val topNavigationActive = LocalTopNavigationActive.current
+    val topNavigationSafeInset = LocalTopNavigationSafeInset.current
+    val isTopNavFocused = LocalTopNavigationFocused.current
+    val topHeroFocusRequester = LocalTopHeroFocusRequester.current
+    val topNavFocusRequester = LocalTopNavFocusRequester.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val useLandscapePosters = uiState.modernLandscapePostersEnabled
     val fullScreenBackdrop = uiState.modernHeroFullScreenBackdropEnabled
@@ -651,6 +661,16 @@ fun ModernHomeContent(
     val screenHeight = with(LocalDensity.current) {
         LocalContext.current.resources.displayMetrics.heightPixels.toDp()
     }
+    val showTopCyclingHero = topNavigationActive &&
+        uiState.heroSectionEnabled &&
+        uiState.heroItems.isNotEmpty()
+    val topCyclingHeroHeight = if (showTopCyclingHero) 240.dp else 0.dp
+    val topCyclingHeroBottom = if (showTopCyclingHero) {
+        topNavigationSafeInset + topCyclingHeroHeight + 14.dp
+    } else {
+        0.dp
+    }
+    var topCyclingHeroFocused by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
             val posterCardCornerRadius = remember(uiState.posterCardCornerRadiusDp) { uiState.posterCardCornerRadiusDp.dp }
@@ -775,12 +795,14 @@ fun ModernHomeContent(
                 trailerPlaybackTarget,
                 heroTrailerUrlsState,
                 isSidebarExpanded,
-                isRapidHorizontalNav
+                isRapidHorizontalNav,
+                topCyclingHeroFocused
             ) {
                 derivedStateOf {
                     isScrollStoppedState.value &&
                         effectiveAutoplayEnabled &&
                         !isSidebarExpanded.value &&
+                        !topCyclingHeroFocused &&
                         !isRapidHorizontalNav.value &&
                         trailerPlaybackTarget == FocusedPosterTrailerPlaybackTarget.HERO_MEDIA &&
                         !heroTrailerUrlsState.value.first.isNullOrBlank()
@@ -791,11 +813,13 @@ fun ModernHomeContent(
                 collectionHeroVideoUrl,
                 collectionHeroVideoPlaybackKey,
                 endedCollectionHeroVideoPlaybackKey,
-                isSidebarExpanded
+                isSidebarExpanded,
+                topCyclingHeroFocused
             ) {
                 derivedStateOf {
                     isScrollStoppedState.value &&
                         !isSidebarExpanded.value &&
+                        !topCyclingHeroFocused &&
                         !collectionHeroVideoUrl.isNullOrBlank() &&
                         collectionHeroVideoPlaybackKey != null &&
                         endedCollectionHeroVideoPlaybackKey != collectionHeroVideoPlaybackKey
@@ -959,7 +983,7 @@ fun ModernHomeContent(
             }
 
             val localDensity = LocalDensity.current
-            val rowsViewportHeightFraction = if (useLandscapePosters) 0.49f else 0.52f
+            val rowsViewportHeightFraction = if (useLandscapePosters) 0.46f else 0.48f
             val rowsViewportHeight = remember(screenHeight, rowsViewportHeightFraction) { screenHeight * rowsViewportHeightFraction }
             val rowTitleLineHeight = MaterialTheme.typography.titleMedium.lineHeight
             val rowTitleHeight = remember(rowTitleLineHeight, localDensity) {
@@ -1014,7 +1038,11 @@ fun ModernHomeContent(
                 if (fullScreenBackdrop) {
                     Modifier.align(Alignment.TopStart).fillMaxWidth().height(screenHeight)
                 } else {
-                    Modifier.align(Alignment.TopEnd).offset(x = NuvioTheme.spacing.huge).fillMaxWidth(MODERN_HERO_MEDIA_WIDTH_FRACTION).height(heroBackdropHeight)
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = NuvioTheme.spacing.huge)
+                        .fillMaxWidth(MODERN_HERO_MEDIA_WIDTH_FRACTION)
+                        .height(heroBackdropHeight)
                 }
             }
 
@@ -1045,6 +1073,41 @@ fun ModernHomeContent(
                 onFirstFrameRendered = onFirstFrameRenderedLambda
             )
 
+            val topHeroVisibleState = remember(isTopNavFocused, topCyclingHeroFocused) {
+                derivedStateOf {
+                    isTopNavFocused || topCyclingHeroFocused
+                }
+            }
+            val topHeroAlpha by animateFloatAsState(
+                targetValue = if (showTopCyclingHero && topHeroVisibleState.value) 1f else 0f,
+                animationSpec = tween(durationMillis = 350),
+                label = "topHeroAlpha"
+            )
+
+            if (showTopCyclingHero) {
+                TopCyclingHeroBanner(
+                    items = uiState.heroItems.asStable(),
+                    trailerPreviewUrls = trailerPreviewUrls,
+                    trailerPreviewAudioUrls = trailerPreviewAudioUrls,
+                    trailerEnabled = uiState.focusedPosterBackdropTrailerEnabled,
+                    trailerDelaySeconds = uiState.focusedPosterBackdropExpandDelaySeconds,
+                    trailerMuted = uiState.focusedPosterBackdropTrailerMuted,
+                    showImdbRatings = uiState.homeImdbRatingsVisibility.showRatings,
+                    visibleAlpha = topHeroAlpha,
+                    onTopNavFocusRequest = { topNavFocusRequester?.requestFocus() },
+                    onContentFocusRequest = { contentFocusRequester.requestFocus() },
+                    onRequestTrailerPreview = onRequestTrailerPreview,
+                    onItemClick = { item -> onNavigateToDetail(item.id, item.apiType, "") },
+                    onItemFocus = onItemFocus,
+                    onFocusChanged = { topCyclingHeroFocused = it },
+                    focusRequester = topHeroFocusRequester,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = topHeroAlpha }
+                        .zIndex(if (topHeroAlpha > 0.01f) 3f else -1f)
+                )
+            }
+
             // Fade content rows when ANY hero media (catalog trailer or collection
             // hero video) is playing in fullscreen — not just catalog trailers.
             val trailerContentAlphaState = animateFloatAsState(
@@ -1056,10 +1119,17 @@ fun ModernHomeContent(
             val shouldPlayTrailerLambda = remember { { shouldPlayCatalogHeroTrailerUpdated || shouldPlayCollectionHeroVideoUpdated } }
             val heroTrailerRenderedLambda = remember { { heroTrailerFirstFrameRenderedUpdated } }
 
-            val heroMetadataModifier = remember(rowHorizontalPadding, rowsViewportHeight) {
+            val heroMetadataModifier = remember(
+                rowHorizontalPadding,
+                rowsViewportHeight
+            ) {
                 Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = rowHorizontalPadding, end = NuvioTheme.spacing.xxxl, bottom = NuvioTheme.spacing.none + rowsViewportHeight + NuvioTheme.spacing.lg)
+                    .padding(
+                        start = rowHorizontalPadding,
+                        end = NuvioTheme.spacing.xxxl,
+                        bottom = rowsViewportHeight + NuvioTheme.spacing.lg
+                    )
                     .fillMaxWidth(MODERN_HERO_TEXT_WIDTH_FRACTION)
             }
 

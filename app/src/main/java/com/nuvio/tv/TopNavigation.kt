@@ -21,8 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -51,7 +51,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigation.NavHostController
@@ -70,6 +69,9 @@ import com.nuvio.tv.ui.theme.NuvioRadii
 import com.nuvio.tv.ui.theme.NuvioStrokes
 import com.nuvio.tv.ui.theme.NuvioTheme
 import com.nuvio.tv.ui.util.rememberDrawerItemFocusRequesters
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
@@ -79,10 +81,18 @@ private val TopNavigationProfileSize = 42.dp
 private val TopNavigationIconSize = 21.dp
 private val TopNavigationVerticalInset = 22.dp
 private val TopNavigationHorizontalInset = 38.dp
+internal val TopNavigationSafeInset = TopNavigationVerticalInset + TopNavigationHeight + 8.dp
+
+internal val LocalTopNavigationActive = compositionLocalOf { false }
+internal val LocalTopNavigationSafeInset = compositionLocalOf { 0.dp }
+internal val LocalTopNavigationFocused = compositionLocalOf { false }
+internal val LocalTopHeroFocusRequester = compositionLocalOf { FocusRequester() }
+internal val LocalTopNavFocusRequester = compositionLocalOf<FocusRequester?> { null }
 
 @Composable
 internal fun TopNavigationScaffold(
     navController: NavHostController,
+    navViewModelStoreOwner: ViewModelStoreOwner,
     startDestination: String,
     currentRoute: String?,
     rootRoutes: Set<String>,
@@ -100,6 +110,8 @@ internal fun TopNavigationScaffold(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val contentFocusRequester = remember { FocusRequester() }
+    val topHeroFocusRequester = remember { FocusRequester() }
+    val topNavigationHazeState = remember { HazeState() }
     val routeFocusRequesters = rememberDrawerItemFocusRequesters(drawerItems)
     var topNavigationHasFocus by remember { mutableStateOf(false) }
     var pendingTopNavigationFocus by remember { mutableStateOf(false) }
@@ -134,12 +146,13 @@ internal fun TopNavigationScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    top = if (showTopNavigation && currentRoute != Screen.Home.route) {
-                        TopNavigationHeight + TopNavigationVerticalInset + 18.dp
-                    } else {
-                        0.dp
+                    top = when {
+                        !showTopNavigation || currentRoute == Screen.Home.route -> 0.dp
+                        currentRoute == Screen.Settings.route -> 16.dp
+                        else -> TopNavigationSafeInset
                     }
                 )
+                .haze(topNavigationHazeState)
                 .onKeyEvent { keyEvent ->
                     if (
                         showTopNavigation &&
@@ -147,28 +160,23 @@ internal fun TopNavigationScaffold(
                         keyEvent.type == KeyEventType.KeyDown &&
                         keyEvent.key == Key.DirectionUp
                     ) {
-                        if (focusManager.moveFocus(FocusDirection.Up)) {
-                            true
-                        } else {
-                            selectedFocusRequester?.requestFocus() == true
-                        }
+                        val heroFocused = runCatching { topHeroFocusRequester.requestFocus() }.getOrDefault(false)
+                        if (heroFocused) true
+                        else selectedFocusRequester?.let { runCatching { it.requestFocus() }.getOrDefault(false) } ?: false
                     } else {
                         false
                     }
                 }
         ) {
-            val navViewModelStoreOwner = remember {
-                object : ViewModelStoreOwner {
-                    override val viewModelStore: ViewModelStore = ViewModelStore()
-                }
-            }
-            DisposableEffect(navViewModelStoreOwner) {
-                onDispose { navViewModelStoreOwner.viewModelStore.clear() }
-            }
             CompositionLocalProvider(
                 LocalSidebarExpanded provides false,
                 LocalContentFocusRequester provides contentFocusRequester,
-                LocalViewModelStoreOwner provides navViewModelStoreOwner
+                LocalTopHeroFocusRequester provides topHeroFocusRequester,
+                LocalTopNavFocusRequester provides selectedFocusRequester,
+                LocalViewModelStoreOwner provides navViewModelStoreOwner,
+                LocalTopNavigationActive provides true,
+                LocalTopNavigationSafeInset provides TopNavigationSafeInset,
+                LocalTopNavigationFocused provides topNavigationHasFocus
             ) {
                 NuvioNavHost(
                     navController = navController,
@@ -199,6 +207,8 @@ internal fun TopNavigationScaffold(
                         targetRoute = targetRoute
                     )
                 },
+                topHeroFocusRequester = topHeroFocusRequester,
+                hazeState = topNavigationHazeState,
                 onExitApp = onExitApp,
                 modifier = Modifier.align(Alignment.TopCenter)
             )
@@ -219,6 +229,8 @@ private fun TopNavigationBar(
     onTopNavigationFocusChanged: (Boolean) -> Unit,
     onSwitchProfile: () -> Unit,
     onDrawerItemClick: (String) -> Unit,
+    topHeroFocusRequester: FocusRequester,
+    hazeState: HazeState,
     onExitApp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -231,9 +243,9 @@ private fun TopNavigationBar(
     val panelBrush = remember(colors) {
         Brush.verticalGradient(
             listOf(
-                colors.media.glassPanelTop.copy(alpha = 0.74f),
-                colors.media.glassPanelMiddle.copy(alpha = 0.68f),
-                colors.media.glassPanelBottom.copy(alpha = 0.72f)
+                Color.White.copy(alpha = 0.16f),
+                colors.Secondary.copy(alpha = 0.08f),
+                Color.White.copy(alpha = 0.035f)
             )
         )
     }
@@ -247,10 +259,11 @@ private fun TopNavigationBar(
                 if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (keyEvent.key) {
                     Key.DirectionDown -> {
-                        if (focusManager.moveFocus(FocusDirection.Down)) {
-                            true
-                        } else {
+                        val heroFocused = runCatching { topHeroFocusRequester.requestFocus() }.getOrDefault(false)
+                        if (heroFocused) true
+                        else {
                             contentFocusRequester.requestFocus()
+                            true
                         }
                     }
 
@@ -275,10 +288,17 @@ private fun TopNavigationBar(
                 .weight(1f)
                 .height(TopNavigationHeight)
                 .clip(panelShape)
+                .hazeChild(
+                    state = hazeState,
+                    shape = panelShape,
+                    tint = Color.Unspecified,
+                    blurRadius = 22.dp,
+                    noiseFactor = 0.055f
+                )
                 .background(brush = panelBrush, shape = panelShape)
                 .border(
                     width = NuvioStrokes.tokens.hairline,
-                    color = colors.text.onOverlay.copy(alpha = 0.15f),
+                    color = Color.White.copy(alpha = 0.34f),
                     shape = panelShape
                 )
                 .padding(horizontal = 8.dp, vertical = 5.dp),
@@ -397,14 +417,14 @@ private fun TopNavigationItem(
     val shape = RoundedCornerShape(NuvioRadii.tokens.full)
     val backgroundColor by animateColorAsState(
         targetValue = when {
-            selected -> colors.text.onOverlay.copy(alpha = 0.9f)
-            focused -> colors.text.onOverlay.copy(alpha = 0.18f)
+            focused -> Color.White.copy(alpha = 0.28f)
+            selected -> colors.Secondary.copy(alpha = 0.20f)
             else -> Color.Transparent
         },
         animationSpec = tween(NuvioMotion.tokens.durations.fast),
         label = "topNavigationItemBackground"
     )
-    val contentColor = if (selected) colors.Background else colors.text.onOverlay
+    val contentColor = colors.text.onOverlay
 
     Card(
         onClick = onClick,

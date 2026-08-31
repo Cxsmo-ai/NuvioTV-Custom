@@ -729,6 +729,19 @@ class MainActivity : ComponentActivity() {
                         else -> Screen.Home.route
                     }
                     val navController = rememberNavController()
+                    // All navigation shells render the same NavHostController. Keep its
+                    // ViewModelStoreOwner stable while swapping Side/Top chrome; attaching a
+                    // different store after the controller graph exists crashes Navigation.
+                    // This owner still belongs to the active profile/session subtree and is
+                    // cleared when that whole subtree leaves composition.
+                    val navViewModelStoreOwner = remember {
+                        object : ViewModelStoreOwner {
+                            override val viewModelStore: ViewModelStore = ViewModelStore()
+                        }
+                    }
+                    DisposableEffect(navViewModelStoreOwner) {
+                        onDispose { navViewModelStoreOwner.viewModelStore.clear() }
+                    }
                     var optimisticRoute by remember { mutableStateOf<String?>(null) }
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val actualRoute = navBackStackEntry?.destination?.route
@@ -987,6 +1000,7 @@ class MainActivity : ComponentActivity() {
                             when (mainUiPrefs.navigationMenuPosition) {
                                 NavigationMenuPosition.TOP -> TopNavigationScaffold(
                                     navController = navController,
+                                    navViewModelStoreOwner = navViewModelStoreOwner,
                                     startDestination = startDestination,
                                     currentRoute = currentRoute,
                                     rootRoutes = rootRoutes,
@@ -1007,6 +1021,7 @@ class MainActivity : ComponentActivity() {
                                 NavigationMenuPosition.SIDE -> if (modernSidebarEnabled) {
                                     ModernSidebarScaffold(
                                         navController = navController,
+                                        navViewModelStoreOwner = navViewModelStoreOwner,
                                         startDestination = startDestination,
                                         currentRoute = currentRoute,
                                         rootRoutes = rootRoutes,
@@ -1030,6 +1045,7 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     LegacySidebarScaffold(
                                         navController = navController,
+                                        navViewModelStoreOwner = navViewModelStoreOwner,
                                         startDestination = startDestination,
                                         currentRoute = currentRoute,
                                         rootRoutes = rootRoutes,
@@ -1212,6 +1228,7 @@ private fun SidebarFocusRecoveryEffect(
 @Composable
 private fun LegacySidebarScaffold(
     navController: NavHostController,
+    navViewModelStoreOwner: ViewModelStoreOwner,
     startDestination: String,
     currentRoute: String?,
     rootRoutes: Set<String>,
@@ -1461,21 +1478,6 @@ private fun LegacySidebarScaffold(
                     }
                 }
         ) {
-            // Profile switching sets hasSelectedProfileThisSession = false, which removes
-            // this whole subtree from composition. NavBackStackEntry ViewModelStores live in
-            // NavControllerViewModel, scoped by default to the Activity - so nothing pops and
-            // nothing clears. Measured 23 Jul 2026: HomeViewModel.onCleared() never fired
-            // across 5 switches (0 CLEARED / 5 INIT) and catalogue loads grew as 1 + 2N,
-            // because stale ViewModels kept collecting activeProfileId and installedAddons.
-            // Owning the store here makes teardown deterministic.
-            val navViewModelStoreOwner = remember {
-                object : ViewModelStoreOwner {
-                    override val viewModelStore: ViewModelStore = ViewModelStore()
-                }
-            }
-            DisposableEffect(navViewModelStoreOwner) {
-                onDispose { navViewModelStoreOwner.viewModelStore.clear() }
-            }
             CompositionLocalProvider(
                 LocalSidebarExpanded provides (drawerState.currentValue == DrawerValue.Open),
                 LocalContentFocusRequester provides contentFocusRequester,
@@ -1593,6 +1595,7 @@ private fun LegacySidebarButton(
 @Composable
 private fun ModernSidebarScaffold(
     navController: NavHostController,
+    navViewModelStoreOwner: ViewModelStoreOwner,
     startDestination: String,
     currentRoute: String?,
     rootRoutes: Set<String>,
@@ -1876,21 +1879,6 @@ private fun ModernSidebarScaffold(
                     }
                 }
         ) {
-            // Profile switching sets hasSelectedProfileThisSession = false, which removes
-            // this whole subtree from composition. NavBackStackEntry ViewModelStores live in
-            // NavControllerViewModel, scoped by default to the Activity - so nothing pops and
-            // nothing clears. Measured 23 Jul 2026: HomeViewModel.onCleared() never fired
-            // across 5 switches (0 CLEARED / 5 INIT) and catalogue loads grew as 1 + 2N,
-            // because stale ViewModels kept collecting activeProfileId and installedAddons.
-            // Owning the store here makes teardown deterministic.
-            val navViewModelStoreOwner = remember {
-                object : ViewModelStoreOwner {
-                    override val viewModelStore: ViewModelStore = ViewModelStore()
-                }
-            }
-            DisposableEffect(navViewModelStoreOwner) {
-                onDispose { navViewModelStoreOwner.viewModelStore.clear() }
-            }
             CompositionLocalProvider(
                 LocalSidebarExpanded provides isSidebarExpanded,
                 LocalContentFocusRequester provides contentFocusRequester,
