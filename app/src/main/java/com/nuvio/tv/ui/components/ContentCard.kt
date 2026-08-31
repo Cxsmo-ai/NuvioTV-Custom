@@ -439,6 +439,7 @@ fun ContentCard(
                         onFirstFrameRendered = {
                             trailerFirstFrameRendered = true
                         },
+                        playerViewFocusable = false,
                         modifier = Modifier.fillMaxSize(),
                         muted = focusedPosterBackdropTrailerMuted
                     )

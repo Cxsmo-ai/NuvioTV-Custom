@@ -128,6 +128,9 @@ fun ModernHomeContent(
     onContinueWatchingPlayManually: (ContinueWatchingItem) -> Unit = {},
     showContinueWatchingManualPlayOption: Boolean = false,
     onRequestTrailerPreview: (String, String, String?, String) -> Unit,
+    onRequestHeroTrailerPreview: (MetaPreview) -> Unit = { item ->
+        onRequestTrailerPreview(item.id, item.name, item.releaseInfo, item.apiType)
+    },
     onLoadMoreCatalog: (String, String, String) -> Unit,
     onRemoveContinueWatching: (String, Int?, Int?, Boolean) -> Unit,
     isCatalogItemWatched: (MetaPreview) -> Boolean = { false },
@@ -257,6 +260,7 @@ fun ModernHomeContent(
     val pendingRowFocusKey = remember { mutableStateOf<String?>(null) }
     val pendingRowFocusIndex = remember { mutableStateOf<Int?>(null) }
     val pendingRowFocusNonce = remember { mutableIntStateOf(0) }
+    var topHeroFocusTransitionRequested by remember { mutableStateOf(false) }
     val restoredFromSavedState = remember { mutableStateOf(false) }
     val heroItem = remember {
         val initialHero = carouselRows.list.firstOrNull()?.items?.list?.firstOrNull()?.heroPreview
@@ -661,9 +665,12 @@ fun ModernHomeContent(
     val screenHeight = with(LocalDensity.current) {
         LocalContext.current.resources.displayMetrics.heightPixels.toDp()
     }
-    val showTopCyclingHero = topNavigationActive &&
-        uiState.heroSectionEnabled &&
-        uiState.heroItems.isNotEmpty()
+    // The dedicated cycling hero is intentionally disabled. Repeated Shield
+    // tests showed AndroidView trailer insertion could intermittently leave the
+    // Compose focus tree without an owner. Top layout now uses the proven
+    // original focused-card hero/backdrop flow: top bar -> Continue Watching /
+    // first row -> remaining rows.
+    val showTopCyclingHero = false
     val topCyclingHeroHeight = if (showTopCyclingHero) 240.dp else 0.dp
     val topCyclingHeroBottom = if (showTopCyclingHero) {
         topNavigationSafeInset + topCyclingHeroHeight + 14.dp
@@ -1075,7 +1082,7 @@ fun ModernHomeContent(
 
             val topHeroVisibleState = remember(isTopNavFocused, topCyclingHeroFocused) {
                 derivedStateOf {
-                    isTopNavFocused || topCyclingHeroFocused
+                    isTopNavFocused || topCyclingHeroFocused || topHeroFocusTransitionRequested
                 }
             }
             val topHeroAlpha by animateFloatAsState(
@@ -1083,6 +1090,19 @@ fun ModernHomeContent(
                 animationSpec = tween(durationMillis = 350),
                 label = "topHeroAlpha"
             )
+
+            LaunchedEffect(topHeroFocusTransitionRequested, showTopCyclingHero) {
+                if (!topHeroFocusTransitionRequested || !showTopCyclingHero) return@LaunchedEffect
+                // The hero intentionally cannot receive focus while hidden. Reveal
+                // it first, then request focus once it is interactive so UP from
+                // Continue Watching cannot skip directly to the top bar.
+                snapshotFlow { topHeroAlpha }.first { it > 0.45f }
+                val focusedHero = runCatching { topHeroFocusRequester.requestFocus() }.getOrDefault(false)
+                topHeroFocusTransitionRequested = false
+                if (!focusedHero) {
+                    topNavFocusRequester?.requestFocus()
+                }
+            }
 
             if (showTopCyclingHero) {
                 TopCyclingHeroBanner(
@@ -1095,11 +1115,36 @@ fun ModernHomeContent(
                     showImdbRatings = uiState.homeImdbRatingsVisibility.showRatings,
                     visibleAlpha = topHeroAlpha,
                     onTopNavFocusRequest = { topNavFocusRequester?.requestFocus() },
-                    onContentFocusRequest = { contentFocusRequester.requestFocus() },
-                    onRequestTrailerPreview = onRequestTrailerPreview,
+                    onContentFocusRequest = {
+                        topHeroFocusTransitionRequested = false
+                        val targetRow = rowByKey.map[MODERN_CONTINUE_WATCHING_ROW_KEY]
+                            ?: carouselRows.list.firstOrNull()
+                        if (targetRow != null) {
+                            val rememberedIndex = if (
+                                targetRow.key == MODERN_CONTINUE_WATCHING_ROW_KEY &&
+                                lastFocusedContinueWatchingIndex.intValue >= 0
+                            ) {
+                                lastFocusedContinueWatchingIndex.intValue
+                            } else {
+                                focusedItemByRow[targetRow.key] ?: 0
+                            }
+                            pendingRowFocusKey.value = targetRow.key
+                            pendingRowFocusIndex.value = rememberedIndex.coerceIn(
+                                0,
+                                (targetRow.items.size - 1).coerceAtLeast(0)
+                            )
+                            pendingRowFocusNonce.intValue++
+                        } else {
+                            contentFocusRequester.requestFocus()
+                        }
+                    },
+                    onRequestTrailerPreview = onRequestHeroTrailerPreview,
                     onItemClick = { item -> onNavigateToDetail(item.id, item.apiType, "") },
                     onItemFocus = onItemFocus,
-                    onFocusChanged = { topCyclingHeroFocused = it },
+                    onFocusChanged = {
+                        topCyclingHeroFocused = it
+                        if (it) topHeroFocusTransitionRequested = false
+                    },
                     focusRequester = topHeroFocusRequester,
                     modifier = Modifier
                         .fillMaxSize()
@@ -1282,6 +1327,12 @@ fun ModernHomeContent(
                 onFocusedHeroMediaNonceChange = onFocusedHeroMediaNonceChangeLambda,
                 onExpansionInteractionNonceChange = onExpansionInteractionNonceChangeLambda,
                 blockLeftOnFirstExpandedItem = blockLeftOnFirstExpandedItem,
+                preferFirstRowOnContainerFocus = topNavigationActive,
+                onNavigateUpFromFirstRow = if (topNavigationActive) {
+                    { topNavFocusRequester?.requestFocus() }
+                } else {
+                    null
+                },
                 isVerticalRowsScrollingState = isVerticalRowsScrollingState,
                 modifier = Modifier.align(Alignment.BottomStart)
             )

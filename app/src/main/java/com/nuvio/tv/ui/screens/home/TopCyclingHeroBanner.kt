@@ -59,7 +59,8 @@ import com.nuvio.tv.ui.theme.NuvioTheme
 import com.nuvio.tv.ui.util.StableList
 import kotlinx.coroutines.delay
 
-private const val TOP_HERO_ADVANCE_MS = 12_000L
+private const val TOP_HERO_ADVANCE_MS = 20_000L
+private const val TOP_HERO_POST_TRAILER_HOLD_MS = 4_000L
 
 @Composable
 internal fun TopCyclingHeroBanner(
@@ -73,7 +74,7 @@ internal fun TopCyclingHeroBanner(
     visibleAlpha: Float = 1f,
     onTopNavFocusRequest: () -> Unit = {},
     onContentFocusRequest: () -> Unit = {},
-    onRequestTrailerPreview: (String, String, String?, String) -> Unit,
+    onRequestTrailerPreview: (MetaPreview) -> Unit,
     onItemClick: (MetaPreview) -> Unit,
     onItemFocus: (MetaPreview) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
@@ -86,6 +87,7 @@ internal fun TopCyclingHeroBanner(
     var activeIndex by remember { mutableIntStateOf(0) }
     var focused by remember { mutableStateOf(false) }
     var trailerFinishedForId by remember { mutableStateOf<String?>(null) }
+    var navigationInteractionNonce by remember { mutableIntStateOf(0) }
     val currentOnRequestTrailer by rememberUpdatedState(onRequestTrailerPreview)
     val currentOnItemClick by rememberUpdatedState(onItemClick)
     val currentOnItemFocus by rememberUpdatedState(onItemFocus)
@@ -97,16 +99,6 @@ internal fun TopCyclingHeroBanner(
         activeIndex = activeIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
     }
 
-    LaunchedEffect(focused, items.size) {
-        if (items.size <= 1) return@LaunchedEffect
-        while (true) {
-            delay(TOP_HERO_ADVANCE_MS)
-            if (!focused) {
-                activeIndex = (activeIndex + 1) % items.size
-            }
-        }
-    }
-
     LaunchedEffect(activeItem.id, focused) {
         trailerFinishedForId = null
         if (focused) currentOnItemFocus(activeItem)
@@ -115,12 +107,9 @@ internal fun TopCyclingHeroBanner(
     LaunchedEffect(activeItem.id, trailerEnabled, trailerDelaySeconds, visibleAlpha > 0.5f) {
         if (!trailerEnabled || visibleAlpha <= 0.5f) return@LaunchedEffect
         delay((trailerDelaySeconds.coerceAtLeast(0) * 1_000L).coerceAtLeast(250L))
-        currentOnRequestTrailer(
-            activeItem.id,
-            activeItem.name,
-            activeItem.releaseInfo,
-            activeItem.apiType
-        )
+        // Pass the complete addon preview so any supplied YouTube trailer ID is
+        // retained as a fallback when TMDB lookup is unavailable.
+        currentOnRequestTrailer(activeItem)
     }
 
     val trailerUrl = trailerPreviewUrls[activeItem.id]
@@ -129,11 +118,37 @@ internal fun TopCyclingHeroBanner(
         visibleAlpha > 0.5f &&
         !trailerUrl.isNullOrBlank() &&
         trailerFinishedForId != activeItem.id
+
+    // Use one restartable timer per hero item. Starting a trailer pauses the
+    // countdown, manual navigation resets it, and a completed trailer gets a
+    // short readable hold before advancing. This prevents the old independent
+    // loop from switching banners in the middle of playback.
+    LaunchedEffect(
+        activeItem.id,
+        items.size,
+        visibleAlpha > 0.5f,
+        focused,
+        playTrailer,
+        trailerFinishedForId,
+        navigationInteractionNonce
+    ) {
+        if (items.size <= 1 || visibleAlpha <= 0.5f || focused || playTrailer) return@LaunchedEffect
+        val holdMs = if (trailerFinishedForId == activeItem.id) {
+            TOP_HERO_POST_TRAILER_HOLD_MS
+        } else {
+            TOP_HERO_ADVANCE_MS
+        }
+        delay(holdMs)
+        activeIndex = (activeIndex + 1) % items.size
+    }
     val shape = RoundedCornerShape(NuvioRadii.tokens.lg)
     val focusColor = NuvioTheme.colors.FocusRing
     val context = LocalContext.current
     val focusRingColor = NuvioTheme.colors.FocusRing
-    val isInteractive = visibleAlpha > 0.4f
+    // Keep this focus node stable while alpha animates and while AndroidView
+    // inserts/removes the native trailer surface. Presentation is controlled by
+    // alpha/z-order; focus eligibility must not oscillate with those frames.
+    val isInteractive = enabled
 
     Box(
         modifier = modifier
@@ -146,25 +161,43 @@ internal fun TopCyclingHeroBanner(
             .focusable(isInteractive)
             .onPreviewKeyEvent { event ->
                 when {
-                    event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp -> {
-                        currentOnTopNavFocusRequest()
+                    event.key == Key.DirectionUp -> {
+                        if (event.type == KeyEventType.KeyUp) {
+                            currentOnTopNavFocusRequest()
+                        }
+                        // Consume the complete physical press across focus
+                        // changes; only the initial key-down performs an action.
                         true
                     }
 
-                    event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown -> {
-                        currentOnContentFocusRequest()
+                    event.key == Key.DirectionDown -> {
+                        if (event.type == KeyEventType.KeyUp) {
+                            currentOnContentFocusRequest()
+                        }
                         true
                     }
 
-                    event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft -> {
-                        if (activeIndex > 0) activeIndex--
-                        else activeIndex = items.size - 1
+                    event.key == Key.DirectionLeft -> {
+                        if (
+                            event.type == KeyEventType.KeyDown &&
+                            event.nativeKeyEvent.repeatCount == 0
+                        ) {
+                            navigationInteractionNonce++
+                            if (activeIndex > 0) activeIndex--
+                            else activeIndex = items.size - 1
+                        }
                         true
                     }
 
-                    event.type == KeyEventType.KeyDown && event.key == Key.DirectionRight -> {
-                        if (activeIndex < items.size - 1) activeIndex++
-                        else activeIndex = 0
+                    event.key == Key.DirectionRight -> {
+                        if (
+                            event.type == KeyEventType.KeyDown &&
+                            event.nativeKeyEvent.repeatCount == 0
+                        ) {
+                            navigationInteractionNonce++
+                            if (activeIndex < items.size - 1) activeIndex++
+                            else activeIndex = 0
+                        }
                         true
                     }
 
@@ -282,6 +315,7 @@ internal fun TopCyclingHeroBanner(
             trailerAudioUrl = trailerAudioUrl,
             isPlaying = playTrailer,
             muted = trailerMuted,
+            playerViewFocusable = false,
             cropToFill = true,
             onEnded = { trailerFinishedForId = activeItem.id },
             modifier = Modifier.fillMaxSize()

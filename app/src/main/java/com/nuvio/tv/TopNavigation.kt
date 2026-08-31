@@ -153,20 +153,6 @@ internal fun TopNavigationScaffold(
                     }
                 )
                 .haze(topNavigationHazeState)
-                .onKeyEvent { keyEvent ->
-                    if (
-                        showTopNavigation &&
-                        !topNavigationHasFocus &&
-                        keyEvent.type == KeyEventType.KeyDown &&
-                        keyEvent.key == Key.DirectionUp
-                    ) {
-                        val heroFocused = runCatching { topHeroFocusRequester.requestFocus() }.getOrDefault(false)
-                        if (heroFocused) true
-                        else selectedFocusRequester?.let { runCatching { it.requestFocus() }.getOrDefault(false) } ?: false
-                    } else {
-                        false
-                    }
-                }
         ) {
             CompositionLocalProvider(
                 LocalSidebarExpanded provides false,
@@ -190,6 +176,7 @@ internal fun TopNavigationScaffold(
             TopNavigationBar(
                 drawerItems = drawerItems,
                 selectedDrawerRoute = selectedDrawerRoute,
+                currentRoute = currentRoute,
                 routeFocusRequesters = routeFocusRequesters,
                 contentFocusRequester = contentFocusRequester,
                 activeProfileName = activeProfileName,
@@ -220,6 +207,7 @@ internal fun TopNavigationScaffold(
 private fun TopNavigationBar(
     drawerItems: List<DrawerItem>,
     selectedDrawerRoute: String?,
+    currentRoute: String?,
     routeFocusRequesters: Map<String, FocusRequester>,
     contentFocusRequester: FocusRequester,
     activeProfileName: String,
@@ -256,15 +244,27 @@ private fun TopNavigationBar(
             .padding(horizontal = TopNavigationHorizontalInset, vertical = TopNavigationVerticalInset)
             .onFocusChanged { onTopNavigationFocusChanged(it.hasFocus) }
             .onPreviewKeyEvent { keyEvent ->
-                if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (keyEvent.key) {
                     Key.DirectionDown -> {
-                        val heroFocused = runCatching { topHeroFocusRequester.requestFocus() }.getOrDefault(false)
-                        if (heroFocused) true
-                        else {
-                            contentFocusRequester.requestFocus()
-                            true
+                        // Keep the whole physical press on this level. Moving
+                        // focus on key-down lets repeats/key-up arrive at the
+                        // newly focused row and can skip a level on Android TV.
+                        if (keyEvent.type == KeyEventType.KeyUp) {
+                            if (currentRoute == Screen.Home.route) {
+                                contentFocusRequester.requestFocus()
+                            } else {
+                                // Non-home roots do not attach the home content
+                                // requester. Let Compose move to the nearest
+                                // focusable control below this glass rail.
+                                val moved = focusManager.moveFocus(FocusDirection.Down)
+                                if (!moved) {
+                                    runCatching { contentFocusRequester.requestFocus() }
+                                }
+                            }
                         }
+                        // Consume key-down, repeats, and key-up; transition once
+                        // only after the physical press is complete.
+                        true
                     }
 
                     Key.DirectionUp -> true
@@ -332,30 +332,43 @@ private fun TopNavigationBar(
             )
         }
 
-        Spacer(modifier = Modifier.width(30.dp))
-        Text(
-            text = clockText,
-            color = colors.text.onOverlay,
-            style = androidx.tv.material3.MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.SemiBold
-            )
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Box(
+        Spacer(modifier = Modifier.width(20.dp))
+        Row(
             modifier = Modifier
-                .height(20.dp)
-                .width(NuvioStrokes.tokens.hairline)
-                .background(colors.text.onOverlay.copy(alpha = 0.35f))
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Text(
-            text = stringResource(R.string.app_name),
-            color = colors.Secondary,
-            style = androidx.tv.material3.MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.SemiBold
-            ),
-            maxLines = 1
-        )
+                .clip(RoundedCornerShape(NuvioRadii.tokens.full))
+                .background(Color.Black.copy(alpha = 0.48f))
+                .border(
+                    width = NuvioStrokes.tokens.hairline,
+                    color = Color.White.copy(alpha = 0.30f),
+                    shape = RoundedCornerShape(NuvioRadii.tokens.full)
+                )
+                .padding(horizontal = 16.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = clockText,
+                color = Color.White,
+                style = androidx.tv.material3.MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                )
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Box(
+                modifier = Modifier
+                    .height(20.dp)
+                    .width(NuvioStrokes.tokens.hairline)
+                    .background(Color.White.copy(alpha = 0.48f))
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = stringResource(R.string.app_name),
+                color = Color.White,
+                style = androidx.tv.material3.MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                maxLines = 1
+            )
+        }
     }
 }
 

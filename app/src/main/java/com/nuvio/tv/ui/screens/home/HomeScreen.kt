@@ -683,6 +683,9 @@ private fun ModernHomeRoute(
         onContinueWatchingPlayManually = onContinueWatchingPlayManually,
         showContinueWatchingManualPlayOption = showContinueWatchingManualPlayOption,
         onRequestTrailerPreview = requestTrailerPreview,
+        onRequestHeroTrailerPreview = remember(viewModel) {
+            { item -> viewModel.requestTrailerPreview(item) }
+        },
         onLoadMoreCatalog = loadMoreCatalog,
         onRemoveContinueWatching = removeContinueWatching,
         isCatalogItemWatched = isCatalogItemWatched,

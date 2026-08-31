@@ -215,6 +215,7 @@ internal fun ModernHeroMediaLayer(
                         onEnded = onTrailerEnded,
                         onFirstFrameRendered = onFirstFrameRendered,
                         muted = mutedVal,
+                        playerViewFocusable = false,
                         cropToFill = false,
                         modifier = Modifier
                             .fillMaxSize()
@@ -239,6 +240,7 @@ internal fun ModernHeroMediaLayer(
                             onEnded = onTrailerEnded,
                             onFirstFrameRendered = onFirstFrameRendered,
                             muted = mutedVal,
+                            playerViewFocusable = false,
                             cropToFill = false,
                             modifier = Modifier
                                 .fillMaxSize()

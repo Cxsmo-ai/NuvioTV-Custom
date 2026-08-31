@@ -19,7 +19,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -45,6 +47,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.withFrameNanos
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.compose.ui.ExperimentalComposeUiApi
 import coil3.imageLoader
@@ -61,9 +64,11 @@ import com.nuvio.tv.ui.util.dpadVerticalFastScroll
 import com.nuvio.tv.ui.util.recompositionHighlighter
 import com.nuvio.tv.ui.components.rememberPlaceholderShimmerOffsetState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 // Vertical poster prefetch: rows just outside the viewport on BOTH flanks get their
@@ -150,6 +155,8 @@ internal fun ModernHomeRowsList(
     onFocusedHeroMediaNonceChange: (Int) -> Unit,
     onExpansionInteractionNonceChange: (Int) -> Unit,
     blockLeftOnFirstExpandedItem: Boolean = false,
+    preferFirstRowOnContainerFocus: Boolean = false,
+    onNavigateUpFromFirstRow: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // Unwrap StableRef wrappers for internal use (not passed to child composables)
@@ -162,6 +169,20 @@ internal fun ModernHomeRowsList(
 
     val rowFocusRequesters = remember { mutableMapOf<String, FocusRequester>() }
     val stableItemFocusRequestersByRow = remember { mutableMapOf<String, StableRef<MutableMap<Int, FocusRequester>>>() }
+    val firstRowKey = carouselRows.list.firstOrNull()?.key
+    val rowNavigationScope = rememberCoroutineScope()
+    var rowNavigationJob by remember { mutableStateOf<Job?>(null) }
+
+    LaunchedEffect(pendingRowFocusNonce.value) {
+        val targetKey = pendingRowFocusKey.value ?: return@LaunchedEffect
+        val targetRowIndex = carouselRows.list.indexOfFirst { it.key == targetKey }
+        if (targetRowIndex >= 0) {
+            // A hero -> content transition may target a row that was previously
+            // scrolled off-screen. Compose it first; its row-level requester then
+            // restores the exact card after the next frame.
+            verticalRowListState.scrollToItem(targetRowIndex)
+        }
+    }
 
     val density = LocalDensity.current
     val context = LocalContext.current
@@ -258,9 +279,14 @@ internal fun ModernHomeRowsList(
         }
     }
 
-    val focusRestorerRequester = remember(activeRowKey) {
+    val focusRestorerRequester = remember(activeRowKey, preferFirstRowOnContainerFocus, carouselRows) {
         {
-            activeRowKey.value?.let { rowFocusRequesters[it] } ?: FocusRequester.Default
+            val targetRowKey = if (preferFirstRowOnContainerFocus) {
+                carouselRows.list.firstOrNull()?.key
+            } else {
+                activeRowKey.value
+            }
+            targetRowKey?.let { rowFocusRequesters[it] } ?: FocusRequester.Default
         }
     }
 
@@ -285,7 +311,6 @@ internal fun ModernHomeRowsList(
                 .focusRequester(contentFocusRequester)
                 .focusRestorer { focusRestorerRequester() }
                 .onPreviewKeyEvent { event ->
-                    val firstRowKey = carouselRows.list.firstOrNull()?.key
                     val lastRowKey = carouselRows.list.lastOrNull()?.key
                     if (event.type == KeyEventType.KeyDown &&
                         event.key == Key.DirectionUp &&
@@ -310,7 +335,7 @@ internal fun ModernHomeRowsList(
                     ) return@onPreviewKeyEvent true
                     false
                 }
-                .dpadVerticalFastScroll(
+                .then(if (!preferFirstRowOnContainerFocus) Modifier.dpadVerticalFastScroll(
                     scrollableState = verticalRowListState,
                     verticalVelocityDpPerSec = 2000f,
                     onFastScrollingChanged = onFastScrollingChanged,
@@ -356,7 +381,7 @@ internal fun ModernHomeRowsList(
                             targetItemKey
                         }
                     },
-                ),
+                ) else Modifier),
             contentPadding = PaddingValues(bottom = rowsViewportHeight),
             verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xl)
         ) {
@@ -364,7 +389,41 @@ internal fun ModernHomeRowsList(
                 items = carouselRows.list,
                 key = { index, row -> "${row.key}_$index" },
                 contentType = { _, row -> row.apiType ?: "modern_home_row" }
-            ) { _, row ->
+            ) { rowIndex, row ->
+                val focusAdjacentRow: (Int) -> Unit = { targetRowIndex ->
+                    rowNavigationJob?.cancel()
+                    val targetRow = carouselRows.list.getOrNull(targetRowIndex)
+                    if (targetRow != null) {
+                        val targetItemIndex = (focusedItemByRowMap[targetRow.key] ?: 0)
+                            .coerceIn(0, (targetRow.items.list.size - 1).coerceAtLeast(0))
+
+                        fun requestTarget(): Boolean {
+                            val cardRequester = stableItemFocusRequestersByRow[targetRow.key]
+                                ?.value
+                                ?.get(targetItemIndex)
+                            val requester = cardRequester ?: rowFocusRequesters[targetRow.key]
+                            return requester?.let {
+                                runCatching { it.requestFocus() }.getOrDefault(false)
+                            } ?: false
+                        }
+
+                        // Adjacent visible rows are the common path. Request
+                        // focus synchronously so a rapid opposite key cannot
+                        // overtake an enqueued coroutine and reverse direction.
+                        if (!requestTarget()) {
+                            rowNavigationJob = rowNavigationScope.launch {
+                                // Off-screen rows must be composed before their card
+                                // requester exists. Keep exactly one cancellable retry.
+                                verticalRowListState.scrollToItem(targetRowIndex)
+                                repeat(8) {
+                                    withFrameNanos { }
+                                    if (requestTarget()) return@launch
+                                    delay(24)
+                                }
+                            }
+                        }
+                    }
+                }
                 val stableOnContinueWatchingOptions = remember(onContinueWatchingOptions) {
                     { item: ContinueWatchingItem -> onContinueWatchingOptions(item) }
                 }
@@ -432,6 +491,21 @@ internal fun ModernHomeRowsList(
                     pendingRowFocusNonce = pendingRowFocusNonce,
                     onPendingRowFocusCleared = onPendingRowFocusCleared,
                     onRowItemFocused = stableOnRowItemFocused,
+                    onNavigateUpFromThisRow = if (row.key == firstRowKey) {
+                        onNavigateUpFromFirstRow?.let { navigateUp ->
+                            {
+                                rowNavigationJob?.cancel()
+                                navigateUp()
+                            }
+                        }
+                    } else {
+                        { focusAdjacentRow(rowIndex - 1) }
+                    },
+                    onNavigateDownFromThisRow = if (rowIndex < carouselRows.list.lastIndex) {
+                        { focusAdjacentRow(rowIndex + 1) }
+                    } else {
+                        null
+                    },
                     useLandscapePosters = useLandscapePosters,
                     showLabels = showLabels,
                     posterCardCornerRadius = posterCardCornerRadius,

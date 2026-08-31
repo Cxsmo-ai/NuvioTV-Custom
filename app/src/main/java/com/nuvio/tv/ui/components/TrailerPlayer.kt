@@ -35,6 +35,7 @@ import com.nuvio.tv.data.trailer.YoutubeChunkedDataSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import android.view.LayoutInflater
+import android.view.ViewGroup
 import com.nuvio.tv.R
 import kotlinx.coroutines.delay
 
@@ -61,6 +62,12 @@ fun TrailerPlayer(
     seekDeltaMs: Long = 0L,
     onProgressChanged: (positionMs: Long, durationMs: Long) -> Unit = { _, _ -> },
     onRemoteKey: (keyCode: Int, action: Int, repeatCount: Int) -> Boolean = { _, _, _ -> false },
+    /**
+     * Whether the native [PlayerView] may participate in Android focus search.
+     * Background/card previews must keep this disabled so inserting the video
+     * surface cannot steal D-pad focus from the Compose control that owns it.
+     */
+    playerViewFocusable: Boolean = true,
     cropToFill: Boolean = false,
     overscanZoom: Float = TRAILER_OVERSCAN_ZOOM,
     modifier: Modifier = Modifier,
@@ -235,8 +242,13 @@ fun TrailerPlayer(
                 factory = { ctx ->
                     (LayoutInflater.from(ctx).inflate(R.layout.trailer_player_view, null) as PlayerView).apply {
                         player = trailerPlayer
-                        isFocusable = true
-                        isFocusableInTouchMode = true
+                        isFocusable = playerViewFocusable
+                        isFocusableInTouchMode = playerViewFocusable
+                        descendantFocusability = if (playerViewFocusable) {
+                            ViewGroup.FOCUS_AFTER_DESCENDANTS
+                        } else {
+                            ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                        }
                         setOnKeyListener { _, keyCode, event ->
                             currentOnRemoteKey(keyCode, event.action, event.repeatCount)
                         }
@@ -257,6 +269,16 @@ fun TrailerPlayer(
                         AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                     } else {
                         AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
+                    view.isFocusable = playerViewFocusable
+                    view.isFocusableInTouchMode = playerViewFocusable
+                    view.descendantFocusability = if (playerViewFocusable) {
+                        ViewGroup.FOCUS_AFTER_DESCENDANTS
+                    } else {
+                        ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                    }
+                    if (!playerViewFocusable && view.hasFocus()) {
+                        view.clearFocus()
                     }
                 },
                 onRelease = { view ->

@@ -425,7 +425,10 @@ internal fun HomeViewModel.requestTrailerPreviewPipeline(
                 title = title,
                 year = extractYear(releaseInfo),
                 tmdbId = tmdbId,
-                type = apiType
+                type = apiType,
+                // Home autoplay has its own explicit user setting. Do not make
+                // it depend on the separate TMDB metadata-enrichment toggle.
+                ignoreUseTrailersGate = true
             )
 
             withContext(Dispatchers.Main) {

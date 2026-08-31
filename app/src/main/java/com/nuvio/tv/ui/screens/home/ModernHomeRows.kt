@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Brush
@@ -437,6 +438,8 @@ internal fun ModernRowSection(
     pendingRowFocusNonce: State<Int>,
     onPendingRowFocusCleared: () -> Unit,
     onRowItemFocused: (String, Int, Boolean) -> Unit,
+    onNavigateUpFromThisRow: (() -> Unit)? = null,
+    onNavigateDownFromThisRow: (() -> Unit)? = null,
     useLandscapePosters: Boolean,
     showLabels: Boolean,
     posterCardCornerRadius: Dp,
@@ -562,6 +565,20 @@ internal fun ModernRowSection(
                 .coerceIn(0, (row.items.list.size - 1).coerceAtLeast(0))
             if (!rowListState.isScrollInProgress) {
                 runCatching { rowListState.scrollToItem(targetIndex) }
+            }
+            // The row can remain logically active while focus is on the top
+            // hero, which means the card's isTargetItem Boolean may never
+            // change and its own effect will not restart. Request the exact
+            // remembered card for every transition nonce instead of relying on
+            // the row focus restorer. Retry briefly while LazyRow composes it.
+            repeat(6) {
+                withFrameNanos { }
+                val targetRequester = itemFocusRequesters[targetIndex]
+                val focused = runCatching {
+                    (targetRequester ?: rowFocusRequester).requestFocus()
+                }.getOrDefault(false)
+                if (focused) return@LaunchedEffect
+                delay(40)
             }
         }
 
@@ -818,6 +835,27 @@ internal fun ModernRowSection(
                 modifier = Modifier
                     .recompositionHighlighter()
                     .focusRequester(rowFocusRequester)
+                    .onPreviewKeyEvent { event ->
+                        when {
+                            onNavigateUpFromThisRow != null &&
+                                event.key == Key.DirectionUp -> {
+                                if (event.type == KeyEventType.KeyUp) {
+                                    onNavigateUpFromThisRow()
+                                }
+                                true
+                            }
+
+                            onNavigateDownFromThisRow != null &&
+                                event.key == Key.DirectionDown -> {
+                                if (event.type == KeyEventType.KeyUp) {
+                                    onNavigateDownFromThisRow()
+                                }
+                                true
+                            }
+
+                            else -> false
+                        }
+                    }
                     .focusRestorer {
                         val savedIdx = rowFocusedIndex.value
                         itemFocusRequesters[savedIdx]
@@ -1351,6 +1389,7 @@ private fun ModernCarouselCard(
                                 isPlaying = true,
                                 onEnded = onTrailerEnded,
                                 muted = focusedPosterBackdropTrailerMuted,
+                                playerViewFocusable = false,
                                 cropToFill = true,
                                 modifier = Modifier.fillMaxSize()
                             )
