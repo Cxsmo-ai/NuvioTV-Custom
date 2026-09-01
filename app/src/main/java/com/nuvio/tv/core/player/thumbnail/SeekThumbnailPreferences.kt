@@ -36,7 +36,7 @@ object SeekThumbnailPreferences {
 
     fun enabledFlow(context: Context): Flow<Boolean> =
         context.applicationContext.seekThumbnailDataStore.data.map { prefs ->
-            prefs[enabledKey] ?: true
+            prefs[enabledKey] ?: false
         }
 
     suspend fun setEnabled(context: Context, enabled: Boolean) {

@@ -84,8 +84,8 @@ class ThumbnailCache(context: Context, titleKey: String, durationMs: Long) {
     private val titleDir = File(rootDir, sha1("$titleKey|$durationMs|v$STORE_VERSION").take(24))
     // Mem cap sized for 10 s density: hold the coarse (stride-30) lattice + a scrub
     // working set so nearest-resident serving doesn't collapse to one frame across an
-    // unfilled span. In RGB_565 (~0.25 MB per 480x270 frame): 256 ~= 64 MB (fast Shield / TV); 64 ~= 16 MB.
-    private val memCache = LruCache<Long, Bitmap>(if (lowTier) 64 else 256)
+    // unfilled span. ~0.5 MB per 480x270 frame => 64 ~= 33 MB (AM9 Pro 4 GB); 16 ~= 8 MB.
+    private val memCache = LruCache<Long, Bitmap>(if (lowTier) 16 else 64)
 
     fun getMem(bucket: Long): Bitmap? = memCache.get(bucket)
 
@@ -99,10 +99,7 @@ class ThumbnailCache(context: Context, titleKey: String, durationMs: Long) {
     fun readDisk(bucket: Long): Bitmap? {
         val f = File(titleDir, "$bucket.jpg")
         if (!f.exists()) return null
-        val options = BitmapFactory.Options().apply {
-            inPreferredConfig = Bitmap.Config.RGB_565
-        }
-        return runCatching { BitmapFactory.decodeFile(f.absolutePath, options) }.getOrNull()
+        return runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull()
     }
 
     /** IO-thread only. Returns true when the entry was written. */

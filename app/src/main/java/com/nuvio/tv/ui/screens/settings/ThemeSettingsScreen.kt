@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
@@ -67,6 +68,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.nuvio.tv.LocaleCache
 import com.nuvio.tv.R
+import com.nuvio.tv.data.local.ThemeDataStore
 import com.nuvio.tv.domain.model.AppTheme
 import com.nuvio.tv.domain.model.SettingsUiStyle
 import com.nuvio.tv.ui.components.NuvioDialog
@@ -211,6 +213,30 @@ fun ThemeSettingsContent(
                         }
                     )
                 }
+            }
+
+            SettingsGroupCard(
+                modifier = Modifier.fillMaxWidth(),
+                title = stringResource(R.string.appearance_app_dimmer),
+                subtitle = stringResource(R.string.appearance_app_dimmer_group_subtitle)
+            ) {
+                SliderSettingsItem(
+                    icon = Icons.Default.BrightnessMedium,
+                    title = stringResource(R.string.appearance_app_dimmer),
+                    subtitle = stringResource(R.string.appearance_app_dimmer_subtitle),
+                    value = uiState.appDimPercent,
+                    valueText = if (uiState.appDimPercent == 0) {
+                        stringResource(R.string.appearance_app_dimmer_off)
+                    } else {
+                        stringResource(R.string.appearance_app_dimmer_value, uiState.appDimPercent)
+                    },
+                    minValue = ThemeDataStore.DEFAULT_APP_DIM_PERCENT,
+                    maxValue = ThemeDataStore.MAX_APP_DIM_PERCENT,
+                    step = 5,
+                    onValueChange = { percent ->
+                        viewModel.onEvent(ThemeSettingsEvent.SelectAppDim(percent))
+                    }
+                )
             }
 
             SettingsGroupCard(

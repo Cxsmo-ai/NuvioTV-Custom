@@ -68,6 +68,7 @@ import com.nuvio.tv.core.player.DolbyVisionConversionConfig
 import com.nuvio.tv.core.player.DolbyVisionConversionStats
 import com.nuvio.tv.core.player.DolbyVisionExtractorsFactory
 import com.nuvio.tv.core.player.DoviBridge
+import com.nuvio.tv.core.player.effects.ForceSdrOutputEffect
 import com.nuvio.tv.core.player.LastPlaybackDiagnostics
 import com.nuvio.tv.core.tracking.TrackingScrobbleAction
 import com.nuvio.tv.ui.screens.settings.MemoryBudget
@@ -190,7 +191,8 @@ internal data class ExoConstructionFingerprint(
     val extensionRendererMode: Int,
     val convertToDv81Active: Boolean,
     val mapDv7ToHevc: Boolean,
-    val tunnelingEnabled: Boolean
+    val tunnelingEnabled: Boolean,
+    val forceSdrOutput: Boolean = true
 )
 
 /**
@@ -1102,6 +1104,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                 matPassthroughEnabled = playerSettings.matPassthroughEnabled,
                 bluetoothForcePcm = isBluetoothAudioOutput,
                 playbackSpeedProvider = { _uiState.value.playbackSpeed },
+                forceSdrOutput = playerSettings.forceSdrOutput,
                 initialForcePcm = hasTriedAudioPcmFallback || isBluetoothAudioOutput,
                 preferSoftwareAudioOnly = isBluetoothAudioOutput && !vc1SoftwareFallbackActive,
                 onPlaybackSpeedAwareAudioSinkCreated = { playbackSpeedAwareAudioSink = it },
@@ -1213,7 +1216,8 @@ internal fun PlayerRuntimeController.initializePlayer(
                 mapDv7ToHevc = mapDv7ToHevcEnabled,
                 // 0.8.5: record the effective flag (raw toggle gated by
                 // prefer-app decoder) — construction uses it, so reuse must too.
-                tunnelingEnabled = playerSettings.effectiveTunnelingEnabled
+                tunnelingEnabled = playerSettings.effectiveTunnelingEnabled,
+                forceSdrOutput = playerSettings.forceSdrOutput
             )
             val reuseCandidatePlayer = _exoPlayer
             val reuseLivePlayer = reuseCandidatePlayer != null &&
@@ -1305,6 +1309,12 @@ internal fun PlayerRuntimeController.initializePlayer(
             libassPipelineSwitchInFlight = false
 
             _exoPlayer?.apply {
+                if (playerSettings.forceSdrOutput) {
+                    // Install the video graph before prepare()/first frame. The effect is a
+                    // declared no-op; the renderer graph performs the actual HDR-to-SDR
+                    // conversion and avoids an initial HDR surface flash or mode switch.
+                    setVideoEffects(listOf(ForceSdrOutputEffect()))
+                }
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
                     .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
@@ -2700,6 +2710,7 @@ private class SubtitleOffsetRenderersFactory(
     private val audioPassthroughPolicy: com.nuvio.tv.core.player.AudioPassthroughPolicy,
     private val bluetoothForcePcm: Boolean = false,
     private val playbackSpeedProvider: () -> Float,
+    private val forceSdrOutput: Boolean = true,
     private val initialForcePcm: Boolean = false,
     /**
      * When true, [EXTENSION_RENDERER_MODE_PREFER] applies to audio only — video stays on the
@@ -2752,7 +2763,12 @@ private class SubtitleOffsetRenderersFactory(
                     .setMaxDroppedFramesToNotify(
                         DefaultRenderersFactory.MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY
                     )
-                out.add(Vc1PtsRepairVideoRenderer(vc1RestampBuilder))
+                out.add(
+                    Vc1PtsRepairVideoRenderer(
+                        builder = vc1RestampBuilder,
+                        forceSdrOutput = forceSdrOutput
+                    )
+                )
             } else {
                 out.add(vc1RestampRenderer)
             }

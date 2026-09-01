@@ -294,6 +294,7 @@ data class PlayerSettings(
     val injectHdr10MetadataOnStrip: Boolean = false,
     val mpvHardwareDecodeMode: MpvHardwareDecodeMode = MpvHardwareDecodeMode.AUTO_SAFE,
     // Display settings
+    val forceSdrOutput: Boolean = true,
     val frameRateMatchingMode: FrameRateMatchingMode = FrameRateMatchingMode.OFF,
     val resolutionMatchingEnabled: Boolean = false,
     // Stream selection settings
@@ -621,6 +622,7 @@ class PlayerSettingsDataStore @Inject constructor(
     private val stripHdr10PlusSeiKey = booleanPreferencesKey("strip_hdr10plus_sei")
     private val injectHdr10MetadataOnStripKey = booleanPreferencesKey("inject_hdr10_metadata_on_strip")
     private val mpvHardwareDecodeModeKey = stringPreferencesKey("mpv_hardware_decode_mode")
+    private val forceSdrOutputKey = booleanPreferencesKey("force_sdr_output")
     private val frameRateMatchingKey = booleanPreferencesKey("frame_rate_matching")
     private val frameRateMatchingModeKey = stringPreferencesKey("frame_rate_matching_mode")
     private val resolutionMatchingEnabledKey = booleanPreferencesKey("resolution_matching_enabled")
@@ -1003,6 +1005,7 @@ class PlayerSettingsDataStore @Inject constructor(
                 stripHdr10PlusSei = prefs[stripHdr10PlusSeiKey] ?: false,
                 injectHdr10MetadataOnStrip = prefs[injectHdr10MetadataOnStripKey] ?: false,
                 mpvHardwareDecodeMode = parseMpvHardwareDecodeMode(prefs[mpvHardwareDecodeModeKey]),
+                forceSdrOutput = prefs[forceSdrOutputKey] ?: true,
                 frameRateMatchingMode = prefs[frameRateMatchingModeKey]?.let {
                     runCatching { FrameRateMatchingMode.valueOf(it) }.getOrNull()
                 } ?: if (prefs[frameRateMatchingKey] == true) FrameRateMatchingMode.START_STOP else FrameRateMatchingMode.OFF,
@@ -1663,6 +1666,12 @@ class PlayerSettingsDataStore @Inject constructor(
     suspend fun setMpvHardwareDecodeMode(mode: MpvHardwareDecodeMode) {
         store().edit { prefs ->
             prefs[mpvHardwareDecodeModeKey] = mode.name
+        }
+    }
+
+    suspend fun setForceSdrOutput(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[forceSdrOutputKey] = enabled
         }
     }
 

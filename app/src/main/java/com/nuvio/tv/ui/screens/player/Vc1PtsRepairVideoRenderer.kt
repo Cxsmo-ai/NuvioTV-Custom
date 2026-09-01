@@ -1,9 +1,12 @@
 package com.nuvio.tv.ui.screens.player
 
+import android.content.Context
 import android.util.Log
 import androidx.media3.common.Format
 import androidx.media3.exoplayer.mediacodec.MediaCodecAdapter
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
+import androidx.media3.exoplayer.video.PlaybackVideoGraphWrapper
+import androidx.media3.exoplayer.video.VideoFrameReleaseControl
 import java.nio.ByteBuffer
 import kotlin.math.abs
 
@@ -30,8 +33,17 @@ import kotlin.math.abs
  * future, freezing video.
  */
 internal class Vc1PtsRepairVideoRenderer(
-    builder: MediaCodecVideoRenderer.Builder
+    builder: MediaCodecVideoRenderer.Builder,
+    private val forceSdrOutput: Boolean = true
 ) : MediaCodecVideoRenderer(builder) {
+
+    override fun createPlaybackVideoGraphWrapper(
+        context: Context,
+        videoFrameReleaseControl: VideoFrameReleaseControl
+    ): PlaybackVideoGraphWrapper =
+        super.createPlaybackVideoGraphWrapper(context, videoFrameReleaseControl).also { graph ->
+            graph.setRequestOpenGlToneMapping(forceSdrOutput)
+        }
 
     private enum class Mode { WATCH, ENGAGED }
 

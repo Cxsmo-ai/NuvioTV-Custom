@@ -916,12 +916,16 @@ internal fun SliderSettingsItem(
         enabled = enabled,
         progressFraction = progress,
         onDecrease = {
-            val newValue = (value - step).coerceAtLeast(minValue)
-            if (newValue != value) onValueChange(newValue)
+            steppedSliderValue(value, minValue, maxValue, step, increase = false)?.let { newValue ->
+                onValueChange(newValue)
+                true
+            } ?: false
         },
         onIncrease = {
-            val newValue = (value + step).coerceAtMost(maxValue)
-            if (newValue != value) onValueChange(newValue)
+            steppedSliderValue(value, minValue, maxValue, step, increase = true)?.let { newValue ->
+                onValueChange(newValue)
+                true
+            } ?: false
         },
         onFocused = onFocused,
         modifier = modifier,
@@ -955,14 +959,16 @@ internal fun SliderSettingsItem(
         enabled = enabled,
         progressFraction = progress,
         onDecrease = {
-            val newIndex = (index - 1).coerceAtLeast(0)
-            val newValue = values[newIndex]
-            if (newValue != selected) onValueChange(newValue)
+            adjacentSliderValue(values, selected, increase = false)?.let { newValue ->
+                onValueChange(newValue)
+                true
+            } ?: false
         },
         onIncrease = {
-            val newIndex = (index + 1).coerceAtMost(lastIndex)
-            val newValue = values[newIndex]
-            if (newValue != selected) onValueChange(newValue)
+            adjacentSliderValue(values, selected, increase = true)?.let { newValue ->
+                onValueChange(newValue)
+                true
+            } ?: false
         },
         onFocused = onFocused,
         modifier = modifier,
@@ -977,8 +983,8 @@ private fun SliderSettingsItemLayout(
     subtitle: String?,
     enabled: Boolean,
     progressFraction: Float,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit,
+    onDecrease: () -> Boolean,
+    onIncrease: () -> Boolean,
     onFocused: () -> Unit,
     modifier: Modifier,
 ) {
@@ -1003,11 +1009,9 @@ private fun SliderSettingsItemLayout(
                 when (event.nativeKeyEvent.keyCode) {
                     KeyEvent.KEYCODE_DPAD_LEFT -> {
                         if (isRtl) onIncrease() else onDecrease()
-                        true
                     }
                     KeyEvent.KEYCODE_DPAD_RIGHT -> {
                         if (isRtl) onDecrease() else onIncrease()
-                        true
                     }
                     else -> false
                 }
@@ -1173,6 +1177,37 @@ private fun SliderSettingsItemLayout(
             }
         }
     }
+}
+
+internal fun steppedSliderValue(
+    value: Int,
+    minValue: Int,
+    maxValue: Int,
+    step: Int,
+    increase: Boolean
+): Int? {
+    val safeStep = step.coerceAtLeast(1)
+    val next = if (increase) {
+        (value + safeStep).coerceAtMost(maxValue)
+    } else {
+        (value - safeStep).coerceAtLeast(minValue)
+    }
+    return next.takeIf { it != value }
+}
+
+internal fun adjacentSliderValue(
+    values: List<Int>,
+    selected: Int,
+    increase: Boolean
+): Int? {
+    if (values.isEmpty()) return null
+    val currentIndex = values.indexOf(selected).takeIf { it >= 0 } ?: 0
+    val nextIndex = if (increase) {
+        (currentIndex + 1).coerceAtMost(values.lastIndex)
+    } else {
+        (currentIndex - 1).coerceAtLeast(0)
+    }
+    return values[nextIndex].takeIf { it != selected }
 }
 
 @Composable

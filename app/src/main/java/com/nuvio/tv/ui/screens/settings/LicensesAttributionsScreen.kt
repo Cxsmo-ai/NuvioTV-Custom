@@ -76,6 +76,7 @@ private const val IntroDbUrl = "https://introdb.app/"
 private const val ImdbDatasetsUrl = "https://developer.imdb.com/non-commercial-datasets/"
 private const val ApacheLicenseUrl = "https://www.apache.org/licenses/LICENSE-2.0"
 private const val LibMpvAndroidUrl = "https://github.com/jarnedemeulemeester/libmpv-android"
+private const val SmartVibranceUrl = "https://github.com/aston89/Smart-vibrance-for-reshade"
 
 private sealed interface LicenseLogo {
     data class Drawable(@param:DrawableRes val resId: Int) : LicenseLogo
@@ -419,5 +420,10 @@ private fun playbackLicenseItems() = listOf(
         title = stringResource(R.string.licenses_attributions_libmpv_title),
         body = stringResource(R.string.licenses_attributions_libmpv_body),
         url = LibMpvAndroidUrl
+    ),
+    LicenseAttributionItem(
+        title = stringResource(R.string.licenses_attributions_smart_vibrance_title),
+        body = stringResource(R.string.licenses_attributions_smart_vibrance_body),
+        url = SmartVibranceUrl
     )
 )

@@ -67,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -551,6 +552,9 @@ class MainActivity : ComponentActivity() {
             val discoverLocation = mainUiPrefs.discoverLocation
 
             val uiScalePercent by com.nuvio.tv.data.local.UiScalePreference.flow(applicationContext).collectAsState(initial = 100)
+            val appDimPercent by themeDataStore.appDimPercent.collectAsState(
+                initial = ThemeDataStore.DEFAULT_APP_DIM_PERCENT
+            )
             NuvioTheme(
                 appTheme = mainUiPrefs.theme,
                 appFont = mainUiPrefs.font,
@@ -582,7 +586,17 @@ class MainActivity : ComponentActivity() {
                     com.nuvio.tv.core.player.LocalTrailerPlayerPool provides trailerPlayerPool
                 ) {
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .drawWithContent {
+                            drawContent()
+                            if (appDimPercent > 0) {
+                                drawRect(
+                                    color = Color.Black,
+                                    alpha = appDimPercent / 100f
+                                )
+                            }
+                        },
                     shape = RectangleShape,
                     colors = SurfaceDefaults.colors(
                         containerColor = NuvioTheme.colors.Background

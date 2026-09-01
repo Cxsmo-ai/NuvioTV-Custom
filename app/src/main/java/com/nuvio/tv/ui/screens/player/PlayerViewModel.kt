@@ -27,6 +27,7 @@ import com.nuvio.tv.core.torrent.TorrentService
 import com.nuvio.tv.core.torrent.TorrentSettings
 import com.nuvio.tv.data.local.AudioDelayRouteDataStore
 import com.nuvio.tv.data.local.PlayerSettingsDataStore
+import com.nuvio.tv.data.local.ThemeDataStore
 import com.nuvio.tv.data.local.DeviceLocalPlayerPreferences
 import com.nuvio.tv.data.local.MDBListSettingsDataStore
 import com.nuvio.tv.data.local.StreamLinkCacheDataStore
@@ -53,8 +54,10 @@ import com.nuvio.tv.data.trailer.TrailerService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
@@ -74,6 +77,7 @@ class PlayerViewModel @Inject constructor(
     private val traktEpisodeMappingService: TraktEpisodeMappingService,
     private val skipIntroRepository: SkipIntroRepository,
     private val playerSettingsDataStore: PlayerSettingsDataStore,
+    private val themeDataStore: ThemeDataStore,
     private val deviceLocalPlayerPreferences: DeviceLocalPlayerPreferences,
     private val streamLinkCacheDataStore: StreamLinkCacheDataStore,
     private val streamBadgeSettingsDataStore: StreamBadgeSettingsDataStore,
@@ -111,6 +115,27 @@ class PlayerViewModel @Inject constructor(
     private val tvRecommendationManager: com.nuvio.tv.core.recommendations.TvRecommendationManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    val appDimPercent: StateFlow<Int> = themeDataStore.appDimPercent.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = ThemeDataStore.DEFAULT_APP_DIM_PERCENT
+    )
+
+    val smartVibranceEnabled: StateFlow<Boolean> = themeDataStore.smartVibranceEnabled.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = false
+    )
+
+    val forceSdrOutput: StateFlow<Boolean> = playerSettingsDataStore.playerSettings
+        .map { settings -> settings.forceSdrOutput }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = true
+        )
 
     init {
         // Release trailer player codec resources so the full-screen player can
@@ -1059,6 +1084,18 @@ class PlayerViewModel @Inject constructor(
 
     fun showNextPostPlayRecommendation() {
         postPlayRecommendationController.showNextRecommendation()
+    }
+
+    fun setAppDimPercent(percent: Int) {
+        viewModelScope.launch {
+            themeDataStore.setAppDimPercent(percent)
+        }
+    }
+
+    fun setSmartVibranceEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            themeDataStore.setSmartVibranceEnabled(enabled)
+        }
     }
 
     fun returnToPlayerFromPostPlay() {

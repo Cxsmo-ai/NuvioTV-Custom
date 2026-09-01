@@ -23,6 +23,11 @@ class ThemeDataStore @Inject constructor(
         private const val FEATURE = "theme_settings"
         const val DEFAULT_SCREENSAVER_TIMEOUT_MINUTES = 5
         const val DEFAULT_SCREENSAVER_DIM_PERCENT = 70
+        const val DEFAULT_APP_DIM_PERCENT = 0
+        const val MAX_APP_DIM_PERCENT = 80
+
+        internal fun normalizeAppDimPercent(percent: Int): Int =
+            percent.coerceIn(DEFAULT_APP_DIM_PERCENT, MAX_APP_DIM_PERCENT)
     }
 
     private fun store(profileId: Int = profileManager.activeProfileId.value) =
@@ -36,6 +41,8 @@ class ThemeDataStore @Inject constructor(
     private val screensaverEnabledKey = booleanPreferencesKey("oled_screensaver_enabled")
     private val screensaverTimeoutKey = intPreferencesKey("oled_screensaver_timeout_min")
     private val screensaverDimKey = intPreferencesKey("oled_screensaver_dim_percent")
+    private val appDimKey = intPreferencesKey("app_dim_percent")
+    private val smartVibranceEnabledKey = booleanPreferencesKey("player_smart_vibrance_plus_enabled")
 
     val selectedThemePreference: Flow<AppTheme?> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { prefs ->
@@ -89,10 +96,23 @@ class ThemeDataStore @Inject constructor(
         }
     }
 
+    val appDimPercent: Flow<Int> = profileManager.activeProfileId.flatMapLatest { pid ->
+        factory.get(pid, FEATURE).data.map { prefs ->
+            normalizeAppDimPercent(prefs[appDimKey] ?: DEFAULT_APP_DIM_PERCENT)
+        }
+    }
+
+    val smartVibranceEnabled: Flow<Boolean> = profileManager.activeProfileId.flatMapLatest { pid ->
+        factory.get(pid, FEATURE).data.map { prefs ->
+            prefs[smartVibranceEnabledKey] ?: false
+        }
+    }
+
     val settingsUiStyle: Flow<SettingsUiStyle> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { prefs ->
-            prefs[settingsUiStyleKey]
-            SettingsUiStyle.CLASSIC
+            prefs[settingsUiStyleKey]?.let { name ->
+                runCatching { SettingsUiStyle.valueOf(name) }.getOrDefault(SettingsUiStyle.CLASSIC)
+            } ?: SettingsUiStyle.CLASSIC
         }
     }
 
@@ -138,6 +158,18 @@ class ThemeDataStore @Inject constructor(
     suspend fun setScreensaverDimPercent(percent: Int) {
         store().edit { prefs ->
             prefs[screensaverDimKey] = percent
+        }
+    }
+
+    suspend fun setAppDimPercent(percent: Int) {
+        store().edit { prefs ->
+            prefs[appDimKey] = normalizeAppDimPercent(percent)
+        }
+    }
+
+    suspend fun setSmartVibranceEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[smartVibranceEnabledKey] = enabled
         }
     }
 

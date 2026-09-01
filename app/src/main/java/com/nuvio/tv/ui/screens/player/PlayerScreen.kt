@@ -10,6 +10,7 @@ import com.nuvio.tv.ui.theme.NuvioMotion
 import com.nuvio.tv.ui.theme.NuvioTheme
 
 import android.util.Log
+import android.os.Build
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -57,6 +58,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.ClosedCaption
@@ -71,6 +73,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Speaker
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -112,6 +115,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.Tracks
+import androidx.media3.common.ColorInfo
+import androidx.media3.common.Format
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Border
@@ -132,6 +139,12 @@ import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
 import com.nuvio.tv.ui.util.localizeEpisodeTitle
 import com.nuvio.tv.data.local.InternalPlayerEngine
+import com.nuvio.tv.data.local.ThemeDataStore
+import com.nuvio.tv.core.player.effects.SmartVibrancePlusEffect
+import com.nuvio.tv.core.player.effects.ForceSdrOutputEffect
+import com.nuvio.tv.core.player.effects.SmartVibranceRuntimeStatus
+import com.nuvio.tv.core.player.effects.shouldApplySmartVibrance
+import com.nuvio.tv.core.player.effects.supportsSmartVibrancePlus
 import com.nuvio.tv.core.player.thumbnail.SeekThumbnailPreferences
 import com.nuvio.tv.core.player.thumbnail.SeekThumbnails
 import com.nuvio.tv.data.local.LibassRenderType
@@ -142,6 +155,7 @@ import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.ui.components.LoadingIndicator
 import com.nuvio.tv.ui.components.PanelActionRow
 import com.nuvio.tv.ui.components.PlayerPanelRow
+import com.nuvio.tv.ui.screens.settings.SliderSettingsItem
 import android.text.format.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -168,8 +182,21 @@ fun PlayerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val postPlayRecommendationState by viewModel.postPlayRecommendationUiState.collectAsState()
     val effectiveAutoplayEnabled by viewModel.effectiveAutoplayEnabled.collectAsState(initial = false)
+    val appDimPercent by viewModel.appDimPercent.collectAsState()
+    val smartVibranceEnabled by viewModel.smartVibranceEnabled.collectAsState()
+    val forceSdrOutput by viewModel.forceSdrOutput.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
+    val outputSupportsHdr = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            context.display
+                ?.hdrCapabilities
+                ?.supportedHdrTypes
+                ?.isNotEmpty() == true
+        } else {
+            false
+        }
+    }
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val containerFocusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
@@ -194,6 +221,20 @@ fun PlayerScreen(
     var reportCodeVisible by remember { mutableStateOf(false) }
     var exitDispatched by remember { mutableStateOf(false) }
     var externalHandoffInProgress by remember { mutableStateOf(false) }
+    var showVideoEnhancementsDialog by remember { mutableStateOf(false) }
+    var smartVibranceRuntimeStatus by remember {
+        mutableStateOf(SmartVibranceRuntimeStatus.OFF)
+    }
+
+    LaunchedEffect(uiState.internalPlayerEngine, smartVibranceEnabled) {
+        if (uiState.internalPlayerEngine == InternalPlayerEngine.MVP_PLAYER) {
+            smartVibranceRuntimeStatus = if (smartVibranceEnabled) {
+                SmartVibranceRuntimeStatus.BYPASSED_MPV
+            } else {
+                SmartVibranceRuntimeStatus.OFF
+            }
+        }
+    }
 
     val exitPlayer: () -> Unit = exitPlayer@{
         if (exitDispatched) return@exitPlayer
@@ -276,7 +317,9 @@ fun PlayerScreen(
 
     val handleBackPress = handleBackPress@{
         if (externalHandoffInProgress) return@handleBackPress
-        if (postPlayRecommendationState.canReturnToPlayer && !uiState.playbackEnded) {
+        if (showVideoEnhancementsDialog) {
+            showVideoEnhancementsDialog = false
+        } else if (postPlayRecommendationState.canReturnToPlayer && !uiState.playbackEnded) {
             returnToPlayerFromPostPlay()
             viewModel.hideControls()
         } else if (postPlayRecommendationState.isVisible || postPlayRecommendationState.isLoadingRecommendation) {
@@ -920,6 +963,12 @@ fun PlayerScreen(
                             useLibass = uiState.useLibass,
                             libassRenderType = uiState.libassRenderType,
                             subtitleStyle = uiState.subtitleStyle,
+                            smartVibranceRequested = smartVibranceEnabled,
+                            forceSdrOutput = forceSdrOutput,
+                            outputSupportsHdr = outputSupportsHdr,
+                            onSmartVibranceStatusChanged = { status ->
+                                smartVibranceRuntimeStatus = status
+                            },
                             onBindSubtitleView = viewModel::bindExoSubtitleView,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -1321,6 +1370,7 @@ fun PlayerScreen(
                 !uiState.showAudioOverlay &&
                 !uiState.showSubtitleOverlay &&
                 !uiState.showSpeedDialog &&
+                !showVideoEnhancementsDialog &&
                 !postPlayRecommendationState.isVisible &&
                 uiState.postPlayMode !is PostPlayMode.StillWatching,
             enter = fadeIn(animationSpec = tween(200)),
@@ -1362,6 +1412,10 @@ fun PlayerScreen(
                     } else {
                         viewModel.onEvent(PlayerEvent.OnShowMoreDialog)
                     }
+                },
+                onOpenVideoEnhancements = {
+                    showVideoEnhancementsDialog = true
+                    viewModel.onUserInteraction()
                 },
                 onOpenInExternalPlayer = {
                     if (!externalHandoffInProgress) {
@@ -1485,7 +1539,6 @@ fun PlayerScreen(
                 !uiState.showLoadingOverlay && !uiState.showPauseOverlay &&
                 !uiState.showSubtitleDelayOverlay && !uiState.showSubtitleTimingDialog &&
                 !uiState.showMoreDialog &&
-                uiState.previewThumbPositionMs == null &&
                 !viewModel.playbackTimeline.collectAsState().value.isLive,
             enter = fadeIn(animationSpec = tween(150)),
             exit = fadeOut(animationSpec = tween(150)),
@@ -1707,6 +1760,20 @@ fun PlayerScreen(
                 onDismiss = { viewModel.onEvent(PlayerEvent.OnDismissTransientOverlay) }
             )
         }
+
+        if (showVideoEnhancementsDialog) {
+            VideoEnhancementsDialog(
+                appDimPercent = appDimPercent,
+                smartVibranceEnabled = smartVibranceEnabled,
+                smartVibranceStatus = smartVibranceRuntimeStatus,
+                onAppDimPercentChanged = viewModel::setAppDimPercent,
+                onSmartVibranceChanged = viewModel::setSmartVibranceEnabled,
+                onDismiss = {
+                    showVideoEnhancementsDialog = false
+                    viewModel.scheduleHideControls()
+                }
+            )
+        }
     }
 }
 
@@ -1766,6 +1833,12 @@ private fun MpvPlayerSurface(
     }
 }
 
+private enum class PlayerVideoEffectMode {
+    NONE,
+    FORCE_SDR,
+    SMART_VIBRANCE
+}
+
 @Composable
 private fun ExoPlayerSurface(
     player: ExoPlayer,
@@ -1776,6 +1849,10 @@ private fun ExoPlayerSurface(
     useLibass: Boolean,
     libassRenderType: LibassRenderType,
     subtitleStyle: SubtitleStyleSettings,
+    smartVibranceRequested: Boolean,
+    forceSdrOutput: Boolean,
+    outputSupportsHdr: Boolean,
+    onSmartVibranceStatusChanged: (SmartVibranceRuntimeStatus) -> Unit,
     onBindSubtitleView: (androidx.media3.ui.SubtitleView?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -1783,6 +1860,15 @@ private fun ExoPlayerSurface(
     val latestAspectMode by rememberUpdatedState(aspectMode)
     val latestBindSubtitleView by rememberUpdatedState(onBindSubtitleView)
     val latestSubtitleStyle by rememberUpdatedState(subtitleStyle)
+    val latestStatusCallback by rememberUpdatedState(onSmartVibranceStatusChanged)
+    var activeVideoFormat by remember(player) { mutableStateOf(player.videoFormat) }
+    var activeEffectMode by remember(player) {
+        mutableStateOf(
+            if (forceSdrOutput) PlayerVideoEffectMode.FORCE_SDR
+            else PlayerVideoEffectMode.NONE
+        )
+    }
+    var videoEffectsFailedForMedia by remember(player) { mutableStateOf(false) }
     val playerView = remember(context, player) {
         PlayerView(context).apply {
             useController = false
@@ -1847,6 +1933,7 @@ private fun ExoPlayerSurface(
             }
 
             override fun onRenderedFirstFrame() {
+                activeVideoFormat = player.videoFormat
                 playerView.post {
                     playerView.applyExoAspectMode(latestAspectMode)
                     controller.refreshVideoBottomFraction()
@@ -1854,10 +1941,38 @@ private fun ExoPlayerSurface(
             }
 
             override fun onTracksChanged(tracks: Tracks) {
+                activeVideoFormat = player.videoFormat
                 // Re-apply subtitle style when tracks change so style is applied
                 // even when subtitles are enabled after initial player setup.
                 playerView.post {
                     playerView.applySubtitleStyleIfNeeded(latestSubtitleStyle)
+                }
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                activeVideoFormat = null
+                videoEffectsFailedForMedia = false
+                activeEffectMode = if (forceSdrOutput) {
+                    PlayerVideoEffectMode.FORCE_SDR
+                } else {
+                    PlayerVideoEffectMode.NONE
+                }
+            }
+
+            override fun onPlayerErrorChanged(error: PlaybackException?) {
+                val videoEffectFailed = error?.errorCode ==
+                    PlaybackException.ERROR_CODE_VIDEO_FRAME_PROCESSOR_INIT_FAILED ||
+                    error?.errorCode == PlaybackException.ERROR_CODE_VIDEO_FRAME_PROCESSING_FAILED
+                if (videoEffectFailed && activeEffectMode != PlayerVideoEffectMode.NONE) {
+                    Log.e(
+                        "SmartVibrancePlus",
+                        "Video effect failed; disabling it for this media item",
+                        error
+                    )
+                    runCatching { player.setVideoEffects(emptyList()) }
+                    activeEffectMode = PlayerVideoEffectMode.NONE
+                    videoEffectsFailedForMedia = true
+                    latestStatusCallback(SmartVibranceRuntimeStatus.FAILED)
                 }
             }
         }
@@ -1867,6 +1982,68 @@ private fun ExoPlayerSurface(
         }
         onDispose {
             player.removeListener(listener)
+        }
+    }
+
+    LaunchedEffect(
+        player,
+        smartVibranceRequested,
+        activeVideoFormat,
+        forceSdrOutput,
+        outputSupportsHdr,
+        videoEffectsFailedForMedia
+    ) {
+        val nextStatus = when {
+            videoEffectsFailedForMedia -> SmartVibranceRuntimeStatus.FAILED
+            !smartVibranceRequested -> SmartVibranceRuntimeStatus.OFF
+            activeVideoFormat == null -> SmartVibranceRuntimeStatus.WAITING_FOR_VIDEO
+            !supportsSmartVibrancePlus(
+                activeVideoFormat,
+                outputSupportsHdr = outputSupportsHdr && !forceSdrOutput
+            ) ->
+                SmartVibranceRuntimeStatus.BYPASSED_HDR
+            activeVideoFormat?.colorInfo?.let(ColorInfo::isTransferHdr) == true ->
+                SmartVibranceRuntimeStatus.ACTIVE_TONEMAPPED_HDR
+            else -> SmartVibranceRuntimeStatus.ACTIVE
+        }
+        val shouldApply = shouldApplySmartVibrance(nextStatus)
+        val desiredEffectMode = when {
+            videoEffectsFailedForMedia -> PlayerVideoEffectMode.NONE
+            shouldApply -> PlayerVideoEffectMode.SMART_VIBRANCE
+            forceSdrOutput -> PlayerVideoEffectMode.FORCE_SDR
+            else -> PlayerVideoEffectMode.NONE
+        }
+        if (activeEffectMode != desiredEffectMode) {
+            val result = runCatching {
+                player.setVideoEffects(
+                    when (desiredEffectMode) {
+                        PlayerVideoEffectMode.NONE -> emptyList()
+                        PlayerVideoEffectMode.FORCE_SDR -> listOf(ForceSdrOutputEffect())
+                        PlayerVideoEffectMode.SMART_VIBRANCE -> listOf(SmartVibrancePlusEffect())
+                    }
+                )
+            }
+            if (result.isSuccess) {
+                activeEffectMode = desiredEffectMode
+                latestStatusCallback(nextStatus)
+            } else {
+                Log.e("SmartVibrancePlus", "Unable to update video effect; using normal playback", result.exceptionOrNull())
+                runCatching { player.setVideoEffects(emptyList()) }
+                activeEffectMode = PlayerVideoEffectMode.NONE
+                videoEffectsFailedForMedia = true
+                latestStatusCallback(SmartVibranceRuntimeStatus.FAILED)
+            }
+        } else {
+            latestStatusCallback(nextStatus)
+        }
+    }
+
+    DisposableEffect(player) {
+        onDispose {
+            if (activeEffectMode != PlayerVideoEffectMode.NONE) {
+                runCatching { player.setVideoEffects(emptyList()) }
+                activeEffectMode = PlayerVideoEffectMode.NONE
+            }
         }
     }
 
@@ -2058,6 +2235,7 @@ private fun PlayerControlsOverlay(
     onSwitchPlayerEngine: () -> Unit,
     onReportPlaybackIssue: () -> Unit,
     onToggleMoreActions: () -> Unit,
+    onOpenVideoEnhancements: () -> Unit,
     onOpenInExternalPlayer: () -> Unit,
     onShowStreamInfo: () -> Unit,
     onTogglePlaybackStats: () -> Unit,
@@ -2324,6 +2502,14 @@ private fun PlayerControlsOverlay(
                             iconPainter = customAspectPainter,
                             contentDescription = stringResource(R.string.cd_aspect_ratio),
                             onClick = onToggleAspectRatio,
+                            downFocusRequester = progressBarFocusRequester,
+                            onUpKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                        ControlButton(
+                            icon = Icons.Default.Tune,
+                            contentDescription = stringResource(R.string.cd_video_enhancements),
+                            onClick = onOpenVideoEnhancements,
                             downFocusRequester = progressBarFocusRequester,
                             onUpKey = onHideControls,
                             onFocused = onResetHideTimer
@@ -3545,6 +3731,101 @@ private fun MoreActionsDialog(
                 PanelActionRow(
                     label = stringResource(R.string.player_more_open_external),
                     onClick = onOpenInExternalPlayer
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VideoEnhancementsDialog(
+    appDimPercent: Int,
+    smartVibranceEnabled: Boolean,
+    smartVibranceStatus: SmartVibranceRuntimeStatus,
+    onAppDimPercentChanged: (Int) -> Unit,
+    onSmartVibranceChanged: (Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val firstFocusRequester = remember { FocusRequester() }
+    val smartVibranceStatusText = when (smartVibranceStatus) {
+        SmartVibranceRuntimeStatus.OFF -> stringResource(R.string.player_smart_vibrance_off)
+        SmartVibranceRuntimeStatus.WAITING_FOR_VIDEO ->
+            stringResource(R.string.player_smart_vibrance_waiting)
+        SmartVibranceRuntimeStatus.ACTIVE ->
+            stringResource(R.string.player_smart_vibrance_active)
+        SmartVibranceRuntimeStatus.ACTIVE_TONEMAPPED_HDR ->
+            stringResource(R.string.player_smart_vibrance_tonemapped_hdr)
+        SmartVibranceRuntimeStatus.BYPASSED_HDR ->
+            stringResource(R.string.player_smart_vibrance_hdr_bypass)
+        SmartVibranceRuntimeStatus.BYPASSED_MPV ->
+            stringResource(R.string.player_smart_vibrance_mpv_bypass)
+        SmartVibranceRuntimeStatus.FAILED ->
+            stringResource(R.string.player_smart_vibrance_failed)
+    }
+
+    LaunchedEffect(Unit) {
+        runCatching { firstFocusRequester.requestFocus() }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .width(500.dp)
+                .clip(RoundedCornerShape(NuvioTheme.radii.xxl))
+                .background(Color.Black.copy(alpha = 0.92f))
+                .border(
+                    BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+                    RoundedCornerShape(NuvioTheme.radii.xxl)
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(NuvioTheme.spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md)
+            ) {
+                Text(
+                    text = stringResource(R.string.player_video_enhancements_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = NuvioTheme.colors.TextPrimary
+                )
+                Text(
+                    text = stringResource(R.string.player_video_enhancements_chain),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.62f)
+                )
+
+                PlayerPanelRow(
+                    title = stringResource(R.string.player_smart_vibrance_title),
+                    titleEnd = if (smartVibranceEnabled) {
+                        stringResource(R.string.player_enhancement_on)
+                    } else {
+                        stringResource(R.string.player_enhancement_off)
+                    },
+                    subtitle = smartVibranceStatusText,
+                    selected = smartVibranceEnabled,
+                    onClick = { onSmartVibranceChanged(!smartVibranceEnabled) },
+                    modifier = Modifier.focusRequester(firstFocusRequester)
+                )
+
+                SliderSettingsItem(
+                    icon = Icons.Default.BrightnessMedium,
+                    title = stringResource(R.string.player_dimmer_title),
+                    subtitle = stringResource(R.string.player_dimmer_subtitle),
+                    value = appDimPercent,
+                    valueText = if (appDimPercent == 0) {
+                        stringResource(R.string.appearance_app_dimmer_off)
+                    } else {
+                        stringResource(R.string.appearance_app_dimmer_value, appDimPercent)
+                    },
+                    minValue = ThemeDataStore.DEFAULT_APP_DIM_PERCENT,
+                    maxValue = ThemeDataStore.MAX_APP_DIM_PERCENT,
+                    step = 5,
+                    onValueChange = onAppDimPercentChanged
+                )
+
+                Text(
+                    text = stringResource(R.string.player_smart_vibrance_compatibility_note),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f)
                 )
             }
         }
