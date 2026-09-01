@@ -3458,5 +3458,6 @@
     <string name="calendar_filter_upcoming">Upcoming</string>
     <string name="calendar_filter_past">Recent Past</string>
     <string name="calendar_refresh">Refresh</string>
+    <string name="calendar_spoiler_hidden">Episode hidden until previous is watched</string>
 
 </resources>

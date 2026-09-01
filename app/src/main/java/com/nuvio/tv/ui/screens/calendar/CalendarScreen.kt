@@ -37,11 +37,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -410,16 +412,7 @@ private fun CalendarEpisodeCard(
         shape = CardDefaults.shape(shape = cardShape)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Episode thumbnail / Show backdrop
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(episode.backdropUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = episode.showTitle,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            CalendarEpisodeArtwork(episode = episode)
 
             // Dark gradient scrim from top to bottom
             Box(
@@ -505,8 +498,12 @@ private fun CalendarEpisodeCard(
 
                 // Episode name
                 Text(
-                    text = episode.episodeTitle,
-                    color = Color.White.copy(alpha = 0.88f),
+                    text = if (episode.isSpoilerHidden) {
+                        stringResource(R.string.calendar_spoiler_hidden)
+                    } else {
+                        episode.episodeTitle
+                    },
+                    color = Color.White.copy(alpha = if (episode.isSpoilerHidden) 0.58f else 0.88f),
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontWeight = FontWeight.Medium,
                         fontSize = 12.sp
@@ -516,6 +513,58 @@ private fun CalendarEpisodeCard(
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CalendarEpisodeArtwork(
+    episode: CalendarEpisode,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    // Never decode the spoiler thumbnail while locked. Safe show artwork is
+    // blurred where supported and darkened on every Android TV API level.
+    val candidates = remember(episode) {
+        episode.artworkCandidates(includeEpisodeThumbnail = !episode.isSpoilerHidden)
+    }
+    var candidateIndex by remember(episode.episodeId, candidates) { mutableIntStateOf(0) }
+    val imageUrl = candidates.getOrNull(candidateIndex)
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(
+                    listOf(Color(0xFF262637), Color(0xFF111118))
+                )
+            )
+    ) {
+        if (imageUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = if (episode.isSpoilerHidden) null else episode.episodeTitle,
+                contentScale = ContentScale.Crop,
+                onError = {
+                    if (candidateIndex < candidates.lastIndex) {
+                        candidateIndex += 1
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (episode.isSpoilerHidden) Modifier.blur(18.dp) else Modifier)
+            )
+        }
+
+        if (episode.isSpoilerHidden) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.72f))
+            )
         }
     }
 }

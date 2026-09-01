@@ -31,7 +31,40 @@ class CalendarModelsTest {
 
         assertEquals("S01E04", episode.episodeCode)
         assertEquals("https://example.com/thumb.jpg", episode.backdropUrl)
+        assertEquals(
+            listOf(
+                "https://example.com/thumb.jpg",
+                "https://example.com/backdrop.jpg",
+                "https://example.com/poster.jpg"
+            ),
+            episode.artworkCandidates()
+        )
         assertTrue(episode.isWatched)
+    }
+
+    @Test
+    fun testCalendarArtworkCandidatesIgnoreBlankAndDuplicateUrls() {
+        val episode = CalendarEpisode(
+            showId = "tt1",
+            showTitle = "Show",
+            episodeId = "tt1:1:2",
+            seasonNumber = 1,
+            episodeNumber = 2,
+            episodeTitle = "Hidden episode",
+            airDate = LocalDate.now(),
+            releaseIso = null,
+            thumbnail = "   ",
+            showBackdrop = "https://example.com/show.jpg",
+            showPoster = "https://example.com/show.jpg",
+            isSpoilerHidden = true
+        )
+
+        assertEquals(listOf("https://example.com/show.jpg"), episode.artworkCandidates())
+        assertEquals(
+            listOf("https://example.com/show.jpg"),
+            episode.artworkCandidates(includeEpisodeThumbnail = false)
+        )
+        assertTrue(episode.isSpoilerHidden)
     }
 
     @Test

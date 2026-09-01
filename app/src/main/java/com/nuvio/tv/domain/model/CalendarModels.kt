@@ -19,13 +19,24 @@ data class CalendarEpisode(
     val overview: String? = null,
     val rating: Double? = null,
     val isWatched: Boolean = false,
+    val isSpoilerHidden: Boolean = false,
     val sourceAddonBaseUrl: String? = null
 ) {
     val episodeCode: String
         get() = "S%02dE%02d".format(seasonNumber, episodeNumber)
 
     val backdropUrl: String?
-        get() = thumbnail ?: showBackdrop ?: showPoster
+        get() = artworkCandidates().firstOrNull()
+
+    /** Ordered artwork choices, excluding blank and duplicate addon URLs. */
+    fun artworkCandidates(includeEpisodeThumbnail: Boolean = true): List<String> =
+        buildList {
+            if (includeEpisodeThumbnail) add(thumbnail)
+            add(showBackdrop)
+            add(showPoster)
+        }
+            .mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
+            .distinct()
 }
 
 @Immutable

@@ -24,9 +24,11 @@ import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -96,6 +98,15 @@ class CalendarRepositoryTest {
 
         val mentalistVideos = listOf(
             Video(
+                id = "tt_mentalist:1:1",
+                title = "Pilot",
+                released = today.minusDays(40).format(DateTimeFormatter.ISO_LOCAL_DATE) + "T00:00:00Z",
+                thumbnail = "https://example.com/thumb-pilot.jpg",
+                season = 1,
+                episode = 1,
+                overview = "Mentalist pilot"
+            ),
+            Video(
                 id = "tt_mentalist:1:2",
                 title = "Red Hair and Silver Tape",
                 released = isoDateToday,
@@ -103,6 +114,15 @@ class CalendarRepositoryTest {
                 season = 1,
                 episode = 2,
                 overview = "Mentalist episode 2"
+            ),
+            Video(
+                id = "tt_mentalist:1:3",
+                title = "Red Tide",
+                released = isoDateTomorrow,
+                thumbnail = "https://example.com/thumb3.jpg",
+                season = 1,
+                episode = 3,
+                overview = "Mentalist episode 3"
             )
         )
         val mentalistMeta = Meta(
@@ -176,7 +196,15 @@ class CalendarRepositoryTest {
 
         repository.refresh()
 
-        val days = repository.calendarDays
+        val days = repository.calendarDays.first()
         assertNotNull(days)
+        val episodes = days.flatMap(CalendarDay::episodes)
+        val episodeTwo = episodes.first { it.showId == "tt_mentalist" && it.episodeNumber == 2 }
+        val episodeThree = episodes.first { it.showId == "tt_mentalist" && it.episodeNumber == 3 }
+        val siloPremiere = episodes.first { it.showId == "tt_silo" }
+
+        assertFalse("Episode 2 follows watched episode 1", episodeTwo.isSpoilerHidden)
+        assertTrue("Episode 3 follows unwatched episode 2", episodeThree.isSpoilerHidden)
+        assertFalse("A series premiere has no previous episode", siloPremiere.isSpoilerHidden)
     }
 }

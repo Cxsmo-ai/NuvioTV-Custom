@@ -114,6 +114,7 @@ class CalendarRepositoryImpl @Inject constructor(
                 val maxDate = today.plusDays(FUTURE_DAYS_LOOKAHEAD)
 
                 val watchedEpisodes = collectWatchedEpisodesMap()
+                val savedArtwork = collectSavedArtworkMap()
 
                 val episodeList = mutableListOf<CalendarEpisode>()
 
@@ -121,7 +122,13 @@ class CalendarRepositoryImpl @Inject constructor(
                     async {
                         semaphore.withPermit {
                             runCatching {
-                                fetchEpisodesForShow(showId, minDate, maxDate, watchedEpisodes)
+                                fetchEpisodesForShow(
+                                    showId = showId,
+                                    minDate = minDate,
+                                    maxDate = maxDate,
+                                    watchedEpisodes = watchedEpisodes,
+                                    savedArtwork = savedArtwork
+                                )
                             }.getOrDefault(emptyList())
                         }
                     }
@@ -265,11 +272,73 @@ class CalendarRepositoryImpl @Inject constructor(
         return map
     }
 
+    private data class SavedArtwork(
+        val poster: String? = null,
+        val backdrop: String? = null
+    )
+
+    /**
+     * Preserve artwork already supplied by Nuvio Sync, trackers and library
+     * entries when a schedule-capable metadata addon omits series artwork.
+     */
+    private suspend fun collectSavedArtworkMap(): Map<String, SavedArtwork> {
+        val artwork = mutableMapOf<String, SavedArtwork>()
+
+        fun put(id: String, poster: String?, backdrop: String?) {
+            if (id.isBlank()) return
+            val existing = artwork[id] ?: SavedArtwork()
+            artwork[id] = SavedArtwork(
+                poster = existing.poster.nonBlank() ?: poster.nonBlank(),
+                backdrop = existing.backdrop.nonBlank() ?: backdrop.nonBlank()
+            )
+        }
+
+        runCatching {
+            watchProgressRepository.allProgress.firstOrNull().orEmpty().forEach { item ->
+                if (item.contentType.equals("series", ignoreCase = true) || item.season != null) {
+                    put(item.contentId, item.poster, item.backdrop)
+                }
+            }
+        }
+        runCatching {
+            watchProgressRepository.watchedItems.firstOrNull().orEmpty().forEach { item ->
+                if (item.contentType.equals("series", ignoreCase = true) || item.season != null) {
+                    put(item.contentId, item.poster, null)
+                }
+            }
+        }
+        runCatching {
+            libraryRepository.libraryItems.firstOrNull().orEmpty().forEach { item ->
+                if (item.type.equals("series", ignoreCase = true)) {
+                    put(item.id, item.poster, item.background)
+                }
+            }
+        }
+        runCatching {
+            for (provider in trackingProgressProviders.providers()) {
+                if (!runCatching { provider.isAuthenticated.first() }.getOrDefault(false)) continue
+                provider.allProgress.firstOrNull().orEmpty().forEach { item ->
+                    if (item.contentType.equals("series", ignoreCase = true) || item.season != null) {
+                        put(item.contentId, item.poster, item.backdrop)
+                    }
+                }
+                provider.watchedItems.firstOrNull().orEmpty().forEach { item ->
+                    if (item.contentType.equals("series", ignoreCase = true) || item.season != null) {
+                        put(item.contentId, item.poster, null)
+                    }
+                }
+            }
+        }
+
+        return artwork
+    }
+
     private suspend fun fetchEpisodesForShow(
         showId: String,
         minDate: LocalDate,
         maxDate: LocalDate,
-        watchedEpisodes: Map<String, Set<Pair<Int, Int>>>
+        watchedEpisodes: Map<String, Set<Pair<Int, Int>>>,
+        savedArtwork: Map<String, SavedArtwork>
     ): List<CalendarEpisode> {
         val meta = metaRepository.getMetaFromAllAddons(type = "series", id = showId)
             .filterIsInstance<NetworkResult.Success<Meta>>()
@@ -279,7 +348,24 @@ class CalendarRepositoryImpl @Inject constructor(
 
         if (meta.videos.isEmpty()) return emptyList()
 
-        val showWatchedSet = watchedEpisodes[showId] ?: watchedEpisodes[meta.id] ?: emptySet()
+        val showWatchedSet = watchedEpisodes[showId].orEmpty() + watchedEpisodes[meta.id].orEmpty()
+        val artworkFallback = savedArtwork[showId] ?: savedArtwork[meta.id]
+        val showPoster = meta.poster.nonBlank() ?: artworkFallback?.poster.nonBlank()
+        val showBackdrop = meta.background.nonBlank()
+            ?: meta.landscapePoster.nonBlank()
+            ?: artworkFallback?.backdrop.nonBlank()
+
+        val orderedEpisodeKeys = meta.videos
+            .mapNotNull { video ->
+                val season = video.season ?: return@mapNotNull null
+                val episode = video.episode ?: return@mapNotNull null
+                if (season <= 0) null else season to episode
+            }
+            .distinct()
+            .sortedWith(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
+        val previousEpisodeByEpisode = orderedEpisodeKeys
+            .zipWithNext { previous, current -> current to previous }
+            .toMap()
 
         val results = mutableListOf<CalendarEpisode>()
 
@@ -292,6 +378,10 @@ class CalendarRepositoryImpl @Inject constructor(
             if (airDate.isBefore(minDate) || airDate.isAfter(maxDate)) continue
 
             val isWatched = (season to episode) in showWatchedSet
+            val previousEpisode = previousEpisodeByEpisode[season to episode]
+            val isSpoilerHidden = !isWatched &&
+                previousEpisode != null &&
+                previousEpisode !in showWatchedSet
 
             val epTitle = video.title.trim().takeIf { it.isNotEmpty() }
                 ?: ("Episode " + episode)
@@ -306,16 +396,19 @@ class CalendarRepositoryImpl @Inject constructor(
                     episodeTitle = epTitle,
                     airDate = airDate,
                     releaseIso = video.released,
-                    thumbnail = video.thumbnail,
-                    showPoster = meta.poster,
-                    showBackdrop = meta.backdropUrl,
+                    thumbnail = video.thumbnail.nonBlank(),
+                    showPoster = showPoster,
+                    showBackdrop = showBackdrop,
                     overview = video.overview,
                     rating = video.rating,
-                    isWatched = isWatched
+                    isWatched = isWatched,
+                    isSpoilerHidden = isSpoilerHidden
                 )
             )
         }
 
         return results
     }
+
+    private fun String?.nonBlank(): String? = this?.trim()?.takeIf(String::isNotEmpty)
 }
