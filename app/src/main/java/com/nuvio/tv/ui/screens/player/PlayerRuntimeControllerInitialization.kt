@@ -192,7 +192,8 @@ internal data class ExoConstructionFingerprint(
     val convertToDv81Active: Boolean,
     val mapDv7ToHevc: Boolean,
     val tunnelingEnabled: Boolean,
-    val forceSdrOutput: Boolean = true
+    val prepareVideoEffectsGraph: Boolean = false,
+    val requestOpenGlToneMapping: Boolean = false
 )
 
 /**
@@ -392,6 +393,13 @@ internal fun PlayerRuntimeController.initializePlayer(
 
             val playerSettings = playerSettingsDataStore.playerSettings.first()
             currentPlayerSettingsForReport = playerSettings
+            // Resolve output before Dolby Vision preprocessing. Force SDR must be visible to
+            // the DV policy so an optimistic EDID cannot select native DV ahead of the SDR
+            // graph; compatible DV7 is exposed as HDR10 first and then tone-mapped.
+            val videoOutputDecision = VideoOutputPolicy.resolve(
+                context = context,
+                forceSdrOutput = playerSettings.forceSdrOutput
+            )
             rememberAudioDelayPerDeviceEnabled = playerSettings.rememberAudioDelayPerDevice
             // Always watch output-device changes so Bluetooth connect/disconnect can switch
             // PCM/passthrough policy in place (Media3 1.8.0 BT semantics; do not rebuild).
@@ -542,7 +550,8 @@ internal fun PlayerRuntimeController.initializePlayer(
                 Dv7HandlingMode.AUTO -> {
                     val result = DolbyVisionBaseLayerPolicy.resolve(
                         context = context,
-                        bridgeReady = DoviBridge.isLibraryLoaded
+                        bridgeReady = DoviBridge.isLibraryLoaded,
+                        forceSdrOutput = videoOutputDecision.prepareSdrOutputGraph
                     )
                     dv7AutoResult = result
                     effectiveDv7Mode = when (result.decision) {
@@ -568,6 +577,22 @@ internal fun PlayerRuntimeController.initializePlayer(
                     dv7AutoResult = null
                     effectiveDv7Mode = playerSettings.dv7HandlingMode
                 }
+            }
+
+            // Explicit native-DV and DV8.1 choices are valid on HDR/DV outputs. An effective
+            // SDR output cannot safely feed either protected DV path into the OpenGL tone
+            // mapper, so DV7 falls back to its HDR10-compatible base layer. Explicit strip and
+            // HDR10 base-layer choices already describe the compatible route and are retained.
+            if (videoOutputDecision.prepareSdrOutputGraph &&
+                (effectiveDv7Mode == Dv7HandlingMode.OFF ||
+                    effectiveDv7Mode == Dv7HandlingMode.DV81_LIBDOVI)
+            ) {
+                Log.i(
+                    PlayerRuntimeController.TAG,
+                    "DV7_SDR_COMPAT: requested=$effectiveDv7Mode " +
+                        "effective=${Dv7HandlingMode.HDR10_BASE_LAYER} host=${url.safeHost()}"
+                )
+                effectiveDv7Mode = Dv7HandlingMode.HDR10_BASE_LAYER
             }
 
             // Experimental: explicit libdovi conversion-mode override. Only applies
@@ -972,11 +997,12 @@ internal fun PlayerRuntimeController.initializePlayer(
             // OR the error handler's per-stream override (preserved for retry-after-failure).
             val mapDv7ToHevcEnabled = effectiveDv7Mode == Dv7HandlingMode.HDR10_BASE_LAYER ||
                     dv7ToHevcForcedStreamUrls.contains(url)
-            val isHdr10BaseLayerModeActive = when (playerSettings.dv7HandlingMode) {
-                Dv7HandlingMode.AUTO -> dv7AutoResult?.displayDv != true
-                else -> effectiveDv7Mode == Dv7HandlingMode.HDR10_BASE_LAYER ||
-                        effectiveDv7Mode == Dv7HandlingMode.STRIP_DV
-            }
+            // Key compatibility signaling from the effective runtime mode, not the raw EDID.
+            // Force SDR intentionally retains reported DV in diagnostics while overriding the
+            // route to HDR10_BASE_LAYER; consulting displayDv here would undo that override.
+            val isHdr10BaseLayerModeActive =
+                effectiveDv7Mode == Dv7HandlingMode.HDR10_BASE_LAYER ||
+                    effectiveDv7Mode == Dv7HandlingMode.STRIP_DV
             com.nuvio.tv.core.player.dvmkv.DolbyVisionCompatibility.setHdr10BaseLayerModeActive(isHdr10BaseLayerModeActive)
             isMapDv7ToHevcActiveForCurrentPlayback = mapDv7ToHevcEnabled
             // DV7 review F2: key this off the effective mode, not the AUTO policy
@@ -1029,6 +1055,26 @@ internal fun PlayerRuntimeController.initializePlayer(
                         "PCM-only sink, stereo downmix, no optical passthrough"
                 )
             }
+
+            // Resolve the active output before constructing the renderer. AUTO keeps the direct
+            // native path on HDR displays. SDR displays (and the manual Force SDR override)
+            // prepare the graph before the first frame; Media3 only tone-maps HDR-transfer input.
+            val smartVibranceGraphRequested = runCatching {
+                themeDataStore.smartVibranceEnabled.first()
+            }.getOrDefault(false)
+            // A persisted Smart Vibrance request also needs the graph to exist before renderer
+            // enable. It does not request tone mapping: native HDR remains HDR and the effect is
+            // bypassed once an HDR/Dolby Vision input format is known in PlayerScreen.
+            val prepareVideoEffectsGraph =
+                videoOutputDecision.prepareSdrOutputGraph || smartVibranceGraphRequested
+            Log.i(
+                PlayerRuntimeController.TAG,
+                "VIDEO_OUTPUT_POLICY: reportedHdr=${videoOutputDecision.outputSupportsHdr} " +
+                    "forceSdr=${playerSettings.forceSdrOutput} " +
+                    "toneMap=${videoOutputDecision.prepareSdrOutputGraph} " +
+                    "graph=$prepareVideoEffectsGraph " +
+                    "smartVibrance=$smartVibranceGraphRequested"
+            )
 
             // ── Renderers Factory (Combining Libass offsets + Audio Gain + Video Fallback) ──
             // Per-format passthrough overrides. softwareDecodersAvailable gates the whole
@@ -1104,7 +1150,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                 matPassthroughEnabled = playerSettings.matPassthroughEnabled,
                 bluetoothForcePcm = isBluetoothAudioOutput,
                 playbackSpeedProvider = { _uiState.value.playbackSpeed },
-                forceSdrOutput = playerSettings.forceSdrOutput,
+                requestOpenGlToneMapping = videoOutputDecision.prepareSdrOutputGraph,
                 initialForcePcm = hasTriedAudioPcmFallback || isBluetoothAudioOutput,
                 preferSoftwareAudioOnly = isBluetoothAudioOutput && !vc1SoftwareFallbackActive,
                 onPlaybackSpeedAwareAudioSinkCreated = { playbackSpeedAwareAudioSink = it },
@@ -1217,7 +1263,8 @@ internal fun PlayerRuntimeController.initializePlayer(
                 // 0.8.5: record the effective flag (raw toggle gated by
                 // prefer-app decoder) — construction uses it, so reuse must too.
                 tunnelingEnabled = playerSettings.effectiveTunnelingEnabled,
-                forceSdrOutput = playerSettings.forceSdrOutput
+                prepareVideoEffectsGraph = prepareVideoEffectsGraph,
+                requestOpenGlToneMapping = videoOutputDecision.prepareSdrOutputGraph
             )
             val reuseCandidatePlayer = _exoPlayer
             val reuseLivePlayer = reuseCandidatePlayer != null &&
@@ -1309,10 +1356,12 @@ internal fun PlayerRuntimeController.initializePlayer(
             libassPipelineSwitchInFlight = false
 
             _exoPlayer?.apply {
-                if (playerSettings.forceSdrOutput) {
+                if (prepareVideoEffectsGraph) {
                     // Install the video graph before prepare()/first frame. The effect is a
-                    // declared no-op; the renderer graph performs the actual HDR-to-SDR
-                    // conversion and avoids an initial HDR surface flash or mode switch.
+                    // declared no-op. When SDR output is requested, the renderer graph performs
+                    // HDR-to-SDR only for HDR-transfer input; otherwise this merely prewarms the
+                    // graph for a persisted Smart Vibrance request. Installing it now avoids an
+                    // initial HDR flash and avoids rebuilding the player after format discovery.
                     setVideoEffects(listOf(ForceSdrOutputEffect()))
                 }
                 val audioAttributes = AudioAttributes.Builder()
@@ -2710,7 +2759,7 @@ private class SubtitleOffsetRenderersFactory(
     private val audioPassthroughPolicy: com.nuvio.tv.core.player.AudioPassthroughPolicy,
     private val bluetoothForcePcm: Boolean = false,
     private val playbackSpeedProvider: () -> Float,
-    private val forceSdrOutput: Boolean = true,
+    private val requestOpenGlToneMapping: Boolean = false,
     private val initialForcePcm: Boolean = false,
     /**
      * When true, [EXTENSION_RENDERER_MODE_PREFER] applies to audio only — video stays on the
@@ -2766,7 +2815,7 @@ private class SubtitleOffsetRenderersFactory(
                 out.add(
                     Vc1PtsRepairVideoRenderer(
                         builder = vc1RestampBuilder,
-                        forceSdrOutput = forceSdrOutput
+                        requestOpenGlToneMapping = requestOpenGlToneMapping
                     )
                 )
             } else {

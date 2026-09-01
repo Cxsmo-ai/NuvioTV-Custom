@@ -188,14 +188,7 @@ fun PlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val outputSupportsHdr = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            context.display
-                ?.hdrCapabilities
-                ?.supportedHdrTypes
-                ?.isNotEmpty() == true
-        } else {
-            false
-        }
+        VideoOutputPolicy.detectHdrOutputSupport(context)
     }
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val containerFocusRequester = remember { FocusRequester() }

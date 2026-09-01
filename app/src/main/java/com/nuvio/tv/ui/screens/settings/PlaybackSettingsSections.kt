@@ -162,6 +162,7 @@ internal fun PlaybackSettingsSections(
     onSetAutoSkipSegmentTypeEnabled: (AutoSkipSegmentType, Boolean) -> Unit,
     onSetFrameRateMatchingMode: (FrameRateMatchingMode) -> Unit,
     onSetResolutionMatchingEnabled: (Boolean) -> Unit,
+    onSetForceSdrOutput: (Boolean) -> Unit,
     onDisableAfrAndResolution: () -> Unit,
     onDisableAfrOnly: () -> Unit,
     onDisableResolutionOnly: () -> Unit,
@@ -396,6 +397,18 @@ internal fun PlaybackSettingsSections(
                     subtitle = stringResource(R.string.playback_show_clock_sub),
                     isChecked = playerSettings.osdClockEnabled,
                     onCheckedChange = onSetOsdClockEnabled,
+                    onFocused = { focusedSection = PlaybackSection.GENERAL },
+                    enabled = !generalUi.isExternalPlayer
+                )
+            }
+
+            item(key = "general_force_sdr_output") {
+                ToggleSettingsItem(
+                    icon = Icons.Default.Image,
+                    title = stringResource(R.string.playback_force_sdr_output),
+                    subtitle = stringResource(R.string.playback_force_sdr_output_sub),
+                    isChecked = playerSettings.forceSdrOutput,
+                    onCheckedChange = onSetForceSdrOutput,
                     onFocused = { focusedSection = PlaybackSection.GENERAL },
                     enabled = !generalUi.isExternalPlayer
                 )

@@ -203,6 +203,10 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setResolutionMatchingEnabled(enabled)
     }
 
+    suspend fun setForceSdrOutput(enabled: Boolean) {
+        playerSettingsDataStore.setForceSdrOutput(enabled)
+    }
+
     suspend fun disableAfrAndResolution() {
         playerSettingsDataStore.setFrameRateMatchingMode(FrameRateMatchingMode.OFF)
         playerSettingsDataStore.setResolutionMatchingEnabled(false)

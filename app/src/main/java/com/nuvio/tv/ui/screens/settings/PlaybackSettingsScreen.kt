@@ -291,6 +291,9 @@ fun PlaybackSettingsContent(
                 onSetResolutionMatchingEnabled = { enabled ->
                     coroutineScope.launch { viewModel.setResolutionMatchingEnabled(enabled) }
                 },
+                onSetForceSdrOutput = { enabled ->
+                    coroutineScope.launch { viewModel.setForceSdrOutput(enabled) }
+                },
                 onDisableAfrAndResolution = { coroutineScope.launch { viewModel.disableAfrAndResolution() } },
                 onDisableAfrOnly = {
                     coroutineScope.launch {

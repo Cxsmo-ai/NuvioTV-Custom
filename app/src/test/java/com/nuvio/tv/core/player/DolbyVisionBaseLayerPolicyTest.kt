@@ -206,10 +206,10 @@ class DolbyVisionBaseLayerPolicyTest {
         assertEquals(Decision.STRIP_TO_HDR10, r.decision)
     }
 
-    // ── NATIVE_DV7 catch-all: non-Amazon non-Xiaomi devices on DV display ──
+    // ── General DV-display DV8.1 conversion ──
 
     @Test
-    fun `non-Amazon device on DV display with DV81 decoder falls through to NATIVE_DV7`() {
+    fun `generic DV display with DV81 decoder and bridge converts`() {
         val r = resolve(
             displayDv = true,
             displayHdr10 = true,
@@ -219,13 +219,13 @@ class DolbyVisionBaseLayerPolicyTest {
             isXiaomi = false,
             bridgeReady = true
         )
-        assertEquals(Decision.NATIVE_DV7, r.decision)
-        assertFalse(r.divertsFromNativeDv7)
+        assertEquals(Decision.CONVERT_TO_DV81, r.decision)
+        assertTrue(r.divertsFromNativeDv7)
         assertFalse(r.mapToHevc)
     }
 
     @Test
-    fun `Samsung device on DV display still falls through to NATIVE_DV7`() {
+    fun `Samsung device on DV display with DV81 decoder and bridge converts`() {
         val r = resolve(
             displayDv = true,
             displayHdr10 = true,
@@ -233,7 +233,7 @@ class DolbyVisionBaseLayerPolicyTest {
             isSamsung = true,
             bridgeReady = true
         )
-        assertEquals(Decision.NATIVE_DV7, r.decision)
+        assertEquals(Decision.CONVERT_TO_DV81, r.decision)
     }
 
     // ── CONVERT_TO_DV81: HDR10 fallback (Samsung + Amazon) ──
@@ -335,6 +335,33 @@ class DolbyVisionBaseLayerPolicyTest {
         val r = resolve(codecSupportsDvheSt = true, bridgeReady = true)
         assertEquals(Decision.STRIP_AND_TONEMAP, r.decision)
         assertTrue(r.mapToHevc)
+    }
+
+    @Test
+    fun `force SDR overrides optimistic Dolby Vision and HDR10 capabilities`() {
+        val r = DolbyVisionBaseLayerPolicy.resolveFromCapabilities(
+            hdrCapsKnown = true,
+            displayDv = true,
+            displayHdr10 = true,
+            displayHdr10Plus = true,
+            displayHlg = true,
+            codecSupportsDvheDtb = true,
+            codecSupportsDvheStn = true,
+            codecSupportsDvheSt = true,
+            isAmazonFireTv = false,
+            isSamsung = false,
+            isXiaomi = false,
+            bridgeReady = true,
+            apiLevel = 30,
+            forceSdrOutput = true
+        )
+
+        assertEquals(Decision.STRIP_AND_TONEMAP, r.decision)
+        assertTrue(r.mapToHevc)
+        // Diagnostics retain what Android reported even though policy treats it as SDR.
+        assertTrue(r.displayDv)
+        assertTrue(r.displayHdr10)
+        assertTrue(r.displayHdr10Plus)
     }
 
     @Test

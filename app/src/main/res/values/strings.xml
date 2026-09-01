@@ -375,7 +375,9 @@
     <string name="player_smart_vibrance_hdr_bypass">On, but bypassed for HDR or Dolby Vision</string>
     <string name="player_smart_vibrance_mpv_bypass">On, but bypassed while the MPV engine is selected</string>
     <string name="player_smart_vibrance_failed">Effect unavailable — normal playback restored</string>
-    <string name="player_smart_vibrance_compatibility_note">Force SDR is active for ExoPlayer: HDR10/HLG is tone-mapped through Media3 OpenGL even when Android reports HDR capability. Dolby Vision keeps its protected compatibility path; MPV does not support this shader.</string>
+    <string name="player_smart_vibrance_compatibility_note">On SDR output, ExoPlayer tone-maps HDR10/HLG through Media3 OpenGL. Compatible Dolby Vision 7 is exposed as HDR10 first; native Dolby Vision is preserved on a DV display. MPV does not support this shader.</string>
+    <string name="playback_force_sdr_output">Force SDR output</string>
+    <string name="playback_force_sdr_output_sub">Leave off for automatic output: SDR stays SDR and HDR stays native on an HDR TV. Enable only when an SDR TV or HDMI device incorrectly reports HDR support. HDR10/HLG is tone-mapped; compatible Dolby Vision 7 uses its HDR10 base layer first. HDR10+ stripping and HDR10 metadata settings remain honored. Applies from the next playback.</string>
     <string name="player_dimmer_title">App dimmer</string>
     <string name="player_dimmer_subtitle">Adjust brightness live without changing the TV picture settings</string>
     <string name="licenses_attributions_smart_vibrance_title">Smart Vibrance Plus</string>

@@ -81,7 +81,7 @@ class SmartVibrancePlusEffectTest {
 
     @Test
     fun forceSdr_defaultsOnAndUsesANoOpGraphTrigger() {
-        assertTrue(PlayerSettings().forceSdrOutput)
+        assertFalse(PlayerSettings().forceSdrOutput)
         assertTrue(ForceSdrOutputEffect().isNoOp(3840, 2160))
         assertEquals(
             1,

@@ -83,16 +83,24 @@ object DolbyVisionBaseLayerPolicy {
         isSamsung: Boolean,
         isXiaomi: Boolean,
         bridgeReady: Boolean,
-        apiLevel: Int
+        apiLevel: Int,
+        forceSdrOutput: Boolean = false
     ): Result {
-        val displayHdr10Family = displayHdr10 || displayHdr10Plus
+        // Keep the reported fields intact for diagnostics, but make the policy behave as an
+        // SDR sink when the user overrides an optimistic/stale HDMI EDID. Native DV and DV8.1
+        // are not safe inputs for Media3's OpenGL HDR-to-SDR path; DV7 must first expose its
+        // HDR10-compatible base layer.
+        val effectiveDisplayDv = displayDv && !forceSdrOutput
+        val effectiveDisplayHdr10 = displayHdr10 && !forceSdrOutput
+        val effectiveDisplayHdr10Plus = displayHdr10Plus && !forceSdrOutput
+        val displayHdr10Family = effectiveDisplayHdr10 || effectiveDisplayHdr10Plus
 
         val decision = when {
             !hdrCapsKnown -> Decision.STRIP_BEST_EFFORT
 
             // Display does DV, device has native DV7 decoder: best case, do nothing.
             // Shield TV and similar with real DvheDtb decoder.
-            displayDv && codecSupportsDvheDtb -> Decision.NATIVE_DV7
+            effectiveDisplayDv && codecSupportsDvheDtb -> Decision.NATIVE_DV7
 
             // General DV-display convert path: any DV-capable display whose device has a
             // Profile-8 decoder (DVHE.ST/STH) and a ready bridge. libdovi rewrites the DV7
@@ -104,7 +112,7 @@ object DolbyVisionBaseLayerPolicy {
             // decoder (DvheDtb, e.g. Shield) are handled by the NATIVE_DV7 branch above and
             // never reach here; DV displays without a P8 decoder fall through to NATIVE_DV7
             // below.
-            displayDv && bridgeReady && codecSupportsDvheSt ->
+            effectiveDisplayDv && bridgeReady && codecSupportsDvheSt ->
                 Decision.CONVERT_TO_DV81
 
             // Xiaomi box path: Amlogic DV decoder exists but does NOT advertise Profile 8
@@ -112,14 +120,14 @@ object DolbyVisionBaseLayerPolicy {
             // decode DV8.1 when fed directly. DolbyVisionCodecFallback handles finding
             // the hidden decoder in the codec selector.
             // No codecSupportsDvheSt requirement — that's the whole point of this branch.
-            displayDv && isXiaomi && bridgeReady -> Decision.CONVERT_TO_DV81
+            effectiveDisplayDv && isXiaomi && bridgeReady -> Decision.CONVERT_TO_DV81
 
             // DV-capable display, non-intervened device. Pass through and let the device's
             // media stack handle it. Chromecast with Google TV (older Amlogic) decodes
             // DV7 natively. Google TV Streamer / Onn / MeCool etc. fall back to HEVC
             // base layer via ExoPlayer's decoder fallback path, producing HDR10. Either
             // way, no intervention from us improves things.
-            displayDv -> Decision.NATIVE_DV7
+            effectiveDisplayDv -> Decision.NATIVE_DV7
 
             // Samsung HDR10 fallback (User 3): no DV display but a DV81 decoder is
             // available. Convert DV7 to DV81 so the decoder emits HDR10. Without this
@@ -158,7 +166,11 @@ object DolbyVisionBaseLayerPolicy {
         )
     }
 
-    fun resolve(context: Context, bridgeReady: Boolean): Result {
+    fun resolve(
+        context: Context,
+        bridgeReady: Boolean,
+        forceSdrOutput: Boolean = false
+    ): Result {
         val apiLevel = Build.VERSION.SDK_INT
         val manufacturer = Build.MANUFACTURER
         val isAmazonFireTv = manufacturer.equals("Amazon", ignoreCase = true)
@@ -179,7 +191,8 @@ object DolbyVisionBaseLayerPolicy {
                 isSamsung = isSamsung,
                 isXiaomi = isXiaomi,
                 bridgeReady = bridgeReady,
-                apiLevel = apiLevel
+                apiLevel = apiLevel,
+                forceSdrOutput = forceSdrOutput
             )
         }
 
@@ -212,7 +225,8 @@ object DolbyVisionBaseLayerPolicy {
             isSamsung = isSamsung,
             isXiaomi = isXiaomi,
             bridgeReady = bridgeReady,
-            apiLevel = apiLevel
+            apiLevel = apiLevel,
+            forceSdrOutput = forceSdrOutput
         )
     }
 

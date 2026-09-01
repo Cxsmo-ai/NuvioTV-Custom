@@ -294,7 +294,9 @@ data class PlayerSettings(
     val injectHdr10MetadataOnStrip: Boolean = false,
     val mpvHardwareDecodeMode: MpvHardwareDecodeMode = MpvHardwareDecodeMode.AUTO_SAFE,
     // Display settings
-    val forceSdrOutput: Boolean = true,
+    // Automatic output is the default. Enable only when an SDR TV/HDMI path incorrectly
+    // advertises HDR support through EDID.
+    val forceSdrOutput: Boolean = false,
     val frameRateMatchingMode: FrameRateMatchingMode = FrameRateMatchingMode.OFF,
     val resolutionMatchingEnabled: Boolean = false,
     // Stream selection settings
@@ -1005,7 +1007,7 @@ class PlayerSettingsDataStore @Inject constructor(
                 stripHdr10PlusSei = prefs[stripHdr10PlusSeiKey] ?: false,
                 injectHdr10MetadataOnStrip = prefs[injectHdr10MetadataOnStripKey] ?: false,
                 mpvHardwareDecodeMode = parseMpvHardwareDecodeMode(prefs[mpvHardwareDecodeModeKey]),
-                forceSdrOutput = prefs[forceSdrOutputKey] ?: true,
+                forceSdrOutput = prefs[forceSdrOutputKey] ?: false,
                 frameRateMatchingMode = prefs[frameRateMatchingModeKey]?.let {
                     runCatching { FrameRateMatchingMode.valueOf(it) }.getOrNull()
                 } ?: if (prefs[frameRateMatchingKey] == true) FrameRateMatchingMode.START_STOP else FrameRateMatchingMode.OFF,

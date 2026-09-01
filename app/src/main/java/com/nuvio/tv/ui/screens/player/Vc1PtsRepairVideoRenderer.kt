@@ -34,7 +34,7 @@ import kotlin.math.abs
  */
 internal class Vc1PtsRepairVideoRenderer(
     builder: MediaCodecVideoRenderer.Builder,
-    private val forceSdrOutput: Boolean = true
+    private val requestOpenGlToneMapping: Boolean = false
 ) : MediaCodecVideoRenderer(builder) {
 
     override fun createPlaybackVideoGraphWrapper(
@@ -42,7 +42,7 @@ internal class Vc1PtsRepairVideoRenderer(
         videoFrameReleaseControl: VideoFrameReleaseControl
     ): PlaybackVideoGraphWrapper =
         super.createPlaybackVideoGraphWrapper(context, videoFrameReleaseControl).also { graph ->
-            graph.setRequestOpenGlToneMapping(forceSdrOutput)
+            graph.setRequestOpenGlToneMapping(requestOpenGlToneMapping)
         }
 
     private enum class Mode { WATCH, ENGAGED }

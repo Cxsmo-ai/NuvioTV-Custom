@@ -134,8 +134,14 @@ class PlayerViewModel @Inject constructor(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = true
+            initialValue = false
         )
+
+    fun setForceSdrOutput(enabled: Boolean) {
+        viewModelScope.launch {
+            playerSettingsDataStore.setForceSdrOutput(enabled)
+        }
+    }
 
     init {
         // Release trailer player codec resources so the full-screen player can
@@ -157,6 +163,7 @@ class PlayerViewModel @Inject constructor(
         traktEpisodeMappingService = traktEpisodeMappingService,
         skipIntroRepository = skipIntroRepository,
         playerSettingsDataStore = playerSettingsDataStore,
+        themeDataStore = themeDataStore,
         deviceLocalPlayerPreferences = deviceLocalPlayerPreferences,
         streamLinkCacheDataStore = streamLinkCacheDataStore,
         streamBadgeSettingsDataStore = streamBadgeSettingsDataStore,
