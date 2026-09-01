@@ -45,6 +45,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
@@ -914,6 +915,7 @@ class MainActivity : ComponentActivity() {
                     val rootRoutes = remember(discoverLocation) {
                         buildSet {
                             add(Screen.Home.route)
+                            add(Screen.Calendar.route)
                             add(Screen.Search.route)
                             add(Screen.Library.route)
                             add(Screen.Settings.route)
@@ -925,12 +927,14 @@ class MainActivity : ComponentActivity() {
 
                     val strNavHome = stringResource(R.string.nav_home)
                     val strNavDiscover = stringResource(R.string.nav_discover)
+                    val strNavCalendar = stringResource(R.string.nav_calendar)
                     val strNavSearch = stringResource(R.string.nav_search)
                     val strNavLibrary = stringResource(R.string.nav_library)
                     val strNavSettings = stringResource(R.string.nav_settings)
                     val drawerItems = remember(
                         strNavHome,
                         strNavDiscover,
+                        strNavCalendar,
                         strNavSearch,
                         strNavLibrary,
                         strNavSettings,
@@ -953,6 +957,13 @@ class MainActivity : ComponentActivity() {
                                     )
                                 )
                             }
+                            add(
+                                DrawerItem(
+                                    route = Screen.Calendar.route,
+                                    label = strNavCalendar,
+                                    icon = Icons.Default.DateRange
+                                )
+                            )
                             add(
                                 DrawerItem(
                                     route = Screen.Search.route,

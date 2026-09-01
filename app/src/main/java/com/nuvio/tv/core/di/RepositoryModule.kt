@@ -1,6 +1,7 @@
 package com.nuvio.tv.core.di
 
 import com.nuvio.tv.data.repository.AddonRepositoryImpl
+import com.nuvio.tv.data.repository.CalendarRepositoryImpl
 import com.nuvio.tv.data.repository.CatalogRepositoryImpl
 import com.nuvio.tv.data.repository.LibraryRepositoryImpl
 import com.nuvio.tv.data.repository.MetaRepositoryImpl
@@ -9,6 +10,7 @@ import com.nuvio.tv.data.repository.SubtitleRepositoryImpl
 import com.nuvio.tv.data.repository.SyncRepositoryImpl
 import com.nuvio.tv.data.repository.WatchProgressRepositoryImpl
 import com.nuvio.tv.domain.repository.AddonRepository
+import com.nuvio.tv.domain.repository.CalendarRepository
 import com.nuvio.tv.domain.repository.CatalogRepository
 import com.nuvio.tv.domain.repository.LibraryRepository
 import com.nuvio.tv.domain.repository.MetaRepository
@@ -29,6 +31,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAddonRepository(impl: AddonRepositoryImpl): AddonRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCalendarRepository(impl: CalendarRepositoryImpl): CalendarRepository
 
     @Binds
     @Singleton

@@ -2314,6 +2314,7 @@
     <string name="nav_home">Home</string>
     <string name="nav_discover">Discover</string>
     <string name="nav_search">Search</string>
+    <string name="nav_calendar">Calendar</string>
     <string name="nav_library">Library</string>
     <string name="nav_addons">Addons</string>
     <string name="nav_movies">Movies</string>
@@ -3449,4 +3450,13 @@
     <string name="ui_scale_group_subtitle" formatted="false">Scale the whole interface between 85% and 115%</string>
     <string name="panel_audio_adjustments">Delay and gain</string>
     <string name="panel_audio_back_to_tracks">Back to tracks</string>
+    <!-- Calendar -->
+    <string name="calendar_title">Calendar</string>
+    <string name="calendar_empty_title">No Scheduled Episodes</string>
+    <string name="calendar_empty_desc">Episodes for shows you have watched or saved will appear here when air dates are announced.</string>
+    <string name="calendar_filter_all">All</string>
+    <string name="calendar_filter_upcoming">Upcoming</string>
+    <string name="calendar_filter_past">Recent Past</string>
+    <string name="calendar_refresh">Refresh</string>
+
 </resources>
