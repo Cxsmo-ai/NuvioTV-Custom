@@ -125,10 +125,8 @@ object SeekThumbnails {
             return
         }
         Log.i(TAG, "eligible: format ready after ${SystemClock.elapsedRealtime() - tPoll0}ms")
-        val isSdr = colorTransfer == null ||
-            (colorTransfer != C.COLOR_TRANSFER_ST2084 && colorTransfer != C.COLOR_TRANSFER_HLG)
-        if (height > 1080 || width > 1920 || !isSdr) {
-            Log.i(TAG, "skip: not <=1080p SDR (${width}x${height} ct=$colorTransfer)")
+        if (height > 2160 || width > 3840) {
+            Log.i(TAG, "skip: resolution > 4K (${width}x${height})")
             return
         }
         stopSession()
@@ -138,6 +136,9 @@ object SeekThumbnails {
     }
 
     fun thumbFor(positionMs: Long): Bitmap? = session?.thumbFor(positionMs)
+
+    fun filmstripFor(centerPositionMs: Long, halfWindow: Int = 3): List<SeekFilmstripFrame> =
+        session?.filmstripFrames(centerPositionMs, halfWindow) ?: emptyList()
 
     /**
      * Build 12b (Lever 1): the player calls this on every held-seek step with the
@@ -249,7 +250,7 @@ object SeekThumbnails {
                         awaitGate()
                         // Build 12a: pacing spaces successive frames; nothing precedes
                         // the first, so the first thumb no longer pays the 1.2 s tax.
-                        if (extractedAny) delay(INTER_FRAME_DELAY_MS)
+                        if (extractedAny && priorityBucket == null) delay(INTER_FRAME_DELAY_MS)
                         val positionMs = (bucket * SPACING_MS)
                             .coerceAtLeast(if (bucket == 0L) 5_000L else 0L)
                             .coerceAtMost(durationMs - 1)
@@ -315,9 +316,8 @@ object SeekThumbnails {
         fun thumbFor(positionMs: Long): Bitmap? {
             val lastBucket = (durationMs - 1) / SPACING_MS
             val bucket = (positionMs / SPACING_MS).coerceIn(0, lastBucket)
+            prefetchWindow(bucket, radius = 4)
             cache.getMem(bucket)?.let { return it }
-            // Exact bucket not resident: promote it from disk for next time.
-            requestDiskLoad(bucket)
             // Build 12b ownership-interval serving: the nearest EXISTING frame owns the
             // gap until a closer one is generated. Expands outward and stops at the first
             // hit (cost ~ distance to nearest; only an empty cache scans to the end and
@@ -329,6 +329,64 @@ object SeekThumbnails {
                 d++
             }
             return null
+        }
+
+        fun prefetchWindow(centerBucket: Long, radius: Int = 4) {
+            val lastBucket = (durationMs - 1) / SPACING_MS
+            val needed = mutableListOf<Long>()
+            for (offset in -radius..radius) {
+                val b = centerBucket + offset
+                if (b in 0..lastBucket) {
+                    if (cache.getMem(b) == null && cache.hasDisk(b) && diskLoadsInFlight.add(b)) {
+                        needed.add(b)
+                    }
+                }
+            }
+            if (needed.isEmpty()) return
+            scope.launch {
+                var loadedAny = false
+                withContext(Dispatchers.IO) {
+                    for (b in needed) {
+                        val bmp = cache.readDisk(b)
+                        diskLoadsInFlight.remove(b)
+                        if (bmp != null) {
+                            cache.putMem(b, bmp)
+                            loadedAny = true
+                        }
+                    }
+                }
+                if (loadedAny) {
+                    tick.intValue++
+                }
+            }
+        }
+
+        fun filmstripFrames(centerPositionMs: Long, halfWindow: Int = 3): List<SeekFilmstripFrame> {
+            val lastBucket = (durationMs - 1) / SPACING_MS
+            val centerBucket = (centerPositionMs / SPACING_MS).coerceIn(0, lastBucket)
+            prefetchWindow(centerBucket, radius = halfWindow + 2)
+            val centerBmp = thumbFor(centerPositionMs)
+
+            return (-halfWindow..halfWindow).map { offset ->
+                val targetBucket = (centerBucket + offset).coerceIn(0, lastBucket)
+                val targetPosMs = targetBucket * SPACING_MS
+                val bmp = cache.getMem(targetBucket) ?: run {
+                    var found: Bitmap? = null
+                    for (d in 1..4) {
+                        val prev = cache.getMem(targetBucket - d)
+                        if (prev != null) { found = prev; break }
+                        val next = cache.getMem(targetBucket + d)
+                        if (next != null) { found = next; break }
+                    }
+                    found ?: centerBmp
+                }
+                SeekFilmstripFrame(
+                    offset = offset,
+                    positionMs = targetPosMs,
+                    bitmap = bmp,
+                    isCenter = offset == 0
+                )
+            }
         }
 
         /** Rest-debounced async disk load: at most one dispatch per DISK_LOAD_DEBOUNCE_MS. */
@@ -364,6 +422,9 @@ object SeekThumbnails {
             var plateauSinceRt = 0L
             while (true) {
                 val p = playerProvider()
+                // Fast-pass for active user scrub and when playback is paused
+                if (priorityBucket != null) return
+                if (p != null && !p.isPlaying) return
                 if (p != null && p.isPlaying) {
                     val ahead = p.bufferedPosition - p.currentPosition
                     val dur = p.duration
@@ -518,3 +579,10 @@ object SeekThumbnails {
         }
     }
 }
+
+data class SeekFilmstripFrame(
+    val offset: Int,
+    val positionMs: Long,
+    val bitmap: Bitmap?,
+    val isCenter: Boolean
+)

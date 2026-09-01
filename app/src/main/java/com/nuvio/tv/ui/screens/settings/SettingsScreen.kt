@@ -53,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
@@ -90,6 +91,7 @@ import com.nuvio.tv.core.build.AppFeaturePolicy
 import com.nuvio.tv.domain.model.ExperienceMode
 import com.nuvio.tv.domain.model.SettingsUiStyle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlin.math.roundToInt
 
@@ -310,6 +312,7 @@ fun SettingsScreen(
     var pendingContentFocusCategory by remember { mutableStateOf<SettingsCategory?>(null) }
     var pendingContentFocusRequestId by remember { mutableLongStateOf(0L) }
     var allowDetailAutofocus by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     val focusManager = LocalFocusManager.current
 
@@ -353,6 +356,7 @@ fun SettingsScreen(
                 .fillMaxSize()
         ) {
             var railHadFocus by remember { mutableStateOf(false) }
+            var focusedRailCategory by remember { mutableStateOf(selectedCategory) }
             val railListState = rememberLazyListState()
 
             val onSectionClick: (SettingsSectionSpec) -> Unit = { section ->
@@ -612,8 +616,16 @@ fun SettingsScreen(
                             .onPreviewKeyEvent { event ->
                                 val toDetailKey = if (isRtl) Key.DirectionLeft else Key.DirectionRight
                                 if (event.type == KeyEventType.KeyDown && event.key == toDetailKey) {
-                                    allowDetailAutofocus = true
-                                    false
+                                    val targetCategory = focusedRailCategory
+                                    val targetSection = visibleSections.firstOrNull {
+                                        it.category == targetCategory
+                                    }
+                                    if (targetSection != null) {
+                                        onSectionClick(targetSection)
+                                        true
+                                    } else {
+                                        false
+                                    }
                                 } else {
                                     false
                                 }
@@ -631,6 +643,9 @@ fun SettingsScreen(
                                 isSelected = selectedCategory == section.category,
                                 focusRequester = railFocusRequesters[section.category],
                                 onClick = { onSectionClick(section) },
+                                onFocused = {
+                                    focusedRailCategory = section.category
+                                },
                                 onFocusedItemPositioned = if (isZenRailGlide) {
                                     { itemCoordinates ->
                                         railCoordinates?.let { container ->
@@ -653,9 +668,14 @@ fun SettingsScreen(
                         .onKeyEvent { event ->
                             val toRailKey = if (isRtl) Key.DirectionRight else Key.DirectionLeft
                             if (event.type == KeyEventType.KeyDown && event.key == toRailKey) {
-                                val movedLeft = focusManager.moveFocus(if (isRtl) FocusDirection.Right else FocusDirection.Left)
-                                if (!movedLeft) {
+                                val moved = focusManager.moveFocus(if (isRtl) FocusDirection.Right else FocusDirection.Left)
+                                if (!moved) {
                                     allowDetailAutofocus = false
+                                    focusedRailCategory = selectedCategory
+                                    val railIndex = visibleSections.indexOfFirst { it.category == selectedCategory }
+                                    if (railIndex >= 0) {
+                                        coroutineScope.launch { runCatching { railListState.scrollToItem(railIndex) } }
+                                    }
                                     val requested = railFocusRequesters[selectedCategory]?.let { requester ->
                                         runCatching { requester.requestFocus() }.isSuccess
                                     } ?: false
