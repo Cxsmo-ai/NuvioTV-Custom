@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -76,9 +77,11 @@ class CalendarRepositoryTest {
             lastWatched = System.currentTimeMillis()
         )
 
+        val watchedItemsFlow = MutableStateFlow<List<WatchedItem>>(emptyList())
+        var watchedEpisodeMap = mapOf("tt_mentalist" to setOf(1 to 1))
         every { watchProgressRepo.allProgress } returns flowOf(listOf(testWatchProgress))
-        every { watchProgressRepo.watchedItems } returns flowOf(emptyList())
-        coEvery { watchProgressRepo.getWatchedShowEpisodes() } returns mapOf("tt_mentalist" to setOf(1 to 1))
+        every { watchProgressRepo.watchedItems } returns watchedItemsFlow.asStateFlow()
+        coEvery { watchProgressRepo.getWatchedShowEpisodes() } answers { watchedEpisodeMap }
 
         val libraryEntry = LibraryEntry(
             id = "tt_silo",
@@ -206,5 +209,30 @@ class CalendarRepositoryTest {
         assertFalse("Episode 2 follows watched episode 1", episodeTwo.isSpoilerHidden)
         assertTrue("Episode 3 follows unwatched episode 2", episodeThree.isSpoilerHidden)
         assertFalse("A series premiere has no previous episode", siloPremiere.isSpoilerHidden)
+
+        watchedEpisodeMap = mapOf("tt_mentalist" to setOf(1 to 1, 1 to 2))
+        watchedItemsFlow.value = listOf(
+            WatchedItem(
+                contentId = "tt_mentalist",
+                contentType = "series",
+                title = "The Mentalist",
+                season = 1,
+                episode = 2,
+                watchedAt = System.currentTimeMillis()
+            )
+        )
+
+        val updatedDays = withTimeout(3_000L) {
+            repository.calendarDays.first { currentDays ->
+                currentDays
+                    .flatMap(CalendarDay::episodes)
+                    .first { it.showId == "tt_mentalist" && it.episodeNumber == 3 }
+                    .isSpoilerHidden
+                    .not()
+            }
+        }
+        val updatedEpisodes = updatedDays.flatMap(CalendarDay::episodes)
+        assertTrue(updatedEpisodes.first { it.showId == "tt_mentalist" && it.episodeNumber == 2 }.isWatched)
+        assertFalse(updatedEpisodes.first { it.showId == "tt_mentalist" && it.episodeNumber == 3 }.isSpoilerHidden)
     }
 }

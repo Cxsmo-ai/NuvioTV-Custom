@@ -33,6 +33,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -56,7 +57,13 @@ class CalendarRepositoryImpl @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
+    private val watchStateMutex = Mutex()
     private val semaphore = Semaphore(CONCURRENT_FETCH_LIMIT)
+    private val previousEpisodeByShow = ConcurrentHashMap<
+        String,
+        Map<Pair<Int, Int>, Pair<Int, Int>>
+    >()
+    private val sourceShowIdByMetaId = ConcurrentHashMap<String, String>()
 
     private val _calendarDays = MutableStateFlow<List<CalendarDay>>(emptyList())
     override val calendarDays: Flow<List<CalendarDay>> = _calendarDays.asStateFlow()
@@ -73,6 +80,8 @@ class CalendarRepositoryImpl @Inject constructor(
                 if (profileId != cachedProfileId) {
                     cachedProfileId = profileId
                     lastFetchTime = 0L
+                    previousEpisodeByShow.clear()
+                    sourceShowIdByMetaId.clear()
                     _calendarDays.value = emptyList()
                     fetchScheduleInternal(forceRefresh = true)
                 }
@@ -80,6 +89,53 @@ class CalendarRepositoryImpl @Inject constructor(
         }
         scope.launch {
             fetchScheduleInternal(forceRefresh = false)
+        }
+        observeWatchedStateChanges()
+    }
+
+    /**
+     * Re-evaluate only the lightweight watch/spoiler flags when local Nuvio,
+     * Nuvio Sync, or a connected tracker changes its watched state. Metadata
+     * and calendar schedules stay cached, so the next episode unlocks without
+     * a network refresh or visible loading state.
+     */
+    private fun observeWatchedStateChanges() {
+        scope.launch {
+            watchProgressRepository.watchedItems.collect {
+                refreshWatchedStateOnly()
+            }
+        }
+        trackingProgressProviders.providers().forEach { provider ->
+            scope.launch {
+                provider.watchedItems.collect {
+                    refreshWatchedStateOnly()
+                }
+            }
+        }
+    }
+
+    private suspend fun refreshWatchedStateOnly() {
+        if (_calendarDays.value.isEmpty()) return
+        watchStateMutex.withLock {
+            val watchedEpisodes = collectWatchedEpisodesMap()
+            _calendarDays.value = _calendarDays.value.map { day ->
+                day.copy(
+                    episodes = day.episodes.map { episode ->
+                        val sourceShowId = sourceShowIdByMetaId[episode.showId]
+                        val watchedForShow = watchedEpisodes[episode.showId].orEmpty() +
+                            sourceShowId?.let(watchedEpisodes::get).orEmpty()
+                        val episodeKey = episode.seasonNumber to episode.episodeNumber
+                        val isWatched = episodeKey in watchedForShow
+                        val previousEpisode = previousEpisodeByShow[episode.showId]?.get(episodeKey)
+                        episode.copy(
+                            isWatched = isWatched,
+                            isSpoilerHidden = !isWatched &&
+                                previousEpisode != null &&
+                                previousEpisode !in watchedForShow
+                        )
+                    }
+                )
+            }
         }
     }
 
@@ -366,6 +422,9 @@ class CalendarRepositoryImpl @Inject constructor(
         val previousEpisodeByEpisode = orderedEpisodeKeys
             .zipWithNext { previous, current -> current to previous }
             .toMap()
+        previousEpisodeByShow[showId] = previousEpisodeByEpisode
+        previousEpisodeByShow[meta.id] = previousEpisodeByEpisode
+        sourceShowIdByMetaId[meta.id] = showId
 
         val results = mutableListOf<CalendarEpisode>()
 
