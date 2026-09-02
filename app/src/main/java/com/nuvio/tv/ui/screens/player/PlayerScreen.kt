@@ -1990,13 +1990,14 @@ private fun ExoPlayerSurface(
             videoEffectsFailedForMedia -> SmartVibranceRuntimeStatus.FAILED
             !smartVibranceRequested -> SmartVibranceRuntimeStatus.OFF
             activeVideoFormat == null -> SmartVibranceRuntimeStatus.WAITING_FOR_VIDEO
-            !supportsSmartVibrancePlus(
-                activeVideoFormat,
-                outputSupportsHdr = outputSupportsHdr && !forceSdrOutput
-            ) ->
+            !supportsSmartVibrancePlus(activeVideoFormat) ->
                 SmartVibranceRuntimeStatus.BYPASSED_HDR
             activeVideoFormat?.colorInfo?.let(ColorInfo::isTransferHdr) == true ->
-                SmartVibranceRuntimeStatus.ACTIVE_TONEMAPPED_HDR
+                if (outputSupportsHdr && !forceSdrOutput) {
+                    SmartVibranceRuntimeStatus.ACTIVE_NATIVE_HDR
+                } else {
+                    SmartVibranceRuntimeStatus.ACTIVE_TONEMAPPED_HDR
+                }
             else -> SmartVibranceRuntimeStatus.ACTIVE
         }
         val shouldApply = shouldApplySmartVibrance(nextStatus)
@@ -3746,6 +3747,8 @@ private fun VideoEnhancementsDialog(
             stringResource(R.string.player_smart_vibrance_waiting)
         SmartVibranceRuntimeStatus.ACTIVE ->
             stringResource(R.string.player_smart_vibrance_active)
+        SmartVibranceRuntimeStatus.ACTIVE_NATIVE_HDR ->
+            stringResource(R.string.player_smart_vibrance_native_hdr)
         SmartVibranceRuntimeStatus.ACTIVE_TONEMAPPED_HDR ->
             stringResource(R.string.player_smart_vibrance_tonemapped_hdr)
         SmartVibranceRuntimeStatus.BYPASSED_HDR ->

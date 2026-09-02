@@ -26,7 +26,7 @@ class SmartVibrancePlusEffectTest {
     }
 
     @Test
-    fun supportGate_rejectsHdrTransfersAndDolbyVision() {
+    fun supportGate_acceptsHdrTransfersAndRejectsNativeDolbyVision() {
         val pq = ColorInfo.Builder()
             .setColorTransfer(C.COLOR_TRANSFER_ST2084)
             .build()
@@ -34,12 +34,12 @@ class SmartVibrancePlusEffectTest {
             .setColorTransfer(C.COLOR_TRANSFER_HLG)
             .build()
 
-        assertFalse(
+        assertTrue(
             supportsSmartVibrancePlus(
                 Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H265).setColorInfo(pq).build()
             )
         )
-        assertFalse(
+        assertTrue(
             supportsSmartVibrancePlus(
                 Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H265).setColorInfo(hlg).build()
             )
@@ -57,22 +57,9 @@ class SmartVibrancePlusEffectTest {
     }
 
     @Test
-    fun supportGate_allowsHdrSourceWhenOutputDisplayIsSdr() {
-        val pq = ColorInfo.Builder()
-            .setColorTransfer(C.COLOR_TRANSFER_ST2084)
-            .build()
-        val hdr10 = Format.Builder()
-            .setSampleMimeType(MimeTypes.VIDEO_H265)
-            .setColorInfo(pq)
-            .build()
-
-        assertTrue(supportsSmartVibrancePlus(hdr10, outputSupportsHdr = false))
-        assertFalse(supportsSmartVibrancePlus(hdr10, outputSupportsHdr = true))
-    }
-
-    @Test
-    fun applicationGate_enablesBothSdrAndHdrToSdrPathsOnly() {
+    fun applicationGate_enablesSdrNativeHdrAndHdrToSdrPaths() {
         assertTrue(shouldApplySmartVibrance(SmartVibranceRuntimeStatus.ACTIVE))
+        assertTrue(shouldApplySmartVibrance(SmartVibranceRuntimeStatus.ACTIVE_NATIVE_HDR))
         assertTrue(shouldApplySmartVibrance(SmartVibranceRuntimeStatus.ACTIVE_TONEMAPPED_HDR))
         assertFalse(shouldApplySmartVibrance(SmartVibranceRuntimeStatus.BYPASSED_HDR))
         assertFalse(shouldApplySmartVibrance(SmartVibranceRuntimeStatus.BYPASSED_MPV))

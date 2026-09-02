@@ -1063,8 +1063,8 @@ internal fun PlayerRuntimeController.initializePlayer(
                 themeDataStore.smartVibranceEnabled.first()
             }.getOrDefault(false)
             // A persisted Smart Vibrance request also needs the graph to exist before renderer
-            // enable. It does not request tone mapping: native HDR remains HDR and the effect is
-            // bypassed once an HDR/Dolby Vision input format is known in PlayerScreen.
+            // enable. It does not request tone mapping: HDR10/HLG remains HDR on an HDR output,
+            // while native Dolby Vision is bypassed once its input format is known.
             val prepareVideoEffectsGraph =
                 videoOutputDecision.prepareSdrOutputGraph || smartVibranceGraphRequested
             Log.i(

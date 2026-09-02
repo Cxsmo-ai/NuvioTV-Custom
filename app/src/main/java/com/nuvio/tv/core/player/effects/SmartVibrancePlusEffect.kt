@@ -2,7 +2,6 @@ package com.nuvio.tv.core.player.effects
 
 import android.content.Context
 import android.opengl.GLES20
-import androidx.media3.common.ColorInfo
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.VideoFrameProcessingException
@@ -61,6 +60,7 @@ enum class SmartVibranceRuntimeStatus {
     OFF,
     WAITING_FOR_VIDEO,
     ACTIVE,
+    ACTIVE_NATIVE_HDR,
     ACTIVE_TONEMAPPED_HDR,
     BYPASSED_HDR,
     BYPASSED_MPV,
@@ -69,24 +69,23 @@ enum class SmartVibranceRuntimeStatus {
 
 internal fun shouldApplySmartVibrance(status: SmartVibranceRuntimeStatus): Boolean =
     status == SmartVibranceRuntimeStatus.ACTIVE ||
+        status == SmartVibranceRuntimeStatus.ACTIVE_NATIVE_HDR ||
         status == SmartVibranceRuntimeStatus.ACTIVE_TONEMAPPED_HDR
 
 /**
- * The upstream shader is authored for SDR RGB. HDR10/HLG is accepted only when
- * the display is SDR: Media3 supplies a linear BT.2020 working buffer and owns
- * the final HDR-to-SDR conversion. Native HDR output and Dolby Vision bypass
- * the custom effect so transfer metadata and hardware playback remain intact.
+ * HDR10/HLG is processed in Media3's high-precision linear working buffer. The
+ * configured output policy remains responsible for either preserving HDR or
+ * tone-mapping it to SDR after this effect. Native Dolby Vision stays on its
+ * decoder/display path because routing DV frames through a generic GL effect
+ * cannot preserve the RPU-driven presentation. DV converted or stripped to an
+ * HDR10 base layer is reported as HEVC and is therefore supported here.
  */
-internal fun supportsSmartVibrancePlus(
-    format: Format?,
-    outputSupportsHdr: Boolean = true
-): Boolean {
+internal fun supportsSmartVibrancePlus(format: Format?): Boolean {
     if (format == null) return false
     if (format.sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION) return false
     val codecs = format.codecs.orEmpty().lowercase()
     if (codecs.contains("dvhe") || codecs.contains("dvh1")) return false
-    val sourceIsHdr = format.colorInfo?.let(ColorInfo::isTransferHdr) == true
-    return !sourceIsHdr || !outputSupportsHdr
+    return true
 }
 
 internal const val SMART_VIBRANCE_PLUS_VERTEX_SHADER = """
@@ -242,12 +241,14 @@ private class SinglePassShaderProgram(
                 /* texUnitIndex = */ 0
             )
             glProgram.bindAttributesAndUniforms()
+            // Match Media3's own one-pass programs: draw without polling the
+            // context-wide GL error flag. A stale driver error from another
+            // stage must not suppress publication of an otherwise valid frame.
             GLES20.glDrawArrays(
                 GLES20.GL_TRIANGLE_STRIP,
                 /* first = */ 0,
                 /* count = */ 4
             )
-            GlUtil.checkGlError()
         } catch (error: GlUtil.GlException) {
             throw VideoFrameProcessingException(error, presentationTimeUs)
         }
