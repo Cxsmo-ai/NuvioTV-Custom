@@ -77,11 +77,15 @@ class SmartVibrancePlusEffectTest {
     }
 
     @Test
-    fun shader_preservesUpstreamPlusConstantsAndSingleTexturePass() {
-        assertTrue(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER.contains("const float kIntensity = 1.5"))
-        assertTrue(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER.contains("const float kSatPivot = 0.5"))
-        assertTrue(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER.contains("const float kGrayPivot = 0.003"))
+    fun shader_preservesPlusAdaptiveCoreLinearColorContractAndSingleTexturePass() {
+        assertTrue(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER.contains("const float kMaxIntensity = 2.0"))
         assertTrue(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER.contains("const float kGraySharpness = 45.0"))
+        assertTrue(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER.contains("linearToBt709"))
+        assertTrue(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER.contains("bt709ToLinear"))
+        assertTrue(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER.contains("chromaEnergy * 10.0"))
+        assertTrue(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER.contains("stabilityBoost"))
+        assertTrue(SMART_VIBRANCE_PLUS_HDR_FRAGMENT_SHADER.contains("const float kMaxIntensity = 2.0"))
+        assertTrue(SMART_VIBRANCE_PLUS_HDR_FRAGMENT_SHADER.contains("stabilityBoost"))
         assertEquals(
             1,
             "texture2D".toRegex().findAll(SMART_VIBRANCE_PLUS_FRAGMENT_SHADER).count()

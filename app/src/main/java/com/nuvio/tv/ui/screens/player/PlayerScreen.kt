@@ -2008,6 +2008,12 @@ private fun ExoPlayerSurface(
             else -> PlayerVideoEffectMode.NONE
         }
         if (activeEffectMode != desiredEffectMode) {
+            Log.i(
+                "SmartVibrancePlus",
+                "Applying mode=$desiredEffectMode status=$nextStatus " +
+                    "sourceHdr=${activeVideoFormat?.colorInfo?.let(ColorInfo::isTransferHdr) == true} " +
+                    "outputHdr=$outputSupportsHdr forceSdr=$forceSdrOutput"
+            )
             val result = runCatching {
                 player.setVideoEffects(
                     when (desiredEffectMode) {
@@ -2019,6 +2025,7 @@ private fun ExoPlayerSurface(
             }
             if (result.isSuccess) {
                 activeEffectMode = desiredEffectMode
+                Log.i("SmartVibrancePlus", "Effect request accepted: mode=$desiredEffectMode")
                 latestStatusCallback(nextStatus)
             } else {
                 Log.e("SmartVibrancePlus", "Unable to update video effect; using normal playback", result.exceptionOrNull())
