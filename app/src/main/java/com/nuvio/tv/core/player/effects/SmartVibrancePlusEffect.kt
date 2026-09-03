@@ -2,7 +2,6 @@ package com.nuvio.tv.core.player.effects
 
 import android.content.Context
 import android.opengl.GLES20
-import android.util.Log
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.VideoFrameProcessingException
@@ -14,16 +13,15 @@ import androidx.media3.effect.GlEffect
 import androidx.media3.effect.GlShaderProgram
 
 /**
- * A one-sample, one-pass Android port of aston89's Smart Vibrance Plus shaders.
+ * A one-sample, one-pass Android port of aston89's Smart Vibrance Plus shader.
  *
- * This keeps the ReShade Plus continuous chroma response and uses the
- * PotPlayer Plus scene-adaptive saturation pivot, grayscale pivot, stability
- * compensation and intensity curve. PotPlayer declares a host-provided
- * previous-frame constant but its pixel shader cannot update that value.
- * Media3 therefore evaluates the adaptive signal directly from the current
- * pixel. This is deterministic and preserves the intended content-aware
- * response without CPU readback, a retained full-frame texture or a second
- * render pass.
+ * The ReShade Plus variant is the self-contained reference implementation: it
+ * adaptively boosts low-chroma pixels while rolling off the effect for already
+ * saturated colors and smoothly protecting near-neutral detail. The PotPlayer
+ * Plus variant also declares a host-provided previous-frame constant, but does
+ * not update that state itself. Media3 intentionally uses the deployable
+ * single-pass Plus core here so playback never needs CPU readback, an extra
+ * frame buffer, or a second render pass.
  *
  * Upstream:
  * https://github.com/aston89/Smart-vibrance-for-reshade
@@ -33,7 +31,6 @@ import androidx.media3.effect.GlShaderProgram
  */
 class SmartVibrancePlusEffect : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram {
-        Log.i(TAG, "Creating shader program: useHdr=$useHdr")
         return SinglePassShaderProgram(
             useHdr = useHdr,
             fragmentShader = if (useHdr) {
@@ -45,10 +42,6 @@ class SmartVibrancePlusEffect : GlEffect {
     }
 
     override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = false
-
-    private companion object {
-        const val TAG = "SmartVibrancePlus"
-    }
 }
 
 /**
@@ -121,55 +114,36 @@ internal const val SMART_VIBRANCE_PLUS_FRAGMENT_SHADER = """
     uniform sampler2D uTexSampler;
     varying vec2 vTexSamplingCoord;
 
-    const float kMaxIntensity = 2.0;
+    const float kIntensity = 1.5;
+    const float kSatPivot = 0.5;
+    const float kGrayPivot = 0.003;
     const float kGraySharpness = 45.0;
 
     float sigmoid(float value) {
-        return 1.0 / (1.0 + exp(-clamp(value, -16.0, 16.0)));
+        return 1.0 / (1.0 + exp(-value));
     }
 
-    vec3 linearToBt709(vec3 color) {
-        vec3 safeColor = max(color, vec3(0.0));
-        vec3 low = safeColor * 4.5;
-        vec3 high = 1.099 * pow(safeColor, vec3(0.45)) - 0.099;
-        return mix(low, high, step(vec3(0.018), safeColor));
-    }
+    void main() {
+        vec4 inputColor = texture2D(uTexSampler, vTexSamplingCoord);
+        vec3 color = inputColor.rgb;
 
-    vec3 bt709ToLinear(vec3 color) {
-        vec3 safeColor = clamp(color, 0.0, 1.0);
-        vec3 low = safeColor / 4.5;
-        vec3 high = pow((safeColor + 0.099) / 1.099, vec3(1.0 / 0.45));
-        return mix(low, high, step(vec3(0.081), safeColor));
-    }
-
-    vec3 applySmartVibrance(vec3 color) {
         float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
         vec3 chroma = color - vec3(luminance);
         float chromaEnergy = dot(chroma, chroma);
         float chromaMagnitude = sqrt(max(chromaEnergy, 0.0));
 
-        float sceneActivity = clamp(chromaEnergy * 10.0, 0.0, 1.0);
-        float satPivot = mix(0.35, 0.65, sceneActivity);
-        float grayPivot = mix(0.006, 0.0015, sceneActivity);
-        float normalizedSaturation = clamp(chromaMagnitude / satPivot, 0.0, 1.0);
+        float normalizedSaturation = clamp(chromaMagnitude / kSatPivot, 0.0, 1.0);
         float rolloff = 1.0 - normalizedSaturation;
-        float graySoft = sigmoid((grayPivot - chromaEnergy) * kGraySharpness);
+        float graySoft = sigmoid((kGrayPivot - chromaEnergy) * kGraySharpness);
         float response = mix(rolloff, 1.0, graySoft);
+        float gain = (kIntensity - 1.0) * response;
 
-        float microActivity = clamp(chromaEnergy, 0.0, 1.0);
-        float stabilityBoost = 1.0 - clamp(microActivity * 5.0, 0.0, 1.0);
-        float intensity = kMaxIntensity *
-            mix(0.85, 1.0, sceneActivity) * stabilityBoost;
-        float gain = max(intensity - 1.0, 0.0) * response;
-
-        return clamp(vec3(luminance) + chroma + chroma * gain, 0.0, 1.0);
-    }
-
-    void main() {
-        vec4 inputColor = texture2D(uTexSampler, vTexSamplingCoord);
-        vec3 perceptualColor = linearToBt709(inputColor.rgb);
-        vec3 adjustedColor = applySmartVibrance(perceptualColor);
-        gl_FragColor = vec4(bt709ToLinear(adjustedColor), inputColor.a);
+        vec3 outputColor = clamp(
+            vec3(luminance) + chroma + chroma * gain,
+            0.0,
+            1.0
+        );
+        gl_FragColor = vec4(outputColor, inputColor.a);
     }
 """
 
@@ -180,34 +154,13 @@ internal const val SMART_VIBRANCE_PLUS_HDR_FRAGMENT_SHADER = """
     uniform sampler2D uTexSampler;
     varying vec2 vTexSamplingCoord;
 
-    const float kMaxIntensity = 2.0;
+    const float kIntensity = 1.5;
+    const float kSatPivot = 0.5;
+    const float kGrayPivot = 0.003;
     const float kGraySharpness = 45.0;
 
     float sigmoid(float value) {
-        return 1.0 / (1.0 + exp(-clamp(value, -16.0, 16.0)));
-    }
-
-    vec3 applySmartVibranceHdr(vec3 color) {
-        float luminance = dot(color, vec3(0.2627, 0.6780, 0.0593));
-        vec3 chroma = color - vec3(luminance);
-        float chromaEnergy = dot(chroma, chroma);
-        float chromaMagnitude = sqrt(max(chromaEnergy, 0.0));
-
-        float sceneActivity = clamp(chromaEnergy * 10.0, 0.0, 1.0);
-        float satPivot = mix(0.35, 0.65, sceneActivity);
-        float grayPivot = mix(0.006, 0.0015, sceneActivity);
-        float normalizedSaturation = clamp(chromaMagnitude / satPivot, 0.0, 1.0);
-        float rolloff = 1.0 - normalizedSaturation;
-        float graySoft = sigmoid((grayPivot - chromaEnergy) * kGraySharpness);
-        float response = mix(rolloff, 1.0, graySoft);
-
-        float microActivity = clamp(chromaEnergy, 0.0, 1.0);
-        float stabilityBoost = 1.0 - clamp(microActivity * 5.0, 0.0, 1.0);
-        float intensity = kMaxIntensity *
-            mix(0.85, 1.0, sceneActivity) * stabilityBoost;
-        float gain = max(intensity - 1.0, 0.0) * response;
-
-        return max(vec3(luminance) + chroma + chroma * gain, vec3(0.0));
+        return 1.0 / (1.0 + exp(-value));
     }
 
     void main() {
@@ -217,7 +170,21 @@ internal const val SMART_VIBRANCE_PLUS_HDR_FRAGMENT_SHADER = """
         // perceptual working space for the upstream SDR-domain vibrance math,
         // then return to linear extended range for Media3/display tone mapping.
         vec3 workingColor = pow(max(inputColor.rgb, vec3(0.0)), vec3(1.0 / 2.2));
-        vec3 adjustedWorkingColor = applySmartVibranceHdr(workingColor);
+        float luminance = dot(workingColor, vec3(0.2627, 0.6780, 0.0593));
+        vec3 chroma = workingColor - vec3(luminance);
+        float chromaEnergy = dot(chroma, chroma);
+        float chromaMagnitude = sqrt(max(chromaEnergy, 0.0));
+
+        float normalizedSaturation = clamp(chromaMagnitude / kSatPivot, 0.0, 1.0);
+        float rolloff = 1.0 - normalizedSaturation;
+        float graySoft = sigmoid((kGrayPivot - chromaEnergy) * kGraySharpness);
+        float response = mix(rolloff, 1.0, graySoft);
+        float gain = (kIntensity - 1.0) * response;
+
+        vec3 adjustedWorkingColor = max(
+            vec3(luminance) + chroma + chroma * gain,
+            vec3(0.0)
+        );
         vec3 outputColor = pow(adjustedWorkingColor, vec3(2.2));
         gl_FragColor = vec4(outputColor, inputColor.a);
     }

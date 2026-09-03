@@ -1059,17 +1059,21 @@ internal fun PlayerRuntimeController.initializePlayer(
             // Resolve the active output before constructing the renderer. AUTO keeps the direct
             // native path on HDR displays. SDR displays (and the manual Force SDR override)
             // prepare the graph before the first frame; Media3 only tone-maps HDR-transfer input.
-            // Media3 requires setVideoEffects() to be called at least once before prepare().
-            // Smart Vibrance can be toggled from the in-player panel, so every ExoPlayer
-            // session must create the graph up front. The no-op bootstrap does not request
-            // tone mapping; the output policy below still decides HDR versus SDR output.
-            val prepareVideoEffectsGraph = true
+            val smartVibranceGraphRequested = runCatching {
+                themeDataStore.smartVibranceEnabled.first()
+            }.getOrDefault(false)
+            // A persisted Smart Vibrance request also needs the graph to exist before renderer
+            // enable. It does not request tone mapping: HDR10/HLG remains HDR on an HDR output,
+            // while native Dolby Vision is bypassed once its input format is known.
+            val prepareVideoEffectsGraph =
+                videoOutputDecision.prepareSdrOutputGraph || smartVibranceGraphRequested
             Log.i(
                 PlayerRuntimeController.TAG,
                 "VIDEO_OUTPUT_POLICY: reportedHdr=${videoOutputDecision.outputSupportsHdr} " +
                     "forceSdr=${playerSettings.forceSdrOutput} " +
                     "toneMap=${videoOutputDecision.prepareSdrOutputGraph} " +
-                    "graph=$prepareVideoEffectsGraph reason=in-player-video-effects"
+                    "graph=$prepareVideoEffectsGraph " +
+                    "smartVibrance=$smartVibranceGraphRequested"
             )
 
             // ── Renderers Factory (Combining Libass offsets + Audio Gain + Video Fallback) ──
