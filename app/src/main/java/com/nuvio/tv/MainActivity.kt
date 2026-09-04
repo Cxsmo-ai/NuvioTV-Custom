@@ -161,6 +161,8 @@ import com.nuvio.tv.domain.repository.AddonRepository
 import com.nuvio.tv.ui.components.NuvioScrollDefaults
 import com.nuvio.tv.ui.components.BrandWordmark
 import com.nuvio.tv.ui.components.ScreensaverOverlay
+import com.nuvio.tv.ui.components.AppDimmerOverlay
+import com.nuvio.tv.ui.components.LocalAppDimPercent
 import com.nuvio.tv.ui.components.LocalCardDepthStyle
 import com.nuvio.tv.ui.components.ProfileAvatarCircle
 import com.nuvio.tv.ui.navigation.NuvioNavHost
@@ -572,6 +574,7 @@ class MainActivity : ComponentActivity() {
                         fontScale = systemDensity.fontScale.coerceAtMost(MAX_SUPPORTED_FONT_SCALE)
                     )
                 }
+                val appDimPercent by themeDataStore.appDimPercent.collectAsState(initial = ThemeDataStore.DEFAULT_APP_DIM_PERCENT)
                 CompositionLocalProvider(
                     LocalDensity provides clampedFontScaleDensity,
                     LocalBringIntoViewSpec provides bringIntoViewSpec,
@@ -579,7 +582,8 @@ class MainActivity : ComponentActivity() {
                     LocalRecompositionHighlighterEnabled provides (BuildConfig.IS_DEBUG_BUILD && mainUiPrefs.composeHighlighterEnabled),
                     LocalCardDepthStyle provides mainUiPrefs.cardDepthStyle,
                     LocalMemberAccess provides mainUiPrefs.memberAccess,
-                    com.nuvio.tv.core.player.LocalTrailerPlayerPool provides trailerPlayerPool
+                    com.nuvio.tv.core.player.LocalTrailerPlayerPool provides trailerPlayerPool,
+                    LocalAppDimPercent provides appDimPercent
                 ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -596,6 +600,7 @@ class MainActivity : ComponentActivity() {
                         visible = screensaverVisible,
                         dimPercent = screensaverDimPercent
                     )
+                    AppDimmerOverlay(dimPercent = appDimPercent)
 
                     if (hasSeenAuthQrOnFirstLaunch == null) {
                         Box(

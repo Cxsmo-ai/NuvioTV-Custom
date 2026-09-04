@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
@@ -287,6 +288,31 @@ fun ThemeSettingsContent(
                         onDismiss = { showScreensaverDimDialog = false }
                     )
                 }
+            }
+
+            SettingsGroupCard(
+                modifier = Modifier.fillMaxWidth(),
+                title = stringResource(R.string.appearance_app_dimmer_title),
+                subtitle = stringResource(R.string.appearance_app_dimmer_subtitle)
+            ) {
+                SliderSettingsItem(
+                    icon = Icons.Default.BrightnessMedium,
+                    title = stringResource(R.string.appearance_app_dimmer_title),
+                    subtitle = stringResource(R.string.appearance_app_dimmer_subtitle),
+                    value = uiState.appDimPercent,
+                    valueText = if (uiState.appDimPercent == 0) {
+                        stringResource(R.string.appearance_app_dimmer_off)
+                    } else {
+                        "${uiState.appDimPercent}%"
+                    },
+                    minValue = 0,
+                    maxValue = 90,
+                    step = 5,
+                    onValueChange = { percent ->
+                        viewModel.onEvent(ThemeSettingsEvent.SelectAppDim(percent))
+                    },
+                    onFocused = {}
+                )
             }
 
             SettingsGroupCard(

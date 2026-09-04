@@ -357,6 +357,12 @@
     <string name="appearance_screensaver_dim_gentle">Screen remains clearly visible</string>
     <string name="appearance_screensaver_dim_balanced">Dark but readable</string>
     <string name="appearance_screensaver_dim_strong">Barely visible</string>
+    <string name="appearance_app_dimmer_title">App Dimmer</string>
+    <string name="appearance_app_dimmer_subtitle">Adjust overall app and video brightness across all screens and menus</string>
+    <string name="appearance_app_dimmer_off">Off (100% Brightness)</string>
+    <string name="player_dimmer_title">App Dimmer</string>
+    <string name="player_dimmer_subtitle">Dim overall display brightness</string>
+    <string name="cd_app_dimmer">App Dimmer</string>
     <string name="settings_style_classic">Default</string>
     <string name="settings_style_classic_desc">Standard layout with cards</string>
     <string name="settings_style_zen">Minimal</string>

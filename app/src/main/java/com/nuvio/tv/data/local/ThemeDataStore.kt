@@ -23,6 +23,8 @@ class ThemeDataStore @Inject constructor(
         private const val FEATURE = "theme_settings"
         const val DEFAULT_SCREENSAVER_TIMEOUT_MINUTES = 5
         const val DEFAULT_SCREENSAVER_DIM_PERCENT = 70
+        const val DEFAULT_APP_DIM_PERCENT = 0
+        const val MAX_APP_DIM_PERCENT = 90
     }
 
     private fun store(profileId: Int = profileManager.activeProfileId.value) =
@@ -36,6 +38,7 @@ class ThemeDataStore @Inject constructor(
     private val screensaverEnabledKey = booleanPreferencesKey("oled_screensaver_enabled")
     private val screensaverTimeoutKey = intPreferencesKey("oled_screensaver_timeout_min")
     private val screensaverDimKey = intPreferencesKey("oled_screensaver_dim_percent")
+    private val appDimPercentKey = intPreferencesKey("app_dim_percent")
 
     val selectedThemePreference: Flow<AppTheme?> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { prefs ->
@@ -86,6 +89,19 @@ class ThemeDataStore @Inject constructor(
     val screensaverDimPercent: Flow<Int> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { prefs ->
             prefs[screensaverDimKey] ?: DEFAULT_SCREENSAVER_DIM_PERCENT
+        }
+    }
+
+    val appDimPercent: Flow<Int> = profileManager.activeProfileId.flatMapLatest { pid ->
+        factory.get(pid, FEATURE).data.map { prefs ->
+            prefs[appDimPercentKey]?.coerceIn(0, MAX_APP_DIM_PERCENT) ?: DEFAULT_APP_DIM_PERCENT
+        }
+    }
+
+    suspend fun setAppDimPercent(percent: Int, profileId: Int = profileManager.activeProfileId.value) {
+        val clamped = percent.coerceIn(0, MAX_APP_DIM_PERCENT)
+        store(profileId).edit { prefs ->
+            prefs[appDimPercentKey] = clamped
         }
     }
 

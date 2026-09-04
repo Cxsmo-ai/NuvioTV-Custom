@@ -33,7 +33,8 @@ data class ThemeSettingsUiState(
     val availableSettingsUiStyles: List<SettingsUiStyle> = SettingsUiStyle.entries.toList(),
     val screensaverEnabled: Boolean = true,
     val screensaverTimeoutMinutes: Int = ThemeDataStore.DEFAULT_SCREENSAVER_TIMEOUT_MINUTES,
-    val screensaverDimPercent: Int = ThemeDataStore.DEFAULT_SCREENSAVER_DIM_PERCENT
+    val screensaverDimPercent: Int = ThemeDataStore.DEFAULT_SCREENSAVER_DIM_PERCENT,
+    val appDimPercent: Int = ThemeDataStore.DEFAULT_APP_DIM_PERCENT
 )
 
 sealed class ThemeSettingsEvent {
@@ -45,6 +46,7 @@ sealed class ThemeSettingsEvent {
     data class ToggleScreensaver(val enabled: Boolean) : ThemeSettingsEvent()
     data class SelectScreensaverTimeout(val minutes: Int) : ThemeSettingsEvent()
     data class SelectScreensaverDim(val percent: Int) : ThemeSettingsEvent()
+    data class SelectAppDim(val percent: Int) : ThemeSettingsEvent()
 }
 
 @HiltViewModel
@@ -147,6 +149,15 @@ class ThemeSettingsViewModel @Inject constructor(
                     }
                 }
         }
+        viewModelScope.launch {
+            themeDataStore.appDimPercent
+                .distinctUntilChanged()
+                .collectLatest { percent ->
+                    _uiState.update { state ->
+                        if (state.appDimPercent == percent) state else state.copy(appDimPercent = percent)
+                    }
+                }
+        }
     }
 
     private fun currentTheme(): AppTheme {
@@ -163,6 +174,7 @@ class ThemeSettingsViewModel @Inject constructor(
             is ThemeSettingsEvent.ToggleScreensaver -> setScreensaverEnabled(event.enabled)
             is ThemeSettingsEvent.SelectScreensaverTimeout -> setScreensaverTimeout(event.minutes)
             is ThemeSettingsEvent.SelectScreensaverDim -> setScreensaverDim(event.percent)
+            is ThemeSettingsEvent.SelectAppDim -> setAppDim(event.percent)
         }
     }
 
@@ -220,6 +232,13 @@ class ThemeSettingsViewModel @Inject constructor(
         if (_uiState.value.screensaverDimPercent == percent) return
         viewModelScope.launch {
             themeDataStore.setScreensaverDimPercent(percent)
+        }
+    }
+
+    private fun setAppDim(percent: Int) {
+        if (_uiState.value.appDimPercent == percent) return
+        viewModelScope.launch {
+            themeDataStore.setAppDimPercent(percent)
         }
     }
 }

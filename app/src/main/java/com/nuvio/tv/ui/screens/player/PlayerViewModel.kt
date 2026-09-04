@@ -47,6 +47,9 @@ import com.nuvio.tv.data.local.TmdbSettingsDataStore
 import com.nuvio.tv.data.local.TraktAuthDataStore
 import com.nuvio.tv.data.local.TraktSettingsDataStore
 import com.nuvio.tv.data.local.TrailerSettingsDataStore
+import com.nuvio.tv.data.local.ThemeDataStore
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import com.nuvio.tv.data.local.WatchedSeriesStateHolder
 import com.nuvio.tv.data.repository.TraktRelatedService
 import com.nuvio.tv.data.trailer.TrailerService
@@ -109,6 +112,7 @@ class PlayerViewModel @Inject constructor(
     private val prefetchSelectionSupplier: com.nuvio.tv.core.stream.PrefetchSelectionSupplier,
     private val screensaverController: com.nuvio.tv.core.player.ScreensaverController,
     private val tvRecommendationManager: com.nuvio.tv.core.recommendations.TvRecommendationManager,
+    private val themeDataStore: ThemeDataStore,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -1107,6 +1111,18 @@ class PlayerViewModel @Inject constructor(
 
     fun consumePendingExitReason() {
         controller.consumePendingExitReason()
+    }
+
+    val appDimPercent: StateFlow<Int> = themeDataStore.appDimPercent.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = ThemeDataStore.DEFAULT_APP_DIM_PERCENT
+    )
+
+    fun setAppDimPercent(percent: Int) {
+        viewModelScope.launch {
+            themeDataStore.setAppDimPercent(percent)
+        }
     }
 
     override fun onCleared() {

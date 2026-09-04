@@ -8,6 +8,10 @@ package com.nuvio.tv.ui.screens.player
 import com.nuvio.tv.ui.theme.NuvioMotion
 
 import com.nuvio.tv.ui.theme.NuvioTheme
+import androidx.compose.material.icons.filled.BrightnessMedium
+import com.nuvio.tv.ui.components.AppDimmerOverlay
+import com.nuvio.tv.ui.components.LocalAppDimPercent
+import com.nuvio.tv.ui.screens.settings.SliderSettingsItem
 
 import android.util.Log
 import android.view.KeyEvent
@@ -194,6 +198,8 @@ fun PlayerScreen(
     var reportCodeVisible by remember { mutableStateOf(false) }
     var exitDispatched by remember { mutableStateOf(false) }
     var externalHandoffInProgress by remember { mutableStateOf(false) }
+    val appDimPercent by viewModel.appDimPercent.collectAsState()
+    var showDimmerDialog by remember { mutableStateOf(false) }
 
     val exitPlayer: () -> Unit = exitPlayer@{
         if (exitDispatched) return@exitPlayer
@@ -1350,6 +1356,7 @@ fun PlayerScreen(
                 onShowAudioDialog = { viewModel.onEvent(PlayerEvent.OnShowAudioOverlay) },
                 onShowSubtitleDialog = { viewModel.onEvent(PlayerEvent.OnShowSubtitleOverlay) },
                 onShowSpeedDialog = { viewModel.onEvent(PlayerEvent.OnShowSpeedDialog) },
+                onShowDimmerDialog = { showDimmerDialog = true },
                 onToggleAspectRatio = {
                     Log.d("PlayerScreen", "onToggleAspectRatio called - dispatching event")
                     viewModel.onEvent(PlayerEvent.OnToggleAspectRatio)
@@ -1696,6 +1703,14 @@ fun PlayerScreen(
                 onCueSelected = { cue ->
                     viewModel.onEvent(PlayerEvent.OnApplySubtitleAutoSyncCue(cue.startTimeMs))
                 }
+            )
+        }
+
+        if (showDimmerDialog) {
+            AppDimmerDialog(
+                dimPercent = appDimPercent,
+                onDimPercentChanged = { viewModel.setAppDimPercent(it) },
+                onDismiss = { showDimmerDialog = false }
             )
         }
 
@@ -2053,6 +2068,7 @@ private fun PlayerControlsOverlay(
     onShowAudioDialog: () -> Unit,
     onShowSubtitleDialog: () -> Unit,
     onShowSpeedDialog: () -> Unit,
+    onShowDimmerDialog: () -> Unit = {},
     onToggleAspectRatio: () -> Unit,
     onSwitchPlayerEngine: () -> Unit,
     onReportPlaybackIssue: () -> Unit,
@@ -2331,6 +2347,14 @@ private fun PlayerControlsOverlay(
                             icon = Icons.AutoMirrored.Filled.OpenInNew,
                             contentDescription = stringResource(R.string.cd_open_external_player),
                             onClick = onOpenInExternalPlayer,
+                            downFocusRequester = progressBarFocusRequester,
+                            onUpKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                        ControlButton(
+                            icon = Icons.Default.BrightnessMedium,
+                            contentDescription = stringResource(R.string.cd_app_dimmer),
+                            onClick = onShowDimmerDialog,
                             downFocusRequester = progressBarFocusRequester,
                             onUpKey = onHideControls,
                             onFocused = onResetHideTimer
@@ -3504,9 +3528,86 @@ private fun SpeedSelectionDialog(
                     }
                 }
             }
+            AppDimmerOverlay(dimPercent = LocalAppDimPercent.current)
         }
     }
 }
+
+@Composable
+private fun AppDimmerDialog(
+    dimPercent: Int,
+    onDimPercentChanged: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val firstFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        runCatching { firstFocusRequester.requestFocus() }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .width(440.dp)
+                .clip(RoundedCornerShape(NuvioTheme.radii.xxl))
+                .background(Color.Black.copy(alpha = 0.90f))
+                .border(
+                    BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                    RoundedCornerShape(NuvioTheme.radii.xxl)
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(NuvioTheme.spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md)
+            ) {
+                Text(
+                    text = stringResource(R.string.player_dimmer_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = NuvioTheme.colors.TextPrimary
+                )
+                Text(
+                    text = stringResource(R.string.player_dimmer_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.65f)
+                )
+
+                SliderSettingsItem(
+                    icon = Icons.Default.BrightnessMedium,
+                    title = stringResource(R.string.player_dimmer_title),
+                    value = dimPercent,
+                    valueText = if (dimPercent == 0) {
+                        stringResource(R.string.appearance_app_dimmer_off)
+                    } else {
+                        "${dimPercent}%"
+                    },
+                    minValue = 0,
+                    maxValue = 90,
+                    step = 5,
+                    onValueChange = onDimPercentChanged,
+                    modifier = Modifier.focusRequester(firstFocusRequester)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
+                ) {
+                    val presets = listOf(0, 25, 50, 75)
+                    presets.forEach { preset ->
+                        val label = if (preset == 0) "Off" else "${preset}%"
+                        DialogButton(
+                            text = label,
+                            onClick = { onDimPercentChanged(preset) },
+                            isPrimary = dimPercent == preset,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            AppDimmerOverlay(dimPercent = dimPercent)
+        }
+    }
+}
+
 
 @Composable
 private fun MoreActionsDialog(
@@ -3546,6 +3647,7 @@ private fun MoreActionsDialog(
                     onClick = onOpenInExternalPlayer
                 )
             }
+            AppDimmerOverlay(dimPercent = LocalAppDimPercent.current)
         }
     }
 }
