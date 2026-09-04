@@ -21,36 +21,51 @@ val LocalFastHorizontalNavigationEnabled = compositionLocalOf { false }
  * @param verticalGateMs   minimum interval between vertical repeats
  */
 fun Modifier.dpadRepeatThrottle(
-    horizontalGateMs: Long = 80L,
-    verticalGateMs: Long = 112L
+    horizontalGateMs: Long = DpadNavigationTiming.STANDARD_HORIZONTAL_REPEAT_MS,
+    verticalGateMs: Long = DpadNavigationTiming.VERTICAL_REPEAT_MS
 ): Modifier = composed {
     val focusManager = LocalFocusManager.current
     val fastHorizontalNavigationEnabled = LocalFastHorizontalNavigationEnabled.current
-    val lastRepeatTime = remember { longArrayOf(0L) }
+    val repeatGate = remember { DirectionalRepeatGate() }
 
     onPreviewKeyEvent { event ->
         val native = event.nativeKeyEvent
+        val directionIndex = when (native.keyCode) {
+            KeyEvent.KEYCODE_DPAD_DOWN -> 0
+            KeyEvent.KEYCODE_DPAD_UP -> 1
+            KeyEvent.KEYCODE_DPAD_LEFT -> 2
+            KeyEvent.KEYCODE_DPAD_RIGHT -> 3
+            else -> -1
+        }
+
+        // A new physical press or release starts a fresh repeat sequence for
+        // that direction. First presses still fall through to native Compose
+        // focus handling and therefore remain exactly one focus step.
+        if (directionIndex >= 0 &&
+            (native.action == KeyEvent.ACTION_UP ||
+                (native.action == KeyEvent.ACTION_DOWN && native.repeatCount == 0))
+        ) {
+            repeatGate.reset(directionIndex)
+            return@onPreviewKeyEvent false
+        }
+
         if (native.action == KeyEvent.ACTION_DOWN &&
             native.repeatCount > 0 &&
-            (native.keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
-                native.keyCode == KeyEvent.KEYCODE_DPAD_UP ||
-                native.keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
-                native.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)
+            directionIndex >= 0
         ) {
             val isVertical = native.keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
                 native.keyCode == KeyEvent.KEYCODE_DPAD_UP
             val gateMs = if (isVertical) {
                 verticalGateMs
             } else if (fastHorizontalNavigationEnabled) {
-                48L
+                DpadNavigationTiming.FAST_HORIZONTAL_REPEAT_MS
             } else {
                 horizontalGateMs
             }
             val now = SystemClock.uptimeMillis()
-            if (now - lastRepeatTime[0] < gateMs) {
+            if (!repeatGate.tryAcquire(directionIndex, now, gateMs)) {
                 return@onPreviewKeyEvent true
             }
-            lastRepeatTime[0] = now
             val direction = when (native.keyCode) {
                 KeyEvent.KEYCODE_DPAD_DOWN -> FocusDirection.Down
                 KeyEvent.KEYCODE_DPAD_UP -> FocusDirection.Up

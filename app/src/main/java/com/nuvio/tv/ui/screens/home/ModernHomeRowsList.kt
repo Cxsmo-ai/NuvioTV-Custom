@@ -337,7 +337,7 @@ internal fun ModernHomeRowsList(
                 }
                 .then(if (!preferFirstRowOnContainerFocus) Modifier.dpadVerticalFastScroll(
                     scrollableState = verticalRowListState,
-                    verticalVelocityDpPerSec = 2000f,
+                    verticalVelocityDpPerSec = 2600f,
                     onFastScrollingChanged = onFastScrollingChanged,
                     shouldHaltForward = {
                         val info = verticalRowListState.layoutInfo

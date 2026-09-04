@@ -1,19 +1,21 @@
 package com.nuvio.tv.ui.components
 
 import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import com.nuvio.tv.ui.theme.NuvioFocus
-import com.nuvio.tv.ui.theme.NuvioMotion
+
+internal const val RESPONSIVE_SCROLL_STIFFNESS = 700f
 
 @OptIn(ExperimentalFoundationApi::class)
 object NuvioScrollDefaults {
     val smoothScrollSpec = object : BringIntoViewSpec {
         @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
         override val scrollAnimationSpec: AnimationSpec<Float> = spring(
-            dampingRatio = 0.95f,
-            stiffness = NuvioMotion.tokens.durations.fast.toFloat()
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = RESPONSIVE_SCROLL_STIFFNESS
         )
 
         override fun calculateScrollDistance(
