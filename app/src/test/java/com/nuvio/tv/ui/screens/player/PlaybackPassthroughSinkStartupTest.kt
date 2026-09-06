@@ -47,8 +47,12 @@ class PlaybackPassthroughSinkStartupTest {
         audioSink.configure(trueHdFormat, 0, null)
         assertTrue(audioSink.isDirectPlaybackActive())
 
-        // Calling play() should trigger handleDiscontinuity on delegate to resync media time
+        // A cold TrueHD start is intentionally deferred until the startup gate is released.
         audioSink.play()
+        verify(exactly = 0) { mockSink.handleDiscontinuity() }
+
+        // End-of-stream force-releases the gate and performs the pending resync.
+        audioSink.playToEndOfStream()
         verify(exactly = 1) { mockSink.handleDiscontinuity() }
 
         // Subsequent play() without pause should NOT trigger handleDiscontinuity again

@@ -885,6 +885,32 @@ private inline fun <reified T : Throwable> Throwable.findCause(): T? {
 }
 
 private class PlayerLoadErrorHandlingPolicy : DefaultLoadErrorHandlingPolicy(6) {
+    override fun getFallbackSelectionFor(
+        fallbackOptions: LoadErrorHandlingPolicy.FallbackOptions,
+        loadErrorInfo: LoadErrorHandlingPolicy.LoadErrorInfo
+    ): LoadErrorHandlingPolicy.FallbackSelection? {
+        val responseCode = loadErrorInfo.exception
+            .findCause<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>()
+            ?.responseCode
+        if (
+            shouldPreferAlternativeHlsTrack(
+                responseCode = responseCode,
+                dataType = loadErrorInfo.mediaLoadData.dataType,
+                alternativeTrackAvailable = fallbackOptions.isFallbackAvailable(
+                    LoadErrorHandlingPolicy.FALLBACK_TYPE_TRACK
+                )
+            )
+        ) {
+            // A media-segment 404 belongs to the selected rendition. Exclude that
+            // rendition first so HLS can continue with another compatible track.
+            return LoadErrorHandlingPolicy.FallbackSelection(
+                LoadErrorHandlingPolicy.FALLBACK_TYPE_TRACK,
+                DefaultLoadErrorHandlingPolicy.DEFAULT_TRACK_EXCLUSION_MS
+            )
+        }
+        return super.getFallbackSelectionFor(fallbackOptions, loadErrorInfo)
+    }
+
 
     // fatal-429 (27 Aug spec, Build 1): monotonic ms of the last 429/503 seen and the
     // start of the current continuous rate-limit streak. Shared across every MediaPeriod
@@ -977,3 +1003,12 @@ private class PlayerLoadErrorHandlingPolicy : DefaultLoadErrorHandlingPolicy(6) 
         return super.getMinimumLoadableRetryCount(dataType)
     }
 }
+
+internal fun shouldPreferAlternativeHlsTrack(
+    responseCode: Int?,
+    dataType: Int,
+    alternativeTrackAvailable: Boolean
+): Boolean =
+    responseCode == 404 &&
+        dataType == androidx.media3.common.C.DATA_TYPE_MEDIA &&
+        alternativeTrackAvailable

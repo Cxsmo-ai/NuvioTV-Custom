@@ -8,6 +8,34 @@ import org.junit.Test
 import java.util.Base64
 
 class PlayerMediaSourceFactoryTest {
+    @Test
+    fun `media segment 404 with an alternative prefers another HLS track`() {
+        org.junit.Assert.assertTrue(
+            shouldPreferAlternativeHlsTrack(
+                responseCode = 404,
+                dataType = androidx.media3.common.C.DATA_TYPE_MEDIA,
+                alternativeTrackAvailable = true
+            )
+        )
+    }
+
+    @Test
+    fun `manifest errors and missing alternatives do not trigger rendition fallback`() {
+        org.junit.Assert.assertFalse(
+            shouldPreferAlternativeHlsTrack(
+                responseCode = 404,
+                dataType = androidx.media3.common.C.DATA_TYPE_MANIFEST,
+                alternativeTrackAvailable = true
+            )
+        )
+        org.junit.Assert.assertFalse(
+            shouldPreferAlternativeHlsTrack(
+                responseCode = 404,
+                dataType = androidx.media3.common.C.DATA_TYPE_MEDIA,
+                alternativeTrackAvailable = false
+            )
+        )
+    }
 
     @Test
     fun `inferMimeType prefers response content type for manifest urls without extension`() {

@@ -312,6 +312,9 @@ internal fun parseSidecarTimedCuesLenient(rawText: String, sourceUrl: String): L
         val cue = Cue.Builder().setText(syncCues[i].text).build()
         out.add(CuesWithTiming(listOf(cue), startUs, durationUs))
     }
+    // collectActiveSidecarCues stops at the first cue starting after the playhead, so the list
+    // has to be ordered. PlayerSubtitleCueParser emits cues in file order.
+    out.sortBy { it.startTimeUs }
     return out
 }
 
