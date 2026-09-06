@@ -7,8 +7,11 @@ data class SimklApiConfiguration(
     val clientId: String,
     val appName: String,
     val appVersion: String,
-    val baseUrl: String = "https://api.simkl.com"
+    val baseUrl: String = "https://api.simkl.com",
+    val clientIdProvider: () -> String = { clientId }
 )
+
+fun SimklApiConfiguration.resolvedClientId(): String = clientIdProvider().trim()
 
 fun buildSimklApiUrl(
     configuration: SimklApiConfiguration,
@@ -20,7 +23,7 @@ fun buildSimklApiUrl(
     query.filterKeys { it !in SIMKL_REQUIRED_QUERY_KEYS }.forEach { (key, value) ->
         builder.addQueryParameter(key, value)
     }
-    builder.addQueryParameter("client_id", configuration.clientId)
+    builder.addQueryParameter("client_id", configuration.resolvedClientId())
     builder.addQueryParameter("app-name", configuration.appName)
     builder.addQueryParameter("app-version", configuration.appVersion)
     return builder.build().toString()

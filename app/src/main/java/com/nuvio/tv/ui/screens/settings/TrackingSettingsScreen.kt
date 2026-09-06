@@ -52,6 +52,8 @@ fun TrackingSettingsScreen(
     val simklState by simklViewModel.uiState.collectAsStateWithLifecycle()
     val trackingState by trackingViewModel.uiState.collectAsStateWithLifecycle()
     val mdbListState by mdbListViewModel.uiState.collectAsStateWithLifecycle()
+    val credentialsViewModel: TrackingCredentialsViewModel = hiltViewModel()
+    val credentialsState by credentialsViewModel.uiState.collectAsStateWithLifecycle()
     val traktFocusRequester = remember { FocusRequester() }
     val simklFocusRequester = remember { FocusRequester() }
     val mdbListFocusRequester = remember { FocusRequester() }
@@ -71,6 +73,7 @@ fun TrackingSettingsScreen(
     var showMoreLikeThisSourceDialog by remember { mutableStateOf(false) }
     var showAnimeIdDialog by remember { mutableStateOf(false) }
     var showMdbListApiKeyDialog by remember { mutableStateOf(false) }
+    var showCredentialsDialog by remember { mutableStateOf(false) }
 
     val hasOverlay = activeProvider != null ||
         disconnectProvider != null ||
@@ -80,6 +83,7 @@ fun TrackingSettingsScreen(
         showMoreLikeThisSourceDialog ||
         showAnimeIdDialog ||
         showMdbListApiKeyDialog ||
+        showCredentialsDialog ||
         showTransferFlow
 
     BackHandler(enabled = !hasOverlay) {
@@ -180,6 +184,13 @@ fun TrackingSettingsScreen(
         watchProgressFocusRequester = watchProgressFocusRequester,
         continueWatchingFocusRequester = continueWatchingFocusRequester,
         moreLikeThisFocusRequester = moreLikeThisFocusRequester,
+        credentialsSummary = if (
+            credentialsState.traktClientId.isNotBlank() &&
+                credentialsState.traktSecretConfigured &&
+                credentialsState.simklClientId.isNotBlank()
+        ) stringResource(R.string.tracking_credentials_configured) else
+            stringResource(R.string.tracking_credentials_not_set),
+        onCredentialsClick = { showCredentialsDialog = true },
         onTraktClick = { openProvider(TrackingProviderId.TRAKT) },
         onSimklClick = { openProvider(TrackingProviderId.SIMKL) },
         onMdbListClick = { openProvider(TrackingProviderId.MDBLIST) },
@@ -337,6 +348,24 @@ fun TrackingSettingsScreen(
         )
     }
 
+    if (showCredentialsDialog) {
+        TrackingCredentialsDialog(
+            state = credentialsState,
+            onSaveTrakt = { clientId, secret ->
+                credentialsViewModel.saveTrakt(clientId, secret)
+                traktViewModel.refreshCredentials()
+            },
+            onSaveSimkl = { clientId ->
+                credentialsViewModel.saveSimkl(clientId)
+                simklViewModel.refreshCredentials()
+            },
+            onDismiss = {
+                credentialsViewModel.refresh()
+                showCredentialsDialog = false
+            }
+        )
+    }
+
     if (showTransferFlow) {
         LibraryTransferFlow(
             availableModes = trackingState.availableLibrarySourceModes,
@@ -488,7 +517,9 @@ internal fun TrackingSettingsOverview(
     onContinueWatchingWindowClick: () -> Unit,
     onCommentsChanged: (Boolean) -> Unit,
     onMoreLikeThisClick: () -> Unit,
-    onAnimeIdClick: () -> Unit
+    onAnimeIdClick: () -> Unit,
+    credentialsSummary: String? = null,
+    onCredentialsClick: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
     val traktPresentation = traktConnectionPresentation(traktState)
@@ -560,6 +591,12 @@ internal fun TrackingSettingsOverview(
                                 modifier = Modifier
                                     .focusRequester(mdbListRowFocusRequester)
                                     .testTag(TrackingSettingsTestTags.MDBLIST_PROVIDER)
+                            )
+                            SettingsActionRow(
+                                title = stringResource(R.string.tracking_credentials_title),
+                                subtitle = stringResource(R.string.tracking_credentials_subtitle),
+                                value = credentialsSummary ?: stringResource(R.string.tracking_credentials_not_set),
+                                onClick = onCredentialsClick
                             )
                         }
                     }

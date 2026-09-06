@@ -209,7 +209,7 @@ class DolbyVisionBaseLayerPolicyTest {
     // ── NATIVE_DV7 catch-all: non-Amazon non-Xiaomi devices on DV display ──
 
     @Test
-    fun `non-Amazon device on DV display with DV81 decoder falls through to NATIVE_DV7`() {
+    fun `generic DV display with Profile 8 decoder and bridge converts`() {
         val r = resolve(
             displayDv = true,
             displayHdr10 = true,
@@ -219,13 +219,13 @@ class DolbyVisionBaseLayerPolicyTest {
             isXiaomi = false,
             bridgeReady = true
         )
-        assertEquals(Decision.NATIVE_DV7, r.decision)
-        assertFalse(r.divertsFromNativeDv7)
+        assertEquals(Decision.CONVERT_TO_DV81, r.decision)
+        assertTrue(r.divertsFromNativeDv7)
         assertFalse(r.mapToHevc)
     }
 
     @Test
-    fun `Samsung device on DV display still falls through to NATIVE_DV7`() {
+    fun `Samsung DV display with Profile 8 decoder and bridge converts`() {
         val r = resolve(
             displayDv = true,
             displayHdr10 = true,
@@ -233,7 +233,7 @@ class DolbyVisionBaseLayerPolicyTest {
             isSamsung = true,
             bridgeReady = true
         )
-        assertEquals(Decision.NATIVE_DV7, r.decision)
+        assertEquals(Decision.CONVERT_TO_DV81, r.decision)
     }
 
     // ── CONVERT_TO_DV81: HDR10 fallback (Samsung + Amazon) ──
@@ -276,10 +276,10 @@ class DolbyVisionBaseLayerPolicyTest {
         assertEquals(Decision.CONVERT_TO_DV81, r.decision)
     }
 
-    // ── STRIP_TO_HDR10: Google TV Streamer + Samsung TV (non-intervened) ──
+    // ── STRIP_TO_HDR10: no usable Profile-8 decoder ──
 
     @Test
-    fun `Generic HDR10 panel with DV81 decoder strips when non-Samsung non-Amazon non-Xiaomi`() {
+    fun `Generic HDR10 panel with DV81 decoder and bridge converts`() {
         val r = resolve(
             displayDv = false,
             displayHdr10 = true,
@@ -289,8 +289,8 @@ class DolbyVisionBaseLayerPolicyTest {
             isXiaomi = false,
             bridgeReady = true
         )
-        assertEquals(Decision.STRIP_TO_HDR10, r.decision)
-        assertTrue(r.mapToHevc)
+        assertEquals(Decision.CONVERT_TO_DV81, r.decision)
+        assertFalse(r.mapToHevc)
     }
 
     @Test
@@ -313,6 +313,17 @@ class DolbyVisionBaseLayerPolicyTest {
             bridgeReady = true
         )
         assertEquals(Decision.STRIP_TO_HDR10, r.decision)
+    }
+
+    @Test
+    fun `HDR10Plus panel with generic device and bridge converts when Profile 8 exists`() {
+        val r = resolve(
+            displayHdr10Plus = true,
+            codecSupportsDvheSt = true,
+            bridgeReady = true
+        )
+        assertEquals(Decision.CONVERT_TO_DV81, r.decision)
+        assertFalse(r.mapToHevc)
     }
 
     @Test

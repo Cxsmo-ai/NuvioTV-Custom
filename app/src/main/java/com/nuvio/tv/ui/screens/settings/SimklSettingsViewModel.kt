@@ -53,6 +53,15 @@ class SimklSettingsViewModel @Inject constructor(
     private var identityRefreshJob: Job? = null
     private var pollJob: Job? = null
 
+    fun refreshCredentials() {
+        _uiState.update {
+            it.copy(
+                credentialsConfigured = authRepository.hasRequiredCredentials(),
+                errorMessage = null
+            )
+        }
+    }
+
     init {
         viewModelScope.launch {
             authRepository.state.collectLatest { state ->

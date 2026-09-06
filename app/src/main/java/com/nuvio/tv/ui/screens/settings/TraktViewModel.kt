@@ -73,6 +73,15 @@ class TraktViewModel @Inject constructor(
         observeAuthState()
     }
 
+    fun refreshCredentials() {
+        _uiState.update {
+            it.copy(
+                credentialsConfigured = traktAuthService.hasRequiredCredentials(),
+                errorMessage = null
+            )
+        }
+    }
+
     fun onContinueWatchingDaysCapSelected(days: Int) {
         viewModelScope.launch {
             traktSettingsDataStore.setContinueWatchingDaysCap(days)

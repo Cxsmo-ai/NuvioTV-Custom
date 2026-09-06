@@ -440,6 +440,16 @@
     <string name="settings_tracking_description">Connect tracking providers and choose which one powers your Library and Continue Watching.</string>
     <string name="tracking_accounts_title">Accounts</string>
     <string name="tracking_accounts_subtitle">Connect and manage tracking services</string>
+    <string name="tracking_credentials_title">Tracker app credentials</string>
+    <string name="tracking_credentials_subtitle">Set local Trakt and Simkl app credentials for account login</string>
+    <string name="tracking_credentials_dialog_subtitle">Credentials stay encrypted on this device and are never synced. Create your own app credentials at trakt.tv and simkl.com.</string>
+    <string name="tracking_credentials_trakt_id">Trakt client ID</string>
+    <string name="tracking_credentials_trakt_secret">Trakt client secret</string>
+    <string name="tracking_credentials_simkl_id">Simkl client ID</string>
+    <string name="tracking_credentials_saved_secret">A Trakt secret is already saved. Leave this blank to keep it.</string>
+    <string name="tracking_credentials_not_set">Not configured</string>
+    <string name="tracking_credentials_configured">Configured</string>
+    <string name="tracking_credentials_saved">Credentials saved. You can connect now.</string>
     <string name="tracking_sources_title">Sources</string>
     <string name="tracking_sources_subtitle">Choose where Nuvio reads your library and watch progress. Playback scrobbles to every connected service.</string>
     <string name="tracking_trakt_features_title">Trakt features</string>

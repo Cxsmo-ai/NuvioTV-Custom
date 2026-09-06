@@ -121,11 +121,12 @@ object DolbyVisionBaseLayerPolicy {
             // way, no intervention from us improves things.
             displayDv -> Decision.NATIVE_DV7
 
-            // Samsung HDR10 fallback (User 3): no DV display but a DV81 decoder is
-            // available. Convert DV7 to DV81 so the decoder emits HDR10. Without this
-            // branch the HEVC base layer fallback fails on some MTK SoCs.
-            // Also fires for Amazon devices on HDR10-only TVs (Karat + HDR10 TV).
-            displayHdr10Family && bridgeReady && codecSupportsDvheSt && (isSamsung || isAmazonFireTv) ->
+            // Any HDR10/HDR10+ output with a usable Profile-8 decoder can use
+            // the libdovi path. The Profile-8 decoder emits DV when the display
+            // supports DV and HDR10/HDR10+ when it does not. Restricting this to
+            // Samsung/Fire TV made Shield and other boxes report dv7-mode-off
+            // even though the same bridge path worked in the official app.
+            displayHdr10Family && bridgeReady && codecSupportsDvheSt ->
                 Decision.CONVERT_TO_DV81
 
             // Xiaomi box on HDR10-only TV: convert so the hidden decoder can emit HDR10.
@@ -133,8 +134,8 @@ object DolbyVisionBaseLayerPolicy {
             // Amlogic firmware (same class of issue as Samsung HDR10 path).
             displayHdr10Family && isXiaomi && bridgeReady -> Decision.CONVERT_TO_DV81
 
-            // HDR10/HDR10+ display on a non-Amazon, non-Samsung, non-Xiaomi device.
-            // Includes Google TV Streamer on HDR10 TV. Strip DV, play HEVC base layer.
+            // HDR10/HDR10+ output without a Profile-8 decoder. Strip DV and use
+            // the HEVC base layer; conversion cannot be safe without a decoder.
             displayHdr10Family -> Decision.STRIP_TO_HDR10
 
             else -> Decision.STRIP_AND_TONEMAP

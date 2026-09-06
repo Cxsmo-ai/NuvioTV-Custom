@@ -6,6 +6,7 @@ import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.data.local.AuthSessionNoticeDataStore
 import com.nuvio.tv.data.local.TraktAuthDataStore
 import com.nuvio.tv.data.local.TraktAuthState
+import com.nuvio.tv.data.local.TrackingClientCredentialsStore
 import com.nuvio.tv.data.remote.api.TraktApi
 import com.nuvio.tv.data.remote.dto.trakt.TraktImagesDto
 import com.nuvio.tv.data.remote.dto.trakt.TraktIdsDto
@@ -307,7 +308,11 @@ class TraktPublicListSourceResolverTest {
             context = context,
             traktApi = api,
             traktAuthDataStore = authStore,
-            authSessionNoticeDataStore = mockk<AuthSessionNoticeDataStore>(relaxed = true)
+            authSessionNoticeDataStore = mockk<AuthSessionNoticeDataStore>(relaxed = true),
+            credentials = mockk<TrackingClientCredentialsStore>(relaxed = true) {
+                every { traktClientId() } returns "client-id"
+                every { traktClientSecret() } returns "client-secret"
+            }
         )
         return TraktPublicListSourceResolver(
             appContext = context,

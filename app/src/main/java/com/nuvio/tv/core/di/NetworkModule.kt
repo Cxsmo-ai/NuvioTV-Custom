@@ -26,6 +26,7 @@ import com.nuvio.tv.data.simkl.SimklApiConfiguration
 import com.nuvio.tv.data.simkl.SimklAuthError
 import com.nuvio.tv.data.simkl.SimklAuthStorage
 import com.nuvio.tv.data.simkl.defaultSimklApiConfiguration
+import com.nuvio.tv.data.local.TrackingClientCredentialsStore
 import com.nuvio.tv.LocaleCache
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -281,7 +282,11 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideSimklApiConfiguration(): SimklApiConfiguration = defaultSimklApiConfiguration()
+    fun provideSimklApiConfiguration(
+        credentials: TrackingClientCredentialsStore
+    ): SimklApiConfiguration = defaultSimklApiConfiguration().copy(
+        clientIdProvider = credentials::simklClientId
+    )
 
     @Provides
     @Singleton
@@ -306,7 +311,8 @@ object NetworkModule {
     @Singleton
     @Named("trakt")
     fun provideTraktOkHttpClient(
-        @Named("validated") okHttpClient: OkHttpClient
+        @Named("validated") okHttpClient: OkHttpClient,
+        credentials: TrackingClientCredentialsStore
     ): OkHttpClient = okHttpClient.newBuilder()
         .addInterceptor { chain ->
             val request = chain.request()
@@ -314,7 +320,7 @@ object NetworkModule {
             val newRequest = request.newBuilder()
                 .header("Content-Type", "application/json")
                 .header("User-Agent", "Nuvio/$version")
-                .header("trakt-api-key", BuildConfig.TRAKT_CLIENT_ID)
+                .header("trakt-api-key", credentials.traktClientId())
                 .header("trakt-api-version", "2")
                 .build()
 

@@ -33,6 +33,21 @@ fun cmakePath(path: String): String {
     return resolved.absolutePath.replace("\\", "/")
 }
 
+// The repository ships ABI-matched libdovi archives. Keep local builds useful
+// out of the box while still allowing CI or a developer to explicitly disable
+// the bridge with DOVI_NATIVE_ENABLED=false. Previously, an omitted property
+// silently produced the stub bridge and the player reported `dv7-mode-off`.
+val bundledDoviRoot = rootProject.file("DV7/libdovi")
+val bundledDoviAvailable = listOf(
+    "android-arm64",
+    "android-armeabi-v7a",
+    "android-x86",
+    "android-x86_64"
+).all { abi ->
+    File(bundledDoviRoot, "$abi/lib/libdovi.a").isFile &&
+        File(bundledDoviRoot, "$abi/include").isDirectory
+}
+
 val localProperties = Properties().apply {
     val localPropertiesFile = rootProject.file("local.properties")
     if (localPropertiesFile.exists()) {
@@ -62,17 +77,37 @@ val devProperties = Properties().apply {
 }
 
 val enableDoviNative = parseBooleanProperty(
-    resolveProperty(devProperties, localProperties, "DOVI_NATIVE_ENABLED")
+    resolveProperty(
+        devProperties,
+        localProperties,
+        "DOVI_NATIVE_ENABLED",
+        if (bundledDoviAvailable) "true" else "false"
+    )
 )
 val doviExtractorHookReady = parseBooleanProperty(
-    resolveProperty(devProperties, localProperties, "DOVI_EXTRACTOR_HOOK_READY")
+    resolveProperty(
+        devProperties,
+        localProperties,
+        "DOVI_EXTRACTOR_HOOK_READY",
+        if (enableDoviNative) "true" else "false"
+    )
 )
 val doviEnableRealLink = parseBooleanProperty(
-    resolveProperty(devProperties, localProperties, "DOVI_ENABLE_REAL_LINK")
+    resolveProperty(
+        devProperties,
+        localProperties,
+        "DOVI_ENABLE_REAL_LINK",
+        if (bundledDoviAvailable) "true" else "false"
+    )
 )
 val doviStaticLibPath = resolveProperty(devProperties, localProperties, "DOVI_LIBDOVI_STATIC_LIB")
 val doviIncludeDirPath = resolveProperty(devProperties, localProperties, "DOVI_LIBDOVI_INCLUDE_DIR")
-val doviPrebuiltRootPath = resolveProperty(devProperties, localProperties, "DOVI_LIBDOVI_PREBUILT_ROOT")
+val doviPrebuiltRootPath = resolveProperty(
+    devProperties,
+    localProperties,
+    "DOVI_LIBDOVI_PREBUILT_ROOT",
+    "DV7/libdovi"
+)
 val sponsorNames = resolveProperty(devProperties, localProperties, "SPONSOR_NAMES", "ragmehos.")
 
 fun env(name: String): String? = providers.environmentVariable(name).orNull
@@ -102,7 +137,9 @@ val releaseStorePasswordValue = env("NUVIO_RELEASE_STORE_PASSWORD")
 android {
     namespace = "com.nuvio.tv"
     compileSdk = 36
-    ndkVersion = "29.0.14206865"
+    // Keep builds reproducible with the NDK shipped on the Android build host.
+    // libdovi is ABI-compatible with this toolchain and does not require NDK 29.
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.nuvio.tv.test"
@@ -116,10 +153,10 @@ android {
         buildConfigField("String", "TRAILER_API_URL", "\"${localProperties.getProperty("TRAILER_API_URL", "")}\"")
         buildConfigField("String", "IMDB_RATINGS_API_BASE_URL", "\"${localProperties.getProperty("IMDB_RATINGS_API_BASE_URL", "")}\"")
         buildConfigField("String", "IMDB_TAPFRAME_API_BASE_URL", "\"${localProperties.getProperty("IMDB_TAPFRAME_API_BASE_URL", "")}\"")
-        buildConfigField("String", "TRAKT_CLIENT_ID", "\"${localProperties.getProperty("TRAKT_CLIENT_ID", "")}\"")
-        buildConfigField("String", "TRAKT_CLIENT_SECRET", "\"${localProperties.getProperty("TRAKT_CLIENT_SECRET", "")}\"")
-        buildConfigField("String", "TRAKT_API_URL", "\"${localProperties.getProperty("TRAKT_API_URL", "https://api.trakt.tv/")}\"")
-        buildConfigField("String", "TRAKT_REDIRECT_URI", "\"${localProperties.getProperty("TRAKT_REDIRECT_URI", "urn:ietf:wg:oauth:2.0:oob")}\"")
+        buildConfigField("String", "TRAKT_CLIENT_ID", buildConfigString(resolveProperty(devProperties, localProperties, "TRAKT_CLIENT_ID")))
+        buildConfigField("String", "TRAKT_CLIENT_SECRET", buildConfigString(resolveProperty(devProperties, localProperties, "TRAKT_CLIENT_SECRET")))
+        buildConfigField("String", "TRAKT_API_URL", buildConfigString(resolveProperty(devProperties, localProperties, "TRAKT_API_URL", "https://api.trakt.tv/")))
+        buildConfigField("String", "TRAKT_REDIRECT_URI", buildConfigString(resolveProperty(devProperties, localProperties, "TRAKT_REDIRECT_URI", "urn:ietf:wg:oauth:2.0:oob")))
         buildConfigField("String", "SIMKL_CLIENT_ID", buildConfigString(resolveProperty(devProperties, localProperties, "SIMKL_CLIENT_ID")))
         buildConfigField("String", "SIMKL_APP_NAME", buildConfigString(resolveProperty(devProperties, localProperties, "SIMKL_APP_NAME", "nuvio")))
         buildConfigField("String", "TMDB_API_KEY", "\"${localProperties.getProperty("TMDB_API_KEY", "")}\"")

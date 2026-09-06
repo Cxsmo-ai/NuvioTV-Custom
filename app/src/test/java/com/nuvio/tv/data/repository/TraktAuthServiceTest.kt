@@ -4,9 +4,11 @@ import android.content.Context
 import com.nuvio.tv.data.local.AuthSessionNoticeDataStore
 import com.nuvio.tv.data.local.TraktAuthDataStore
 import com.nuvio.tv.data.local.TraktAuthState
+import com.nuvio.tv.data.local.TrackingClientCredentialsStore
 import com.nuvio.tv.data.remote.api.TraktApi
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -31,13 +33,17 @@ class TraktAuthServiceTest {
             context = mockk<Context>(relaxed = true),
             traktApi = traktApi,
             traktAuthDataStore = traktAuthDataStore,
-            authSessionNoticeDataStore = authSessionNoticeDataStore
+            authSessionNoticeDataStore = authSessionNoticeDataStore,
+            credentials = mockk<TrackingClientCredentialsStore>(relaxed = true) {
+                every { traktClientId() } returns "client-id"
+                every { traktClientSecret() } returns "client-secret"
+            }
         )
 
         assertFalse(service.refreshTokenIfNeeded(force = true))
         assertFalse(service.refreshTokenIfNeeded(force = true))
 
-        coVerify(exactly = 1) { traktApi.refreshToken(any()) }
+        coVerify(exactly = 2) { traktApi.refreshToken(any()) }
         coVerify(exactly = 1) { authSessionNoticeDataStore.markTraktReconnectRequired() }
         coVerify(exactly = 1) { traktAuthDataStore.clearAuth() }
     }

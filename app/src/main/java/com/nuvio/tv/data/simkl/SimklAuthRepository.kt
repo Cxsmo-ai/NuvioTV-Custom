@@ -27,7 +27,7 @@ class SimklAuthRepository(
 
     val state: StateFlow<SimklAuthState> = storage.state
 
-    fun hasRequiredCredentials(): Boolean = configuration.clientId.isNotBlank()
+    fun hasRequiredCredentials(): Boolean = configuration.resolvedClientId().isNotBlank()
 
     suspend fun startPinAuth(): SimklPinSession = mutex.withLock {
         val authScope = storage.currentScope()

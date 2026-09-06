@@ -7,6 +7,7 @@ import com.nuvio.tv.R
 import com.nuvio.tv.data.local.AuthSessionNoticeDataStore
 import com.nuvio.tv.data.local.TraktAuthDataStore
 import com.nuvio.tv.data.local.TraktAuthState
+import com.nuvio.tv.data.local.TrackingClientCredentialsStore
 import com.nuvio.tv.data.remote.api.TraktApi
 import com.nuvio.tv.data.remote.dto.trakt.TraktDeviceCodeRequestDto
 import com.nuvio.tv.data.remote.dto.trakt.TraktDeviceCodeResponseDto
@@ -39,7 +40,8 @@ class TraktAuthService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val traktApi: TraktApi,
     private val traktAuthDataStore: TraktAuthDataStore,
-    private val authSessionNoticeDataStore: AuthSessionNoticeDataStore
+    private val authSessionNoticeDataStore: AuthSessionNoticeDataStore,
+    private val credentials: TrackingClientCredentialsStore
 ) {
     private val refreshLeewaySeconds = 60L
     private val refreshFatalRetryDelayMs = 2_000L
@@ -119,8 +121,12 @@ class TraktAuthService @Inject constructor(
     }
 
     fun hasRequiredCredentials(): Boolean {
-        return BuildConfig.TRAKT_CLIENT_ID.isNotBlank() && BuildConfig.TRAKT_CLIENT_SECRET.isNotBlank()
+        return traktClientId().isNotBlank() && traktClientSecret().isNotBlank()
     }
+
+    private fun traktClientId(): String = credentials.traktClientId()
+
+    private fun traktClientSecret(): String = credentials.traktClientSecret()
 
     suspend fun getCurrentAuthState(): TraktAuthState = traktAuthDataStore.getCurrentState()
 
@@ -158,7 +164,7 @@ class TraktAuthService @Inject constructor(
         // Retry-After header when the server supplies a short back-off.
         suspend fun requestOnce(): Response<TraktDeviceCodeResponseDto> =
             traktApi.requestDeviceCode(
-                TraktDeviceCodeRequestDto(clientId = BuildConfig.TRAKT_CLIENT_ID)
+                TraktDeviceCodeRequestDto(clientId = traktClientId())
             )
 
         var response = try {
@@ -213,8 +219,8 @@ class TraktAuthService @Inject constructor(
             traktApi.requestDeviceToken(
                 TraktDeviceTokenRequestDto(
                     code = deviceCode,
-                    clientId = BuildConfig.TRAKT_CLIENT_ID,
-                    clientSecret = BuildConfig.TRAKT_CLIENT_SECRET
+                    clientId = traktClientId(),
+                    clientSecret = traktClientSecret()
                 )
             )
         } catch (e: IOException) {
@@ -278,8 +284,8 @@ class TraktAuthService @Inject constructor(
                     traktApi.refreshToken(
                         TraktRefreshTokenRequestDto(
                             refreshToken = refreshToken,
-                            clientId = BuildConfig.TRAKT_CLIENT_ID,
-                            clientSecret = BuildConfig.TRAKT_CLIENT_SECRET,
+                            clientId = traktClientId(),
+                            clientSecret = traktClientSecret(),
                             redirectUri = traktRedirectUri()
                         )
                     )
@@ -321,8 +327,8 @@ class TraktAuthService @Inject constructor(
                     traktApi.revokeToken(
                         TraktRevokeRequestDto(
                             token = accessToken,
-                            clientId = BuildConfig.TRAKT_CLIENT_ID,
-                            clientSecret = BuildConfig.TRAKT_CLIENT_SECRET
+                            clientId = traktClientId(),
+                            clientSecret = traktClientSecret()
                         )
                     )
                 }
