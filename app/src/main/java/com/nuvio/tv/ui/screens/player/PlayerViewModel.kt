@@ -33,6 +33,7 @@ import com.nuvio.tv.data.local.StreamLinkCacheDataStore
 import com.nuvio.tv.data.local.StreamBadgeSettingsDataStore
 import com.nuvio.tv.data.repository.ParentalGuideRepository
 import com.nuvio.tv.data.repository.MDBListRepository
+import com.nuvio.tv.data.repository.MDBListWatchlistDataSource
 import com.nuvio.tv.data.repository.SkipIntroRepository
 import com.nuvio.tv.data.repository.TraktEpisodeMappingService
 import com.nuvio.tv.domain.repository.AddonRepository
@@ -52,6 +53,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import com.nuvio.tv.data.local.WatchedSeriesStateHolder
 import com.nuvio.tv.data.repository.TraktRelatedService
+import com.nuvio.tv.data.simkl.SimklSyncRepository
 import com.nuvio.tv.data.trailer.TrailerService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -93,6 +95,8 @@ class PlayerViewModel @Inject constructor(
     private val tmdbSettingsDataStore: TmdbSettingsDataStore,
     private val mdbListRepository: MDBListRepository,
     private val mdbListSettingsDataStore: MDBListSettingsDataStore,
+    private val mdbListWatchlistDataSource: MDBListWatchlistDataSource,
+    private val simklSyncRepository: SimklSyncRepository,
     private val trailerPlayerPool: com.nuvio.tv.core.player.TrailerPlayerPool,
     private val trailerService: TrailerService,
     private val trailerSettingsDataStore: TrailerSettingsDataStore,
@@ -173,6 +177,8 @@ class PlayerViewModel @Inject constructor(
         tmdbSettingsDataStore = tmdbSettingsDataStore,
         mdbListRepository = mdbListRepository,
         mdbListSettingsDataStore = mdbListSettingsDataStore,
+        mdbListWatchlistDataSource = mdbListWatchlistDataSource,
+        simklSyncRepository = simklSyncRepository,
         traktRelatedService = traktRelatedService,
         traktAuthDataStore = traktAuthDataStore,
         traktSettingsDataStore = traktSettingsDataStore,

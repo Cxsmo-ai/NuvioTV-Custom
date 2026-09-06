@@ -266,7 +266,9 @@ android {
             isEnable = !buildingAppBundle
             reset()
             include("armeabi-v7a", "arm64-v8a")
-            isUniversalApk = false
+            // Publish one device-agnostic APK alongside the optimized ABI APKs.
+            // The release workflow attaches all of them to the same release.
+            isUniversalApk = true
         }
     }
 

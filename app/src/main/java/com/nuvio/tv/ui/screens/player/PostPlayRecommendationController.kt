@@ -17,7 +17,12 @@ import com.nuvio.tv.data.local.TraktAuthDataStore
 import com.nuvio.tv.data.local.TraktSettingsDataStore
 import com.nuvio.tv.data.local.WatchedSeriesStateHolder
 import com.nuvio.tv.data.repository.MDBListRepository
+import com.nuvio.tv.data.repository.MDBListWatchlistDataSource
 import com.nuvio.tv.data.repository.TraktRelatedService
+import com.nuvio.tv.data.simkl.SimklSyncRepository
+import com.nuvio.tv.data.simkl.canonicalContentId
+import com.nuvio.tv.data.simkl.idValue
+import com.nuvio.tv.data.simkl.resolvedPosterUrl
 import com.nuvio.tv.data.trailer.TrailerService
 import com.nuvio.tv.data.trailer.TrailerPlaybackSource
 import com.nuvio.tv.domain.model.Meta
@@ -60,6 +65,8 @@ internal class PostPlayRecommendationController(
     private val tmdbSettingsDataStore: TmdbSettingsDataStore,
     private val mdbListRepository: MDBListRepository,
     private val mdbListSettingsDataStore: MDBListSettingsDataStore,
+    private val mdbListWatchlistDataSource: MDBListWatchlistDataSource,
+    private val simklSyncRepository: SimklSyncRepository,
     private val traktRelatedService: TraktRelatedService,
     private val traktAuthDataStore: TraktAuthDataStore,
     private val traktSettingsDataStore: TraktSettingsDataStore,
@@ -648,9 +655,17 @@ internal class PostPlayRecommendationController(
         } else {
             null
         }
-        val candidates = kuratoCandidates ?: bingeCatCandidates ?: withTimeoutOrNull(10_000L) {
-            loadLegacyCandidates(meta, tmdbContentType, sourcePreference)
-        }.orEmpty()
+        val candidates = when (sourcePreference) {
+            PostPlayRecommendationSource.SIMKL -> withTimeoutOrNull(2_000L) {
+                loadSimklCandidates(tmdbContentType)
+            }.orEmpty()
+            PostPlayRecommendationSource.MDBLIST -> withTimeoutOrNull(10_000L) {
+                loadMdbListCandidates(tmdbContentType)
+            }.orEmpty()
+            else -> kuratoCandidates ?: bingeCatCandidates ?: withTimeoutOrNull(10_000L) {
+                loadLegacyCandidates(meta, tmdbContentType, sourcePreference)
+            }.orEmpty()
+        }
 
         val hideUnreleased = layoutPreferenceDataStore.hideUnreleasedContent.first()
         val watchedIds = combine(
@@ -679,6 +694,54 @@ internal class PostPlayRecommendationController(
             val remaining = filtered.asSequence().filterNot { it === first }
             remaining.forEach(::add)
         }
+    }
+
+    /**
+     * Simkl does not expose a documented item-to-item recommendation endpoint.
+     * Its already-synchronised, authenticated library is therefore used as a
+     * deterministic post-play candidate source. This keeps the source useful
+     * and offline-friendly without guessing at an undocumented API.
+     */
+    private suspend fun loadSimklCandidates(contentType: ContentType): List<MetaPreview> {
+        simklSyncRepository.ensureLoaded()
+        return simklSyncRepository.state.value.snapshot.entries.mapNotNull { entry ->
+            val media = entry.media ?: return@mapNotNull null
+            val isMovie = entry.isMovieEntry()
+            if ((contentType == ContentType.MOVIE) != isMovie) return@mapNotNull null
+            val id = media.canonicalContentId() ?: return@mapNotNull null
+            MetaPreview(
+                id = id,
+                type = if (isMovie) ContentType.MOVIE else ContentType.SERIES,
+                rawType = if (isMovie) "movie" else "series",
+                name = media.title?.trim().orEmpty().ifBlank { id },
+                poster = entry.resolvedPosterUrl(),
+                posterShape = com.nuvio.tv.domain.model.PosterShape.POSTER,
+                background = null,
+                logo = null,
+                description = null,
+                releaseInfo = media.year?.toString(),
+                imdbRating = null,
+                genres = emptyList(),
+                imdbId = media.ids.idValue("imdb")
+            )
+        }.distinctBy { "${it.apiType}:${it.id}" }
+    }
+
+    /**
+     * MDBList's documented read surface is a user's watchlist, not a related
+     * titles endpoint. Use that watchlist as the explicit MDBList source and
+     * let the normal post-play filtering remove the current/watched items.
+     */
+    private suspend fun loadMdbListCandidates(contentType: ContentType): List<MetaPreview> {
+        val apiKey = mdbListWatchlistDataSource.apiKeyOrNull() ?: return emptyList()
+        return mdbListWatchlistDataSource.fetchAll(apiKey)
+            .asSequence()
+            .filter { entry ->
+                (contentType == ContentType.MOVIE) == entry.type.equals("movie", ignoreCase = true)
+            }
+            .map { entry -> entry.toMetaPreview() }
+            .distinctBy { "${it.apiType}:${it.id}" }
+            .toList()
     }
 
     /**

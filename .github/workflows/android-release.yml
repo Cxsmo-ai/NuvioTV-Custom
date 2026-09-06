@@ -230,12 +230,52 @@ jobs:
             mv -- "${apk}" "${apk_dir}/NuvioTV-Custom-${RELEASE_VERSION}-${abi}.apk"
           done
 
+          for abi in universal arm64-v8a armeabi-v7a; do
+            if [[ ! -f "${apk_dir}/NuvioTV-Custom-${RELEASE_VERSION}-${abi}.apk" ]]; then
+              echo "Expected ${abi} APK was not produced." >&2
+              exit 1
+            fi
+          done
+
+      - name: Generate Downloader install entries
+        if: inputs.mode != 'dry-run'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          apk_dir="app/build/outputs/apk/full/release"
+          base_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
+          : > downloader-install-entries.txt
+          {
+            echo "NuvioTV Custom ${RELEASE_VERSION} — Downloader install entries"
+            echo
+            echo "Paste a URL directly into Downloader by AFTVnews. These URLs are release-stable and work without a short-code service."
+            echo
+          } > downloader-install-entries.md
+          for apk in "${apk_dir}"/NuvioTV-Custom-*.apk; do
+            name="$(basename "${apk}")"
+            url="${base_url}/${name}"
+            printf '%s | %s\n' "${name}" "${url}" >> downloader-install-entries.txt
+            printf -- '- **%s** — `%s`\n' "${name}" "${url}" >> downloader-install-entries.md
+          done
+
       - name: Upload build artifacts
         if: inputs.mode != 'dry-run'
         uses: actions/upload-artifact@v6
         with:
           name: nuviotv-${{ steps.release.outputs.version }}-full-release
           path: app/build/outputs/apk/full/release/NuvioTV-Custom-*.apk
+          if-no-files-found: error
+
+      - name: Upload Downloader install entries
+        if: inputs.mode != 'dry-run'
+        uses: actions/upload-artifact@v6
+        with:
+          name: nuviotv-${{ steps.release.outputs.version }}-downloader-entries
+          path: |
+            downloader-install-entries.txt
+            downloader-install-entries.md
           if-no-files-found: error
 
       - name: Create GitHub release
@@ -261,4 +301,7 @@ jobs:
           if [[ "${RELEASE_MODE}" == "draft" ]]; then
             release_args+=(--draft)
           fi
-          gh release create "${release_args[@]}" "${release_apks[@]}"
+          gh release create "${release_args[@]}" \
+            "${release_apks[@]}" \
+            downloader-install-entries.txt \
+            downloader-install-entries.md

@@ -931,6 +931,10 @@
     <string name="autoplay_post_play_recommendation_source_tmdb">TMDB similar titles</string>
     <string name="autoplay_post_play_recommendation_source_kurato">Kurato AI Discover (AIOStreams)</string>
     <string name="autoplay_post_play_recommendation_source_bingecat">BingeCat AI Search</string>
+    <string name="autoplay_post_play_recommendation_source_simkl">Simkl tracked titles</string>
+    <string name="autoplay_post_play_recommendation_source_simkl_sub">Use titles from your synced Simkl library.</string>
+    <string name="autoplay_post_play_recommendation_source_mdblist">MDBList watchlist titles</string>
+    <string name="autoplay_post_play_recommendation_source_mdblist_sub">Use titles from your MDBList watchlist.</string>
     <string name="autoplay_next_episode">Auto-play Next Episode</string>
     <string name="autoplay_next_episode_sub">Start next episode automatically when prompt appears.</string>
     <string name="autoplay_next_episode_fallback">Fallback when binge group fails</string>
