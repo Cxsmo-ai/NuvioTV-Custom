@@ -19,6 +19,7 @@ jobs:
     name: Test and compile NuvioTV Custom
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -44,3 +45,12 @@ jobs:
 
       - name: Compile benchmark APK
         run: ./gradlew :app:assembleFullBenchmark --no-daemon
+
+      - name: Upload benchmark APKs
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v6
+        with:
+          name: nuviotv-main-${{ github.sha }}-benchmark
+          path: app/build/outputs/apk/full/benchmark/*.apk
+          if-no-files-found: error
+          retention-days: 14
