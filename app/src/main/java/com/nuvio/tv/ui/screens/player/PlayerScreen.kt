@@ -84,6 +84,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -200,6 +201,9 @@ fun PlayerScreen(
     var externalHandoffInProgress by remember { mutableStateOf(false) }
     val appDimPercent by viewModel.appDimPercent.collectAsState()
     var showDimmerDialog by remember { mutableStateOf(false) }
+    // One press/release owner shared by the player root and the scrubber. This
+    // prevents a focus change during a held key from losing the release event.
+    val remoteInputRouter = remember { PlayerRemoteInputRouter() }
 
     val exitPlayer: () -> Unit = exitPlayer@{
         if (exitDispatched) return@exitPlayer
@@ -496,11 +500,14 @@ fun PlayerScreen(
             !uiState.showSpeedDialog
         ) {
             // Wait for AnimatedVisibility animation to complete before focusing play/pause button
-            kotlinx.coroutines.delay(250)
-            try {
-                playPauseFocusRequester.requestFocus()
-            } catch (e: Exception) {
-                // Focus requester may not be ready yet
+            // was a large input dead-zone: a remote press during those 250 ms
+            // had no focused control and was silently dropped. Retry across
+            // composition frames instead, stopping as soon as focus is owned.
+            repeat(16) {
+                withFrameNanos { }
+                val focused = runCatching { playPauseFocusRequester.requestFocus() }
+                    .getOrDefault(false)
+                if (focused) return@LaunchedEffect
             }
         } else if (!uiState.showControls) {
             // When controls are hidden, let skip intro button take focus if visible
@@ -527,6 +534,41 @@ fun PlayerScreen(
     LaunchedEffect(uiState.showSubtitleTimingDialog) {
         if (!uiState.showSubtitleTimingDialog) {
             subtitleTimingConsumeNextConfirmKeyUp = false
+        }
+    }
+
+    val playerPanelOrDialogOpen = uiState.showEpisodesPanel || uiState.showSourcesPanel ||
+        uiState.showAudioOverlay || uiState.showSubtitleOverlay ||
+        uiState.showSubtitleStylePanel || uiState.showSpeedDialog ||
+        uiState.showSubtitleDelayOverlay || uiState.showSubtitleTimingDialog ||
+        uiState.showMoreDialog || shouldConfirmNextEpisodeOnEnd ||
+        uiState.postPlayMode is PostPlayMode.StillWatching ||
+        postPlayRecommendationState.isVisible
+
+    // If a panel takes focus while a remote key is held, abandon the gesture;
+    // the panel owns the remaining events and no stale seek may be committed.
+    LaunchedEffect(playerPanelOrDialogOpen) {
+        if (playerPanelOrDialogOpen) remoteInputRouter.reset()
+    }
+
+    val dispatchRemoteActions: (List<PlayerRemoteAction>) -> Unit = { actions ->
+        actions.forEach { action ->
+            when (action) {
+                PlayerRemoteAction.TogglePlayback -> viewModel.onEvent(PlayerEvent.OnPlayPause)
+                PlayerRemoteAction.PlayIfPaused -> if (!uiState.isPlaying) {
+                    viewModel.onEvent(PlayerEvent.OnPlayPause)
+                }
+                PlayerRemoteAction.PauseIfPlaying -> if (uiState.isPlaying) {
+                    viewModel.onEvent(PlayerEvent.OnPlayPause)
+                }
+                PlayerRemoteAction.ToggleControls -> viewModel.onEvent(PlayerEvent.OnToggleControls)
+                PlayerRemoteAction.DismissPauseOverlay -> viewModel.onEvent(PlayerEvent.OnDismissPauseOverlay)
+                is PlayerRemoteAction.PreviewSeek -> viewModel.onEvent(
+                    PlayerEvent.OnPreviewSeekBy(action.deltaMs)
+                )
+                PlayerRemoteAction.CommitPreviewSeek -> viewModel.onEvent(PlayerEvent.OnCommitPreviewSeek)
+                PlayerRemoteAction.CancelPreviewSeek -> viewModel.onEvent(PlayerEvent.OnCancelPreviewSeek)
+            }
         }
     }
     LaunchedEffect(uiState.showStreamInfoOverlay, uiState.showControls, uiState.showMoreDialog) {
@@ -703,161 +745,25 @@ fun PlayerScreen(
                     }
                 }
 
-                // When a side panel or dialog is open, let it handle all keys
-                val panelOrDialogOpen = uiState.showEpisodesPanel || uiState.showSourcesPanel ||
-                        uiState.showAudioOverlay || uiState.showSubtitleOverlay ||
-                        uiState.showSubtitleStylePanel || uiState.showSpeedDialog ||
-                        uiState.showSubtitleDelayOverlay || uiState.showSubtitleTimingDialog ||
-                        uiState.showMoreDialog ||
-                        shouldConfirmNextEpisodeOnEnd ||
-                        uiState.postPlayMode is PostPlayMode.StillWatching ||
-                        postPlayRecommendationState.isVisible
-                if (panelOrDialogOpen) return@onKeyEvent false
-
-                if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP) {
-                    when (keyEvent.nativeKeyEvent.keyCode) {
-                        KeyEvent.KEYCODE_DPAD_LEFT,
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            if (!uiState.showControls) {
-                                viewModel.onEvent(PlayerEvent.OnCommitPreviewSeek)
-                                return@onKeyEvent true
-                            }
-                        }
-                        // Seek review F2: media FF/RW commit on release, matching
-                        // the DPAD preview/commit model.
-                        KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-                        KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                            viewModel.onEvent(PlayerEvent.OnCommitPreviewSeek)
-                            return@onKeyEvent true
-                        }
-                    }
-                    return@onKeyEvent false
+                // The root handles only screen-level keys. Focused controls and
+                // the scrubber use the same router instance, so every ACTION_UP
+                // is consumed only when its ACTION_DOWN was claimed here.
+                if (playerPanelOrDialogOpen) return@onKeyEvent false
+                val mode = when {
+                    uiState.showPauseOverlay -> PlayerRemoteInputMode.PAUSE_OVERLAY
+                    uiState.showControls -> PlayerRemoteInputMode.CONTROLS_VISIBLE
+                    else -> PlayerRemoteInputMode.CONTROLS_HIDDEN
                 }
-
-                if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
-                    if (uiState.showPauseOverlay) {
-                        when (keyEvent.nativeKeyEvent.keyCode) {
-                            KeyEvent.KEYCODE_DPAD_CENTER,
-                            KeyEvent.KEYCODE_ENTER,
-                            KeyEvent.KEYCODE_NUMPAD_ENTER,
-                            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-                            KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                                // Resume directly from pause overlay in one click.
-                                viewModel.onEvent(PlayerEvent.OnPlayPause)
-                            }
-                            KeyEvent.KEYCODE_MEDIA_PAUSE,
-                            KeyEvent.KEYCODE_MEDIA_STOP -> {
-                            }
-                            else -> {
-                                viewModel.onEvent(PlayerEvent.OnDismissPauseOverlay)
-                            }
-                        }
-                        return@onKeyEvent true
-                    }
-                    when (keyEvent.nativeKeyEvent.keyCode) {
-                        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                            if (!uiState.showControls) {
-                                viewModel.onEvent(PlayerEvent.OnPlayPause)
-                                true
-                            } else {
-                                // Let the focused button handle it
-                                false
-                            }
-                        }
-                        KeyEvent.KEYCODE_DPAD_LEFT,
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            val overlayButtonsCoexist = skipButtonActuallyVisible &&
-                                uiState.postPlayMode is PostPlayMode.AutoPlay
-                            if (!uiState.showControls && !overlayButtonsCoexist) {
-                                val isLeft =
-                                    keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_LEFT
-                                val deltaMs = PlayerScrubRates.deltaMsForHold(
-                                    holdDurationMs = keyEvent.nativeKeyEvent.eventTime - keyEvent.nativeKeyEvent.downTime,
-                                    forward = !isLeft
-                                )
-                                viewModel.onEvent(PlayerEvent.OnPreviewSeekBy(deltaMs))
-                                true
-                            } else {
-                                // Let focus system handle navigation when controls are visible
-                                // or both skip and next-episode buttons are on screen
-                                false
-                            }
-                        }
-                        KeyEvent.KEYCODE_DPAD_UP -> {
-                                if (!uiState.showControls) {
-                                    viewModel.onEvent(PlayerEvent.OnToggleControls)
-                                } else {
-                                    try {
-                                        progressBarFocusRequester.requestFocus()
-                                    } catch (_: Exception) {
-                                        val skipVisible = skipButtonActuallyVisible
-                                        if (skipVisible) {
-                                            try {
-                                                skipIntroFocusRequester.requestFocus()
-                                            } catch (_: Exception) {
-                                            }
-                                        } else if (uiState.postPlayMode is PostPlayMode.AutoPlay) {
-                                            try {
-                                                nextEpisodeFocusRequester.requestFocus()
-                                            } catch (_: Exception) {
-                                            }
-                                        } else {
-                                            viewModel.hideControls()
-                                        }
-                                    }
-                                }
-                                true
-                            }
-                        KeyEvent.KEYCODE_DPAD_DOWN -> {
-                            if (!uiState.showControls) {
-                                viewModel.onEvent(PlayerEvent.OnToggleControls)
-                                true
-                            } else {
-                                // Let focus system handle navigation when controls are visible
-                                false
-                            }
-                        }
-                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                            viewModel.onEvent(PlayerEvent.OnPlayPause)
-                            true
-                        }
-                        KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                            if (!uiState.isPlaying) {
-                                viewModel.onEvent(PlayerEvent.OnPlayPause)
-                            }
-                            true
-                        }
-                        KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                            if (uiState.isPlaying) {
-                                viewModel.onEvent(PlayerEvent.OnPlayPause)
-                            }
-                            true
-                        }
-                        KeyEvent.KEYCODE_MEDIA_STOP -> {
-                            viewModel.onEvent(PlayerEvent.OnPlayPause)
-                            true
-                        }
-                        // Seek review F2: these previously fired a *real* seek on
-                        // every ACTION_DOWN including auto-repeats - holding FF was
-                        // 10-20 discrete seeks in a couple of seconds, each
-                        // reopening the datasource chain (a 429 generator against
-                        // per-IP CDN limiters with parallel connections on). Route
-                        // through the existing preview/commit machinery instead:
-                        // accumulate on repeat, one network seek on key release.
-                        KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-                        KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                            val isRewind =
-                                keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_MEDIA_REWIND
-                            val deltaMs = PlayerScrubRates.deltaMsForHold(
-                                holdDurationMs = keyEvent.nativeKeyEvent.eventTime - keyEvent.nativeKeyEvent.downTime,
-                                forward = !isRewind
-                            )
-                            viewModel.onEvent(PlayerEvent.OnPreviewSeekBy(deltaMs))
-                            true
-                        }
-                        else -> false
-                    }
-                } else false
+                val result = remoteInputRouter.handle(
+                    keyCode = keyEvent.nativeKeyEvent.keyCode,
+                    action = keyEvent.nativeKeyEvent.action,
+                    holdDurationMs = keyEvent.nativeKeyEvent.eventTime - keyEvent.nativeKeyEvent.downTime,
+                    mode = mode,
+                    canceled = keyEvent.nativeKeyEvent.isCanceled,
+                    allowDpadSeek = false
+                )
+                dispatchRemoteActions(result.actions)
+                result.consumed
             }
     ) {
         // Video Player
@@ -1339,6 +1245,7 @@ fun PlayerScreen(
                 playPauseFocusRequester = playPauseFocusRequester,
                 progressBarFocusRequester = progressBarFocusRequester,
                 streamInfoFocusRequester = streamInfoFocusRequester,
+                remoteInputRouter = remoteInputRouter,
                 reportCodeVisible = reportCodeVisible,
                 progressBarUpFocusRequester = when {
                     skipButtonActuallyVisible -> skipIntroFocusRequester
@@ -2056,6 +1963,7 @@ private fun PlayerControlsOverlay(
     playPauseFocusRequester: FocusRequester,
     progressBarFocusRequester: FocusRequester,
     streamInfoFocusRequester: FocusRequester,
+    remoteInputRouter: PlayerRemoteInputRouter,
     progressBarUpFocusRequester: FocusRequester? = null,
     onSkipAnchorChanged: (Dp) -> Unit = {},
     onPlayPause: () -> Unit,
@@ -2399,6 +2307,7 @@ private fun PlayerControlsOverlay(
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 PlayerControlsProgressBarHost(
                     viewModel = viewModel,
+                    remoteInputRouter = remoteInputRouter,
                     focusRequester = progressBarFocusRequester,
                     upFocusRequester = progressBarUpFocusRequester ?: streamInfoFocusRequester,
                     downFocusRequester = playPauseFocusRequester,
@@ -2484,6 +2393,7 @@ private fun PlayerControlsOverlay(
 @Composable
 private fun PlayerControlsProgressBarHost(
     viewModel: PlayerViewModel,
+    remoteInputRouter: PlayerRemoteInputRouter,
     focusRequester: FocusRequester,
     upFocusRequester: FocusRequester? = null,
     downFocusRequester: FocusRequester? = null,
@@ -2501,6 +2411,10 @@ private fun PlayerControlsProgressBarHost(
         onSeekCommit = {
             viewModel.onEvent(PlayerEvent.OnCommitPreviewSeek)
         },
+        onSeekCancel = {
+            viewModel.onEvent(PlayerEvent.OnCancelPreviewSeek)
+        },
+        remoteInputRouter = remoteInputRouter,
         focusRequester = focusRequester,
         upFocusRequester = upFocusRequester,
         downFocusRequester = downFocusRequester,
@@ -2716,6 +2630,8 @@ private fun ProgressBar(
     duration: Long,
     onSeekPreview: (Long) -> Unit,
     onSeekCommit: () -> Unit,
+    onSeekCancel: () -> Unit = {},
+    remoteInputRouter: PlayerRemoteInputRouter? = null,
     focusRequester: FocusRequester? = null,
     upFocusRequester: FocusRequester? = null,
     downFocusRequester: FocusRequester? = null,
@@ -2768,18 +2684,29 @@ private fun ProgressBar(
             }
             .focusable()
             .onPreviewKeyEvent { keyEvent ->
-                if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP) {
-                    when (keyEvent.nativeKeyEvent.keyCode) {
-                        KeyEvent.KEYCODE_DPAD_LEFT,
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            onSeekCommit()
-                            return@onPreviewKeyEvent true
+                val keyCode = keyEvent.nativeKeyEvent.keyCode
+                if (remoteInputRouter != null &&
+                    (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)
+                ) {
+                    val result = remoteInputRouter.handle(
+                        keyCode = keyCode,
+                        action = keyEvent.nativeKeyEvent.action,
+                        holdDurationMs = keyEvent.nativeKeyEvent.eventTime - keyEvent.nativeKeyEvent.downTime,
+                        mode = PlayerRemoteInputMode.CONTROLS_VISIBLE,
+                        canceled = keyEvent.nativeKeyEvent.isCanceled,
+                        allowDpadSeek = true
+                    )
+                    result.actions.forEach { action ->
+                        when (action) {
+                            is PlayerRemoteAction.PreviewSeek -> onSeekPreview(action.deltaMs)
+                            PlayerRemoteAction.CommitPreviewSeek -> onSeekCommit()
+                            PlayerRemoteAction.CancelPreviewSeek -> onSeekCancel()
+                            else -> Unit
                         }
                     }
-                    return@onPreviewKeyEvent false
+                    return@onPreviewKeyEvent result.consumed
                 }
 
-                // testing additional key handling for DPAD_LEFT and DPAD_RIGHT to allow seek in focus (check)
                 if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         KeyEvent.KEYCODE_DPAD_DOWN -> {
@@ -2806,26 +2733,6 @@ private fun ProgressBar(
                             } else {
                                 false
                             }
-                        }
-                        // Seek F5a: previously flat +/-10 s while the hidden-controls
-                        // DPAD path accelerated - now both use the shared ramp.
-                        KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            onSeekPreview(
-                                PlayerScrubRates.deltaMsForHold(
-                                    holdDurationMs = keyEvent.nativeKeyEvent.eventTime - keyEvent.nativeKeyEvent.downTime,
-                                    forward = false
-                                )
-                            )
-                            true
-                        }
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            onSeekPreview(
-                                PlayerScrubRates.deltaMsForHold(
-                                    holdDurationMs = keyEvent.nativeKeyEvent.eventTime - keyEvent.nativeKeyEvent.downTime,
-                                    forward = true
-                                )
-                            )
-                            true
                         }
                         else -> false
                     }

@@ -1501,6 +1501,13 @@ fun PlayerRuntimeController.onEvent(event: PlayerEvent) {
                 }
             }
         }
+        PlayerEvent.OnCancelPreviewSeek -> {
+            if (_playbackTimeline.value.isLive) return
+            pendingPreviewSeekExpiryJob?.cancel()
+            pendingPreviewSeekPosition = null
+            _uiState.update { it.copy(pendingPreviewSeekPosition = null, previewThumbPositionMs = null) }
+            currentPlaybackPositionMs()?.let { updatePlaybackTimeline(currentPosition = it) }
+        }
         is PlayerEvent.OnSeekTo -> {
             if (_playbackTimeline.value.isLive) return
             pendingPreviewSeekPosition = null
