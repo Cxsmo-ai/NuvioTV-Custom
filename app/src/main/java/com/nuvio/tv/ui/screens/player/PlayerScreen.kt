@@ -14,6 +14,7 @@ import com.nuvio.tv.ui.components.LocalAppDimPercent
 import com.nuvio.tv.ui.screens.settings.SliderSettingsItem
 
 import android.util.Log
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -760,6 +761,7 @@ fun PlayerScreen(
                     holdDurationMs = keyEvent.nativeKeyEvent.eventTime - keyEvent.nativeKeyEvent.downTime,
                     mode = mode,
                     canceled = keyEvent.nativeKeyEvent.isCanceled,
+                    eventTimeMs = keyEvent.nativeKeyEvent.eventTime,
                     allowDpadSeek = false
                 )
                 dispatchRemoteActions(result.actions)
@@ -2499,8 +2501,9 @@ private fun PillControlButton(
     onDownKey: (() -> Unit)? = null,
     onFocused: (() -> Unit)? = null
 ) {
+    val clickGate = remember { PlayerClickGate() }
     Button(
-        onClick = onClick,
+        onClick = { if (clickGate.accept()) onClick() },
         modifier = Modifier
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .then(
@@ -2557,9 +2560,10 @@ private fun ControlButton(
     onFocused: (() -> Unit)? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val clickGate = remember { PlayerClickGate() }
 
     IconButton(
-        onClick = onClick,
+        onClick = { if (clickGate.accept()) onClick() },
         enabled = enabled,
         modifier = Modifier
             .size(NuvioTheme.spacing.xxxl)
@@ -2621,6 +2625,22 @@ private fun ControlButton(
                 modifier = Modifier.size(28.dp)
             )
         }
+    }
+}
+
+/** Filters duplicate click callbacks from a noisy/long-running TV remote. */
+private class PlayerClickGate {
+    private var lastAcceptedAtMs = Long.MIN_VALUE
+
+    fun accept(): Boolean {
+        val now = SystemClock.uptimeMillis()
+        if (lastAcceptedAtMs != Long.MIN_VALUE &&
+            now - lastAcceptedAtMs < PlayerRemoteInputRouter.ONE_SHOT_DEBOUNCE_MS
+        ) {
+            return false
+        }
+        lastAcceptedAtMs = now
+        return true
     }
 }
 
@@ -2694,6 +2714,7 @@ private fun ProgressBar(
                         holdDurationMs = keyEvent.nativeKeyEvent.eventTime - keyEvent.nativeKeyEvent.downTime,
                         mode = PlayerRemoteInputMode.CONTROLS_VISIBLE,
                         canceled = keyEvent.nativeKeyEvent.isCanceled,
+                        eventTimeMs = keyEvent.nativeKeyEvent.eventTime,
                         allowDpadSeek = true
                     )
                     result.actions.forEach { action ->

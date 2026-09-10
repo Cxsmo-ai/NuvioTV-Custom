@@ -12,11 +12,20 @@ import android.view.KeyEvent
  * real seek on [PlayerRemoteAction.CommitPreviewSeek].
  */
 internal class PlayerRemoteInputRouter {
+    companion object {
+        // Shield remotes occasionally emit a second complete press after a
+        // long-running playback session. This is intentionally limited to
+        // one-shot actions; seek repeats are never filtered by this window.
+        const val ONE_SHOT_DEBOUNCE_MS = 180L
+    }
+
     private val consumedDownKeys = mutableSetOf<Int>()
+    private val lastReleaseTimeMs = mutableMapOf<Int, Long>()
     private var activeSeekKey: Int? = null
 
     fun reset() {
         consumedDownKeys.clear()
+        lastReleaseTimeMs.clear()
         activeSeekKey = null
     }
 
@@ -26,10 +35,11 @@ internal class PlayerRemoteInputRouter {
         holdDurationMs: Long,
         mode: PlayerRemoteInputMode,
         canceled: Boolean = false,
+        eventTimeMs: Long = -1L,
         allowDpadSeek: Boolean = false
     ): PlayerRemoteInputResult {
         if (action == KeyEvent.ACTION_UP) {
-            return release(keyCode, canceled)
+            return release(keyCode, canceled, eventTimeMs)
         }
         if (action != KeyEvent.ACTION_DOWN && action != KeyEvent.ACTION_MULTIPLE) {
             return PlayerRemoteInputResult.NotConsumed
@@ -68,6 +78,16 @@ internal class PlayerRemoteInputRouter {
             } else {
                 PlayerRemoteInputResult.NotConsumed
             }
+        }
+
+        // Keep the down/up pair consumed so the duplicate cannot leak to a
+        // focused Compose button, but do not dispatch the action a second time.
+        val lastRelease = lastReleaseTimeMs[keyCode]
+        if (isOneShotKey(keyCode) && eventTimeMs >= 0L && lastRelease != null &&
+            eventTimeMs >= lastRelease && eventTimeMs - lastRelease < ONE_SHOT_DEBOUNCE_MS
+        ) {
+            consumedDownKeys += keyCode
+            return PlayerRemoteInputResult(consumed = true)
         }
 
         when (mode) {
@@ -130,9 +150,12 @@ internal class PlayerRemoteInputRouter {
         }
     }
 
-    private fun release(keyCode: Int, canceled: Boolean): PlayerRemoteInputResult {
+    private fun release(keyCode: Int, canceled: Boolean, eventTimeMs: Long = -1L): PlayerRemoteInputResult {
         val wasConsumed = consumedDownKeys.remove(keyCode)
         if (!wasConsumed) return PlayerRemoteInputResult.NotConsumed
+        if (isOneShotKey(keyCode) && eventTimeMs >= 0L) {
+            lastReleaseTimeMs[keyCode] = eventTimeMs
+        }
 
         return if (activeSeekKey == keyCode) {
             activeSeekKey = null
@@ -163,6 +186,14 @@ internal class PlayerRemoteInputRouter {
         ) true else null
         else -> null
     }
+
+    private fun isOneShotKey(keyCode: Int): Boolean = keyCode.isConfirmKey() ||
+        keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
+        keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
+        keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE ||
+        keyCode == KeyEvent.KEYCODE_MEDIA_STOP ||
+        keyCode == KeyEvent.KEYCODE_DPAD_UP ||
+        keyCode == KeyEvent.KEYCODE_DPAD_DOWN
 }
 
 internal enum class PlayerRemoteInputMode {

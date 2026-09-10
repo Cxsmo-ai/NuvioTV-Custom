@@ -198,4 +198,34 @@ class PlayerRemoteInputRouterTest {
         assertEquals(listOf(PlayerRemoteAction.CancelPreviewSeek), release.actions)
         assertTrue(release.consumed)
     }
+
+    @Test
+    fun duplicateOneShotPressWithinDebounceWindowIsConsumedWithoutAction() {
+        val router = PlayerRemoteInputRouter()
+        val firstDown = router.handle(
+            keyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+            action = KeyEvent.ACTION_DOWN,
+            holdDurationMs = 0L,
+            eventTimeMs = 1_000L,
+            mode = PlayerRemoteInputMode.CONTROLS_HIDDEN
+        )
+        router.handle(
+            keyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+            action = KeyEvent.ACTION_UP,
+            holdDurationMs = 20L,
+            eventTimeMs = 1_020L,
+            mode = PlayerRemoteInputMode.CONTROLS_HIDDEN
+        )
+        val duplicateDown = router.handle(
+            keyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+            action = KeyEvent.ACTION_DOWN,
+            holdDurationMs = 0L,
+            eventTimeMs = 1_100L,
+            mode = PlayerRemoteInputMode.CONTROLS_HIDDEN
+        )
+
+        assertEquals(listOf(PlayerRemoteAction.TogglePlayback), firstDown.actions)
+        assertTrue(duplicateDown.consumed)
+        assertTrue(duplicateDown.actions.isEmpty())
+    }
 }
