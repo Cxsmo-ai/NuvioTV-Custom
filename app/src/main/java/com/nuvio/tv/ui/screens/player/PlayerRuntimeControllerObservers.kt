@@ -651,18 +651,37 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
     if (!skipIntroEnabled) return
     if (id.isNullOrBlank()) return
 
-    // Prefer videoId over contentId — videoId carries the season/episode-specific ID
-    val effectiveId = currentVideoId?.takeIf { it.isNotBlank() } ?: id
-
-    val imdbId = effectiveId.split(":").firstOrNull()?.takeIf { it.startsWith("tt") } ?: return
     val isSeries = contentType?.lowercase() in setOf("series", "tv", "show")
     if (isSeries && (season == null || episode == null)) return
 
-    val key = "$imdbId:${season ?: 0}:${episode ?: 0}:$skipSettingsFingerprint"
-    if (skipIntroFetchedKey == key) return
-    skipIntroFetchedKey = key
-
     scope.launch {
+        // Skip providers all use the title's IMDb ID. Nuvio commonly carries a
+        // TMDB ID in contentId/videoId, so resolve that ID before giving up.
+        // The resolver is cached and bounded; it can never hold up playback.
+        val candidates = listOfNotNull(
+            currentVideoId?.takeIf { it.isNotBlank() },
+            id.takeIf { it.isNotBlank() }
+        )
+        val imdbId = candidates.asSequence()
+            .mapNotNull(::extractImdbId)
+            .firstOrNull()
+            ?: withTimeoutOrNull(4_000L) {
+                var resolved: String? = null
+                for (tmdbId in candidates.mapNotNull(::extractTmdbId).distinct()) {
+                    resolved = tmdbService.tmdbToImdb(tmdbId, contentType ?: "movie")
+                    if (!resolved.isNullOrBlank()) break
+                }
+                resolved
+            }
+        if (imdbId.isNullOrBlank()) {
+            Log.d(PlayerRuntimeController.TAG, "Skip lookup skipped: no IMDb/TMDB ID for $candidates")
+            return@launch
+        }
+
+        val key = "$imdbId:${season ?: 0}:${episode ?: 0}:$skipSettingsFingerprint"
+        if (skipIntroFetchedKey == key) return@launch
+        skipIntroFetchedKey = key
+
         val fetchT0 = android.os.SystemClock.elapsedRealtime()
         skipIntervals = withTimeoutOrNull(8_000L) {
             skipIntroRepository.getSkipIntervals(
@@ -697,6 +716,19 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
         )
     }
 }
+
+private fun extractImdbId(value: String): String? =
+    value.substringBefore(':').substringBefore('/').trim()
+        .takeIf { it.matches(Regex("tt\\d+")) }
+
+private fun extractTmdbId(value: String): Int? =
+    value.removePrefix("tmdb:")
+        .removePrefix("movie:")
+        .removePrefix("series:")
+        .substringBefore(':')
+        .substringBefore('/')
+        .trim()
+        .toIntOrNull()
 
 private fun com.nuvio.tv.data.local.PlayerSettings.skipSettingsFingerprint(): String =
     "${skipSourcePolicy.name}:${skipEnabledSources.map { it.storedValue }.sorted().joinToString(",")}:" +
