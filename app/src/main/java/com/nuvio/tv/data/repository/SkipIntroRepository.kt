@@ -4,10 +4,9 @@ import android.util.Log
 import com.nuvio.tv.BuildConfig
 import com.nuvio.tv.data.local.AutoSkipSegmentType
 import com.nuvio.tv.data.local.PlayerSettingsDataStore
+import com.nuvio.tv.data.local.SkipProviderCredentialsStore
 import com.nuvio.tv.data.local.SkipSource
 import com.nuvio.tv.data.local.SkipSourcePolicy
-import com.nuvio.tv.data.remote.api.IntroDbApi
-import com.nuvio.tv.data.remote.api.IntroDbSegment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -43,12 +42,14 @@ private data class CachedSkipIntervals(val storedAtMs: Long, val intervals: List
  */
 @Singleton
 class SkipIntroRepository @Inject constructor(
-    private val introDbApi: IntroDbApi,
     private val playerSettingsDataStore: PlayerSettingsDataStore,
+    private val credentialsStore: SkipProviderCredentialsStore,
     private val httpClient: OkHttpClient
 ) {
     private val cache = ConcurrentHashMap<String, CachedSkipIntervals>()
-    private val introDbConfigured = BuildConfig.INTRODB_API_URL.isNotEmpty()
+    // The official public endpoint is the safe default; a build-time URL can
+    // still override it for mirrors or development environments.
+    private val introDbConfigured = true
 
     suspend fun getSkipIntervals(
         imdbId: String?,
@@ -60,6 +61,7 @@ class SkipIntroRepository @Inject constructor(
     ): List<SkipInterval> {
         val normalizedId = imdbId?.trim()?.takeIf { it.matches(Regex("tt\\d+")) } ?: return emptyList()
         val settings = playerSettingsDataStore.playerSettings.first()
+        val credentials = credentialsStore.credentials.first()
         if (!settings.skipIntroEnabled) return emptyList()
 
         val sources = selectedSources(settings.skipSourcePolicy, settings.skipEnabledSources)
@@ -67,7 +69,10 @@ class SkipIntroRepository @Inject constructor(
         val categoryKey = settings.skipEnabledSegmentTypes.map { it.storedValue }.sorted().joinToString(",")
         val key = listOf(
             normalizedId, season, episode, mediaType.orEmpty(),
-            settings.skipSourcePolicy.name, sources.joinToString { it.storedValue }, categoryKey
+            settings.skipSourcePolicy.name, sources.joinToString { it.storedValue }, categoryKey,
+            credentials.publicMetaDbApiKey.isNotBlank(),
+            credentials.introDbAppApiKey.isNotBlank(),
+            credentials.theIntroDbApiKey.isNotBlank()
         ).joinToString(":")
         val now = System.currentTimeMillis()
         cache[key]?.takeIf { now - it.storedAtMs < CACHE_TTL_MS }?.let { return it.intervals }
@@ -81,8 +86,14 @@ class SkipIntroRepository @Inject constructor(
                         runCatching {
                             when (source) {
                                 SkipSource.INTRO_DB -> if (isSeries && introDbConfigured) {
-                                    fetchFromIntroDb(normalizedId, season, episode)
+                                    fetchFromIntroDb(normalizedId, season, episode, credentials.introDbAppApiKey)
                                 } else emptyList()
+                                SkipSource.THE_INTRO_DB -> fetchFromTheIntroDb(
+                                    normalizedId, season, episode, isSeries, durationMs, credentials.theIntroDbApiKey
+                                )
+                                SkipSource.PUBLIC_META_DB -> fetchFromPublicMetaDb(
+                                    normalizedId, season, episode, isSeries, credentials.publicMetaDbApiKey
+                                )
                                 SkipSource.MOVIE_HAVEN_DB -> if (!isSeries) {
                                     fetchFromMovieHavenDb(normalizedId)
                                 } else emptyList()
@@ -115,34 +126,84 @@ class SkipIntroRepository @Inject constructor(
         val forced = when (policy) {
             SkipSourcePolicy.AUTO -> null
             SkipSourcePolicy.INTRO_DB_ONLY -> SkipSource.INTRO_DB
+            SkipSourcePolicy.THE_INTRO_DB_ONLY -> SkipSource.THE_INTRO_DB
+            SkipSourcePolicy.PUBLIC_META_DB_ONLY -> SkipSource.PUBLIC_META_DB
             SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY -> SkipSource.MOVIE_HAVEN_DB
             SkipSourcePolicy.VIDEO_SKIP_ONLY -> SkipSource.VIDEO_SKIP
         }
         return if (forced != null) listOf(forced) else listOf(
-            SkipSource.INTRO_DB, SkipSource.MOVIE_HAVEN_DB, SkipSource.VIDEO_SKIP
+            SkipSource.INTRO_DB, SkipSource.THE_INTRO_DB, SkipSource.PUBLIC_META_DB,
+            SkipSource.MOVIE_HAVEN_DB, SkipSource.VIDEO_SKIP
         ).filter { it in enabled }
     }
 
-    private suspend fun fetchFromIntroDb(imdbId: String, season: Int, episode: Int): List<SkipInterval> = try {
-        val response = introDbApi.getSegments(imdbId, season, episode)
-        if (!response.isSuccessful) emptyList() else response.body()?.let { data ->
-            listOfNotNull(
-                data.intro.toSkipIntervalOrNull("intro", data.intro?.confidence),
-                data.recap.toSkipIntervalOrNull("recap", data.recap?.confidence),
-                data.outro.toSkipIntervalOrNull("outro", data.outro?.confidence)
-            )
-        }.orEmpty()
-    } catch (_: Exception) {
-        Log.d(TAG, "IntroDB unavailable for $imdbId S${season}E$episode")
-        emptyList()
+    private suspend fun fetchFromIntroDb(
+        imdbId: String,
+        season: Int,
+        episode: Int,
+        apiKey: String
+    ): List<SkipInterval> {
+        val base = BuildConfig.INTRODB_API_URL.trimEnd('/').ifBlank { "https://api.introdb.app" }
+        val headers = buildMap {
+            put("Accept", "application/json")
+            if (apiKey.isNotBlank()) put("X-API-Key", apiKey)
+        }
+        return getText(
+            "$$base/segments?imdb_id=$$imdbId&season=$$season&episode=$$episode",
+            headers = headers
+        )?.let { SkipMetadataParser.parseIntroDb(it, "introdb") }.orEmpty()
     }
 
-    private fun IntroDbSegment?.toSkipIntervalOrNull(type: String, confidence: Double?): SkipInterval? {
-        if (this == null) return null
-        val start = startSec ?: startMs?.let { it / 1000.0 }
-        val end = endSec ?: endMs?.let { it / 1000.0 }
-        if (start == null || end == null || end <= start) return null
-        return SkipInterval(start, end, type, "introdb", confidence = confidence ?: 1.0)
+    private suspend fun fetchFromTheIntroDb(
+        imdbId: String,
+        season: Int,
+        episode: Int,
+        isSeries: Boolean,
+        durationMs: Long?,
+        apiKey: String
+    ): List<SkipInterval> {
+        val query = buildString {
+            append("imdb_id=").append(imdbId)
+            if (isSeries) {
+                append("&season=").append(season)
+                append("&episode=").append(episode)
+            }
+            if (durationMs != null && durationMs > 0) append("&duration_ms=").append(durationMs)
+        }
+        val headers = buildMap {
+            put("Accept", "application/json")
+            put("User-Agent", "NuvioTV/skip-metadata")
+            if (apiKey.isNotBlank()) put("Authorization", "Bearer $$apiKey")
+        }
+        return getText("https://api.theintrodb.org/v3/media?$$query", headers = headers)
+            ?.let { SkipMetadataParser.parseTheIntroDb(it, "theintrodb", durationMs) }
+            .orEmpty()
+    }
+
+    private suspend fun fetchFromPublicMetaDb(
+        imdbId: String,
+        season: Int,
+        episode: Int,
+        isSeries: Boolean,
+        apiKey: String
+    ): List<SkipInterval> {
+        if (apiKey.isBlank()) return emptyList()
+        val headers = mapOf("Accept" to "application/json", "Authorization" to "Bearer $$apiKey")
+        val mediaType = if (isSeries) "tv" else "movie"
+        val mapping = getText(
+            "https://publicmetadb.com/api/external/mappings/lookup?id_type=imdb&id_value=$$imdbId&media_type=$$mediaType",
+            headers = headers
+        )?.let(SkipMetadataParser::parsePublicMetaDbMapping) ?: return emptyList()
+        val url = buildString {
+            append("https://publicmetadb.com/api/external/skips?tmdb_id=$$mapping&media_type=$$mediaType")
+            if (isSeries) {
+                append("&season=").append(season)
+                append("&episode=").append(episode)
+            }
+        }
+        return getText(url, headers = headers)
+            ?.let { SkipMetadataParser.parsePublicMetaDb(it, "publicmetadb") }
+            .orEmpty()
     }
 
     private suspend fun fetchFromMovieHavenDb(imdbId: String): List<SkipInterval> {
@@ -188,11 +249,16 @@ class SkipIntroRepository @Inject constructor(
         }
     }
 
-    private suspend fun getText(url: String, maxBytes: Long = MAX_RESPONSE_BYTES): String? =
+    private suspend fun getText(
+        url: String,
+        maxBytes: Long = MAX_RESPONSE_BYTES,
+        headers: Map<String, String> = emptyMap()
+    ): String? =
         withContext(Dispatchers.IO) {
             val request = Request.Builder()
                 .url(url)
                 .header("Accept", "application/json,text/plain,*/*")
+                .apply { headers.forEach { (name, value) -> header(name, value) } }
                 .build()
             runCatching {
                 httpClient.newCall(request).execute().use { response ->
@@ -225,6 +291,104 @@ class SkipIntroRepository @Inject constructor(
 }
 
 internal object SkipMetadataParser {
+    fun parseIntroDb(raw: String, provider: String): List<SkipInterval> = runCatching {
+        val root = JSONObject(raw)
+        val items = mutableListOf<Pair<String, JSONObject>>()
+        root.optJSONArray("segments")?.let { array ->
+            for (index in 0 until array.length()) {
+                array.optJSONObject(index)?.let { item ->
+                    items += (item.optString("segment_type", item.optString("type", "custom")) to item)
+                }
+            }
+        }
+        listOf("intro", "recap", "outro", "credits").forEach { type ->
+            root.optJSONObject(type)?.let { items += type to it }
+        }
+        items.mapNotNull { (rawType, item) ->
+            val start = timeSeconds(item, "start_ms", "start_sec") ?: return@mapNotNull null
+            val end = timeSeconds(item, "end_ms", "end_sec") ?: return@mapNotNull null
+            if (end <= start) return@mapNotNull null
+            SkipInterval(
+                startTime = start,
+                endTime = end,
+                type = rawType,
+                provider = provider,
+                confidence = item.optDouble("confidence", 1.0).coerceIn(0.0, 1.0)
+            )
+        }
+    }.getOrDefault(emptyList())
+
+    fun parseTheIntroDb(
+        raw: String,
+        provider: String,
+        durationMs: Long?
+    ): List<SkipInterval> = runCatching {
+        val root = JSONObject(raw)
+        listOf("intro", "recap", "credits", "preview").flatMap { rawType ->
+            val items = root.optJSONArray(rawType) ?: return@flatMap emptyList()
+            buildList {
+                for (index in 0 until items.length()) {
+                    val item = items.optJSONObject(index) ?: continue
+                    val start = timeSeconds(item, "start_ms", "start") ?: 0.0
+                    val end = timeSeconds(item, "end_ms", "end")
+                        ?: durationMs?.takeIf { it > 0 }?.div(1000.0)
+                        ?: continue
+                    if (end > start) add(
+                        SkipInterval(start, end, rawType, provider, confidence = 0.86)
+                    )
+                }
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    fun parsePublicMetaDbMapping(raw: String): String? = runCatching {
+        val results = JSONObject(raw).optJSONArray("results") ?: return@runCatching null
+        results.optJSONObject(0)?.optLong("tmdb_id", 0L)?.takeIf { it > 0 }?.toString()
+    }.getOrNull()
+
+    fun parsePublicMetaDb(raw: String, provider: String): List<SkipInterval> = runCatching {
+        val items = JSONObject(raw).optJSONArray("items") ?: JSONArray()
+        buildList {
+            for (index in 0 until items.length()) {
+                val item = items.optJSONObject(index) ?: continue
+                val introStart = item.optLong("intro_start_ms", -1L)
+                val introEnd = item.optLong("intro_end_ms", -1L)
+                if (introStart >= 0 && introEnd > introStart) {
+                    add(SkipInterval(introStart / 1000.0, introEnd / 1000.0, "intro", provider, confidence = 0.82))
+                }
+                val creditsStart = item.optLong("credits_start_ms", -1L)
+                val creditsEnd = item.optLong("credits_end_ms", -1L)
+                if (creditsStart >= 0 && creditsEnd > creditsStart) {
+                    add(SkipInterval(creditsStart / 1000.0, creditsEnd / 1000.0, "credits", provider, confidence = 0.82))
+                }
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    private fun timeSeconds(item: JSONObject, millisKey: String, secondsKey: String): Double? {
+        val millis = item.opt(millisKey)
+        if (millis != null && millis != JSONObject.NULL) {
+            millis.toString().toDoubleOrNull()?.let { return it / 1000.0 }
+        }
+        val seconds = item.opt(secondsKey)
+        if (seconds != null && seconds != JSONObject.NULL) {
+            seconds.toString().toDoubleOrNull()?.let { return it }
+            parseClock(seconds.toString())?.let { return it }
+        }
+        return null
+    }
+
+    private fun parseClock(value: String): Double? {
+        val parts = value.trim().split(":")
+        return runCatching {
+            when (parts.size) {
+                2 -> parts[0].toDouble() * 60 + parts[1].toDouble()
+                3 -> parts[0].toDouble() * 3600 + parts[1].toDouble() * 60 + parts[2].toDouble()
+                else -> null
+            }
+        }.getOrNull()
+    }
+
     fun parseMovieHaven(raw: String): List<SkipInterval> = runCatching {
         val root = JSONObject(raw)
         // MovieHavenDB stores either a direct document or an IMDb-keyed

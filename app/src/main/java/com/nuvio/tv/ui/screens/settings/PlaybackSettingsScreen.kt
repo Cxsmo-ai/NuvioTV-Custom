@@ -121,6 +121,9 @@ fun PlaybackSettingsContent(
     )
     val installedAddonNames by viewModel.installedAddonNames.collectAsStateWithLifecycle(initialValue = emptyList())
     val enabledPluginNames by viewModel.enabledPluginNames.collectAsStateWithLifecycle(initialValue = emptyList())
+    val skipProviderCredentials by viewModel.skipProviderCredentials.collectAsStateWithLifecycle(
+        initialValue = com.nuvio.tv.data.local.SkipProviderCredentials()
+    )
     val coroutineScope = rememberCoroutineScope()
     var memoryUsageTrigger by remember { mutableStateOf(0) }
     var showMemoryUsage by remember { mutableStateOf(false) }
@@ -149,6 +152,7 @@ fun PlaybackSettingsContent(
     var showPlayerPreferenceDialog by remember { mutableStateOf(false) }
     var showInternalPlayerEngineDialog by remember { mutableStateOf(false) }
     var showP2pConsentDialog by remember { mutableStateOf(false) }
+    var showSkipProviderCredentialsDialog by remember { mutableStateOf(false) }
 
     fun dismissAllDialogs() {
         showLanguageDialog = false
@@ -174,6 +178,7 @@ fun PlaybackSettingsContent(
         showPlayerPreferenceDialog = false
         showInternalPlayerEngineDialog = false
         showP2pConsentDialog = false
+        showSkipProviderCredentialsDialog = false
     }
 
     fun openDialog(setter: () -> Unit) {
@@ -287,6 +292,7 @@ fun PlaybackSettingsContent(
                 onSetSkipSourceEnabled = { source, enabled ->
                     coroutineScope.launch { viewModel.setSkipSourceEnabled(source, enabled) }
                 },
+                onShowSkipProviderCredentials = { openDialog { showSkipProviderCredentialsDialog = true } },
                 onSetSkipEnabledSegmentType = { segmentType, enabled ->
                     coroutineScope.launch { viewModel.setSkipEnabledSegmentType(segmentType, enabled) }
                 },
@@ -620,6 +626,16 @@ fun PlaybackSettingsContent(
         onDismissReuseLastLinkCacheDialog = ::dismissAllDialogs,
         onDismissPostPlayRecommendationSourceDialog = ::dismissAllDialogs
     )
+
+    if (showSkipProviderCredentialsDialog) {
+        SkipProviderCredentialsDialog(
+            current = skipProviderCredentials,
+            onSavePublicMetaDb = { value -> coroutineScope.launch { viewModel.setPublicMetaDbApiKey(value) } },
+            onSaveIntroDbApp = { value -> coroutineScope.launch { viewModel.setIntroDbAppApiKey(value) } },
+            onSaveTheIntroDb = { value -> coroutineScope.launch { viewModel.setTheIntroDbApiKey(value) } },
+            onDismiss = ::dismissAllDialogs
+        )
+    }
 
     if (showP2pConsentDialog) {
         P2pConsentDialog(

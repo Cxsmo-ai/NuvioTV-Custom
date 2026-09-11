@@ -43,4 +43,53 @@ class SkipMetadataParserTest {
         assertTrue(SkipMetadataParser.parseVideoSkip("garbage").isEmpty())
         assertEquals(3723.25, SkipMetadataParser.parseTimestamp("1:02:03.25")!!, 0.001)
     }
+
+    @Test
+    fun introDbParserSupportsArrayAndClockTimestamps() {
+        val intervals = SkipMetadataParser.parseIntroDb(
+            """{"segments":[
+                {"segment_type":"intro","start_ms":2000,"end_ms":60000,"confidence":0.9},
+                {"segment_type":"outro","start_sec":"52:00","end_sec":"53:00"}
+            ]}""",
+            "introdb"
+        )
+
+        assertEquals(2, intervals.size)
+        assertEquals(2.0, intervals[0].startTime, 0.001)
+        assertEquals("outro", intervals[1].type)
+        assertEquals(0.9, intervals[0].confidence, 0.001)
+    }
+
+    @Test
+    fun theIntroDbParserUsesAllCategoryArraysAndDurationForOpenEnd() {
+        val intervals = SkipMetadataParser.parseTheIntroDb(
+            """{"intro":[{"start_ms":null,"end_ms":90000}],
+               "credits":[{"start_ms":1800000,"end_ms":null}],
+               "preview":[{"start_ms":1000,"end_ms":3000}]}""",
+            "theintrodb",
+            2_000_000L
+        )
+
+        assertEquals(3, intervals.size)
+        assertEquals(0.0, intervals[0].startTime, 0.001)
+        assertEquals(2000.0, intervals[1].endTime, 0.001)
+        assertEquals("credits", intervals[1].type)
+    }
+
+    @Test
+    fun publicMetaDbParserReadsMappingAndContributedRanges() {
+        assertEquals(
+            "1396",
+            SkipMetadataParser.parsePublicMetaDbMapping(
+                """{"results":[{"tmdb_id":1396,"media_type":"tv"}]}"""
+            )
+        )
+        val intervals = SkipMetadataParser.parsePublicMetaDb(
+            """{"items":[{"id":"a","intro_start_ms":1000,"intro_end_ms":60000,
+                "credits_start_ms":3200000,"credits_end_ms":3300000}]}""",
+            "publicmetadb"
+        )
+        assertEquals(listOf("intro", "credits"), intervals.map { it.type })
+        assertEquals(60.0, intervals[0].endTime, 0.001)
+    }
 }

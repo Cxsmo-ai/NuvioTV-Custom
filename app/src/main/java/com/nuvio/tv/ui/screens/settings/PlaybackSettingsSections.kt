@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -164,6 +165,7 @@ internal fun PlaybackSettingsSections(
     onSetSkipIntroEnabled: (Boolean) -> Unit,
     onSetSkipSourcePolicy: (SkipSourcePolicy) -> Unit,
     onSetSkipSourceEnabled: (SkipSource, Boolean) -> Unit,
+    onShowSkipProviderCredentials: () -> Unit,
     onSetSkipEnabledSegmentType: (AutoSkipSegmentType, Boolean) -> Unit,
     onSetParentalGuideEnabled: (Boolean) -> Unit,
     onSetAutoSkipSegmentTypeEnabled: (AutoSkipSegmentType, Boolean) -> Unit,
@@ -482,18 +484,31 @@ internal fun PlaybackSettingsSections(
                         subtitle = when (playerSettings.skipSourcePolicy) {
                             SkipSourcePolicy.AUTO -> "Auto: use all enabled sources"
                             SkipSourcePolicy.INTRO_DB_ONLY -> "IntroDB only"
+                            SkipSourcePolicy.THE_INTRO_DB_ONLY -> "TheIntroDB only"
+                            SkipSourcePolicy.PUBLIC_META_DB_ONLY -> "PublicMetaDB only"
                             SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY -> "MovieHavenDB only"
                             SkipSourcePolicy.VIDEO_SKIP_ONLY -> "VideoSkip only"
                         },
                         onClick = {
                             val next = when (playerSettings.skipSourcePolicy) {
                                 SkipSourcePolicy.AUTO -> SkipSourcePolicy.INTRO_DB_ONLY
-                                SkipSourcePolicy.INTRO_DB_ONLY -> SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY
+                                SkipSourcePolicy.INTRO_DB_ONLY -> SkipSourcePolicy.THE_INTRO_DB_ONLY
+                                SkipSourcePolicy.THE_INTRO_DB_ONLY -> SkipSourcePolicy.PUBLIC_META_DB_ONLY
+                                SkipSourcePolicy.PUBLIC_META_DB_ONLY -> SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY
                                 SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY -> SkipSourcePolicy.VIDEO_SKIP_ONLY
                                 SkipSourcePolicy.VIDEO_SKIP_ONLY -> SkipSourcePolicy.AUTO
                             }
                             onSetSkipSourcePolicy(next)
                         },
+                        onFocused = { focusedSection = PlaybackSection.GENERAL }
+                    )
+                }
+                item(key = "general_skip_credentials") {
+                    NavigationSettingsItem(
+                        icon = Icons.Default.Lock,
+                        title = "Provider credentials",
+                        subtitle = "Optional encrypted keys for PublicMetaDB, IntroDB.app, and TheIntroDB",
+                        onClick = onShowSkipProviderCredentials,
                         onFocused = { focusedSection = PlaybackSection.GENERAL }
                     )
                 }
@@ -503,6 +518,8 @@ internal fun PlaybackSettingsSections(
                             icon = Icons.Default.Extension,
                             title = when (source) {
                                 SkipSource.INTRO_DB -> "IntroDB"
+                                SkipSource.THE_INTRO_DB -> "TheIntroDB"
+                                SkipSource.PUBLIC_META_DB -> "PublicMetaDB"
                                 SkipSource.MOVIE_HAVEN_DB -> "MovieHavenDB"
                                 SkipSource.VIDEO_SKIP -> "VideoSkip"
                             },
