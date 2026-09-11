@@ -72,7 +72,8 @@ class SkipIntroRepository @Inject constructor(
             settings.skipSourcePolicy.name, sources.joinToString { it.storedValue }, categoryKey,
             credentials.publicMetaDbApiKey.isNotBlank(),
             credentials.introDbAppApiKey.isNotBlank(),
-            credentials.theIntroDbApiKey.isNotBlank()
+            credentials.theIntroDbApiKey.isNotBlank(),
+            credentials.notScareApiKey.isNotBlank()
         ).joinToString(":")
         val now = System.currentTimeMillis()
         cache[key]?.takeIf { now - it.storedAtMs < CACHE_TTL_MS }?.let { return it.intervals }
@@ -100,6 +101,9 @@ class SkipIntroRepository @Inject constructor(
                                 SkipSource.VIDEO_SKIP -> fetchFromVideoSkip(
                                     normalizedId, title, isSeries, season, episode
                                 )
+                                SkipSource.NOT_SCARE -> if (credentials.notScareApiKey.isNotBlank()) {
+                                    fetchFromNotScare(normalizedId, credentials.notScareApiKey)
+                                } else emptyList()
                             }
                         }.getOrElse { error ->
                             Log.d(TAG, "${source.storedValue}: ${error.message ?: "unavailable"}")
@@ -130,11 +134,23 @@ class SkipIntroRepository @Inject constructor(
             SkipSourcePolicy.PUBLIC_META_DB_ONLY -> SkipSource.PUBLIC_META_DB
             SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY -> SkipSource.MOVIE_HAVEN_DB
             SkipSourcePolicy.VIDEO_SKIP_ONLY -> SkipSource.VIDEO_SKIP
+            SkipSourcePolicy.NOT_SCARE_ONLY -> SkipSource.NOT_SCARE
         }
         return if (forced != null) listOf(forced) else listOf(
             SkipSource.INTRO_DB, SkipSource.THE_INTRO_DB, SkipSource.PUBLIC_META_DB,
-            SkipSource.MOVIE_HAVEN_DB, SkipSource.VIDEO_SKIP
+            SkipSource.MOVIE_HAVEN_DB, SkipSource.VIDEO_SKIP, SkipSource.NOT_SCARE
         ).filter { it in enabled }
+    }
+
+    private suspend fun fetchFromNotScare(imdbId: String, apiKey: String): List<SkipInterval> {
+        val headers = mapOf(
+            "Accept" to "application/json",
+            "User-Agent" to "NuvioTV/skip-metadata",
+            "x-api-key" to apiKey
+        )
+        return getText("https://notscare.me/api/v1/movie/$imdbId", headers = headers)
+            ?.let { SkipMetadataParser.parseNotScare(it, "notscare") }
+            .orEmpty()
     }
 
     private suspend fun fetchFromIntroDb(
@@ -361,6 +377,48 @@ internal object SkipMetadataParser {
                 if (creditsStart >= 0 && creditsEnd > creditsStart) {
                     add(SkipInterval(creditsStart / 1000.0, creditsEnd / 1000.0, "credits", provider, confidence = 0.82))
                 }
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    /** Parses the official NotScare API payload; no website scraping or RPC is used. */
+    fun parseNotScare(raw: String, provider: String): List<SkipInterval> = runCatching {
+        val root = JSONObject(raw)
+        val items = sequenceOf(
+            root.optJSONArray("jumpscares"),
+            root.optJSONArray("jumpScares"),
+            root.optJSONArray("scares"),
+            root.optJSONObject("movie")?.optJSONArray("jumpscares"),
+            root.optJSONObject("data")?.optJSONArray("jumpscares"),
+            root.optJSONObject("data")?.optJSONArray("scares")
+        ).filterNotNull().firstOrNull() ?: JSONArray()
+        buildList {
+            for (index in 0 until items.length()) {
+                val item = items.optJSONObject(index) ?: continue
+                val timestampValue = item.opt("timestamp") ?: item.opt("time") ?: item.opt("start")
+                val start = when (timestampValue) {
+                    is Number -> timestampValue.toDouble()
+                    else -> timestampValue?.toString()?.let(::parseTimestamp)
+                } ?: continue
+                val end = item.opt("end")?.let { value ->
+                    when (value) {
+                        is Number -> value.toDouble()
+                        else -> parseTimestamp(value.toString())
+                    }
+                }?.takeIf { it > start } ?: (start + 4.0)
+                val major = item.optString("type", item.optString("severity", "minor"))
+                    .equals("major", ignoreCase = true)
+                add(
+                    SkipInterval(
+                        startTime = start,
+                        endTime = end,
+                        type = "jumpscare",
+                        provider = provider,
+                        action = "warn",
+                        confidence = if (major) 0.9 else 0.84,
+                        severity = if (major) "high" else "medium"
+                    )
+                )
             }
         }
     }.getOrDefault(emptyList())

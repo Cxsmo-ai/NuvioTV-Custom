@@ -510,7 +510,8 @@ enum class SkipSource(val storedValue: String) {
     THE_INTRO_DB("theintrodb"),
     PUBLIC_META_DB("publicmetadb"),
     MOVIE_HAVEN_DB("moviehavendb"),
-    VIDEO_SKIP("videoskip");
+    VIDEO_SKIP("videoskip"),
+    NOT_SCARE("notscare");
 
     companion object {
         fun fromStoredValue(value: String): SkipSource? = values().firstOrNull { it.storedValue == value }
@@ -523,7 +524,8 @@ enum class SkipSourcePolicy {
     THE_INTRO_DB_ONLY,
     PUBLIC_META_DB_ONLY,
     MOVIE_HAVEN_DB_ONLY,
-    VIDEO_SKIP_ONLY;
+    VIDEO_SKIP_ONLY,
+    NOT_SCARE_ONLY;
 
     companion object {
         fun fromStoredValue(value: String?): SkipSourcePolicy = values().firstOrNull { it.name == value } ?: AUTO

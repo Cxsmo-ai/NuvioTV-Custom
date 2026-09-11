@@ -45,8 +45,10 @@ The post-play screen keeps Nuvio's original full-screen hero presentation and ad
   their normal in-app tracking settings, and install/enable the relevant Stremio addon for Kurato or
   BingeCat. The Nuvio account QR login is separate and uses the normal Nuvio TV-login backend.
   Trakt's own API still requires a Trakt client application credential somewhere (official Nuvio
-  releases ship their build-time credential; this fork also supports the encrypted in-app credential
-  editor), but it is not the Nuvio account credential and it is never needed for Nuvio QR login.
+  releases ship their build-time credential; this fork supports the same release-time configuration
+  through `NUVIO_TRAKT_CLIENT_ID` and `NUVIO_TRAKT_CLIENT_SECRET`, with the encrypted in-app
+  credential editor retained as a fallback for locally built APKs. It is not the Nuvio account
+  credential and it is never needed for Nuvio QR login.
 - Catalog pagination continues until the provider is exhausted, reports no more results, or stops
   making progress. Recommendations are not artificially capped at four items.
 - Details are resolved lazily for the selected recommendation and a small prefetch window, keeping
@@ -83,6 +85,7 @@ The current provider set is:
 | **PublicMetaDB** | Movie and series skip metadata through IMDb-to-TMDB mapping. A PublicMetaDB API key is required. |
 | **MovieHavenDB** | Movie scene metadata served from the public MovieHavenDB dataset; the current client does not use it for series episodes. |
 | **VideoSkip** | Title-search plus server-returned timeline metadata. It is queried as metadata only; the client does not download or host video. |
+| **NotScare** | Official jumpscare metadata API queried directly from the device with the user’s encrypted API key. It is metadata-only and does not use Ascend Media RPC. |
 
 Skip settings support **Auto** (all enabled sources) and a provider-only policy for each source. You
 can also enable or disable segment categories, including intro, recap, outro/credits, preview, and

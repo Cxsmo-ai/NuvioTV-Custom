@@ -456,6 +456,7 @@ internal fun PlaybackSettingsSections(
                             SkipSourcePolicy.PUBLIC_META_DB_ONLY -> "PublicMetaDB only"
                             SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY -> "MovieHavenDB only"
                             SkipSourcePolicy.VIDEO_SKIP_ONLY -> "VideoSkip only"
+                            SkipSourcePolicy.NOT_SCARE_ONLY -> "NotScare only"
                         },
                         onClick = {
                             val next = when (playerSettings.skipSourcePolicy) {
@@ -464,7 +465,8 @@ internal fun PlaybackSettingsSections(
                                 SkipSourcePolicy.THE_INTRO_DB_ONLY -> SkipSourcePolicy.PUBLIC_META_DB_ONLY
                                 SkipSourcePolicy.PUBLIC_META_DB_ONLY -> SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY
                                 SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY -> SkipSourcePolicy.VIDEO_SKIP_ONLY
-                                SkipSourcePolicy.VIDEO_SKIP_ONLY -> SkipSourcePolicy.AUTO
+                                SkipSourcePolicy.VIDEO_SKIP_ONLY -> SkipSourcePolicy.NOT_SCARE_ONLY
+                                SkipSourcePolicy.NOT_SCARE_ONLY -> SkipSourcePolicy.AUTO
                             }
                             onSetSkipSourcePolicy(next)
                         },
@@ -475,7 +477,7 @@ internal fun PlaybackSettingsSections(
                     NavigationSettingsItem(
                         icon = Icons.Default.Lock,
                         title = "Provider credentials",
-                        subtitle = "Optional encrypted keys for PublicMetaDB, IntroDB.app, and TheIntroDB",
+                        subtitle = "Optional encrypted keys for PublicMetaDB, IntroDB.app, TheIntroDB, and NotScare",
                         onClick = onShowSkipProviderCredentials,
                         onFocused = { focusedSection = PlaybackSection.GENERAL }
                     )
@@ -490,6 +492,7 @@ internal fun PlaybackSettingsSections(
                                 SkipSource.PUBLIC_META_DB -> "PublicMetaDB"
                                 SkipSource.MOVIE_HAVEN_DB -> "MovieHavenDB"
                                 SkipSource.VIDEO_SKIP -> "VideoSkip"
+                                SkipSource.NOT_SCARE -> "NotScare"
                             },
                             subtitle = "Fetch skip metadata directly on this device",
                             isChecked = source in playerSettings.skipEnabledSources,

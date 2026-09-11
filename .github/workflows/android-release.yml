@@ -36,6 +36,11 @@ jobs:
       RELEASE_KEY_ALIAS: ${{ secrets.NUVIO_RELEASE_KEY_ALIAS }}
       RELEASE_KEY_PASSWORD: ${{ secrets.NUVIO_RELEASE_KEY_PASSWORD }}
       RELEASE_STORE_PASSWORD: ${{ secrets.NUVIO_RELEASE_STORE_PASSWORD }}
+      # Official Nuvio releases bundle the Trakt app credential at build time,
+      # so users only complete the normal Trakt device login. These are app
+      # credentials, not a user's Trakt account token.
+      TRAKT_CLIENT_ID: ${{ secrets.NUVIO_TRAKT_CLIENT_ID }}
+      TRAKT_CLIENT_SECRET: ${{ secrets.NUVIO_TRAKT_CLIENT_SECRET }}
 
     steps:
       - name: Check out full history
@@ -186,6 +191,8 @@ jobs:
           set_property NUVIO_RELEASE_KEY_ALIAS "${RELEASE_KEY_ALIAS}"
           set_property NUVIO_RELEASE_KEY_PASSWORD "${RELEASE_KEY_PASSWORD}"
           set_property NUVIO_RELEASE_STORE_PASSWORD "${RELEASE_STORE_PASSWORD}"
+          set_property TRAKT_CLIENT_ID "${TRAKT_CLIENT_ID}"
+          set_property TRAKT_CLIENT_SECRET "${TRAKT_CLIENT_SECRET}"
 
           # These values are required for the production app to reach the
           # normal Nuvio account/TV-login backend. Tracker app credentials are

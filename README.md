@@ -82,7 +82,8 @@ In addition to the playback and library work below, this fork includes:
   then falls back to the normal metadata/recommendation providers. A provider that is not installed,
   not connected, disabled, or has no compatible catalog is skipped without blocking the player.
 - **Native skip metadata** -- the player can query IntroDB, TheIntroDB, PublicMetaDB, MovieHavenDB,
-  and VideoSkip for time intervals such as intros, recaps, credits, jumpscares, profanity, and other
+  VideoSkip, and the official NotScare API for time intervals such as intros, recaps, credits,
+  jumpscares, profanity, and other
   supported categories. It receives metadata only; it never proxies, rewrites, or downloads the
   video stream. Provider failures and no-match responses are isolated so playback continues.
 - **Progressive AIOStreams scraping** -- the stream screen can consume cumulative NDJSON snapshots from the forked AIOStreams progressive endpoint, so usable results appear while slower addons continue.

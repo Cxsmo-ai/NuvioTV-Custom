@@ -64,6 +64,9 @@ class PlaybackSettingsViewModel @Inject constructor(
     suspend fun setTheIntroDbApiKey(value: String) =
         skipProviderCredentialsStore.setTheIntroDbApiKey(value)
 
+    suspend fun setNotScareApiKey(value: String) =
+        skipProviderCredentialsStore.setNotScareApiKey(value)
+
     suspend fun setSeekrApiKey(value: String) =
         seekrCredentialsStore.setApiKey(value)
 
