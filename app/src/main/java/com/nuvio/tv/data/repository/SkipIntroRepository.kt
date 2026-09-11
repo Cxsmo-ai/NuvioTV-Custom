@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -89,6 +90,7 @@ class SkipIntroRepository @Inject constructor(
             normalizedId, season, episode, mediaType.orEmpty(),
             title.orEmpty(), releaseYear.orEmpty(),
             tmdbId ?: 0, tvdbId ?: 0, anilistId ?: 0,
+            durationMs?.takeIf { it > 0L } ?: 0L,
             settings.skipSourcePolicy.name, sources.joinToString { it.storedValue }, categoryKey,
             credentials.publicMetaDbApiKey.isNotBlank(),
             credentials.introDbAppApiKey.isNotBlank(),
@@ -372,21 +374,32 @@ class SkipIntroRepository @Inject constructor(
 
     private suspend fun postJson(url: String, body: String): String? =
         withContext(Dispatchers.IO) {
-            val request = Request.Builder()
-                .url(url)
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/json")
-                .header("User-Agent", "SkipMe.db/0.0 NuvioTV/skip-metadata")
-                .post(body.toRequestBody(JSON_MEDIA_TYPE))
-                .build()
-            runCatching {
-                httpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use null
-                    val responseBody = response.body ?: return@use null
-                    if (responseBody.contentLength() > MAX_RESPONSE_BYTES) return@use null
-                    responseBody.source().peek().readUtf8(MAX_RESPONSE_BYTES)
-                }
-            }.getOrNull()
+            repeat(SKIP_ME_MAX_ATTEMPTS) { attempt ->
+                var retryableFailure = false
+                val responseBody = runCatching {
+                    val request = Request.Builder()
+                        .url(url)
+                        .header("Accept", "application/json")
+                        .header("Content-Type", "application/json; charset=utf-8")
+                        .header("User-Agent", "SkipMe.db/0.0 NuvioTV/skip-metadata")
+                        .post(body.toRequestBody(JSON_MEDIA_TYPE))
+                        .build()
+                    httpClient.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) {
+                            retryableFailure = response.code in RETRYABLE_HTTP_CODES
+                            Log.d(TAG, "SkipMe request failed: HTTP ${response.code} ${url.substringAfterLast('/')}")
+                            return@use null
+                        }
+                        val responseBody = response.body ?: return@use null
+                        if (responseBody.contentLength() > MAX_RESPONSE_BYTES) return@use null
+                        responseBody.source().readUtf8(MAX_RESPONSE_BYTES)
+                    }
+                }.getOrNull()
+                if (responseBody != null) return@withContext responseBody
+                if (!retryableFailure || attempt == SKIP_ME_MAX_ATTEMPTS - 1) return@withContext null
+                delay(SKIP_ME_RETRY_DELAY_MS)
+            }
+            null
         }
 
     private fun trimCacheIfNeeded() {
@@ -406,6 +419,9 @@ class SkipIntroRepository @Inject constructor(
         const val MAX_VIDEO_SKIP_DOWNLOADS = 6
         const val MAX_RESPONSE_BYTES = 2L * 1024L * 1024L
         const val MAX_SKIP_FILE_BYTES = 2L * 1024L * 1024L
+        const val SKIP_ME_MAX_ATTEMPTS = 2
+        const val SKIP_ME_RETRY_DELAY_MS = 250L
+        val RETRYABLE_HTTP_CODES = setOf(408, 425, 429, 500, 502, 503, 504)
         val JSON_MEDIA_TYPE = "application/json".toMediaType()
     }
 }

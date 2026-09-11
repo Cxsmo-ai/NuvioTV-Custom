@@ -655,13 +655,22 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
     if (isSeries && (season == null || episode == null)) return
 
     scope.launch {
-        // Skip providers all use the title's IMDb ID. Nuvio commonly carries a
-        // TMDB ID in contentId/videoId, so resolve that ID before giving up.
+        // Skip providers all use external IDs. For series, the root content id
+        // is authoritative; currentVideoId may be an episode-level id or a
+        // provider-specific video id. Prefer the root id so SkipMe's
+        // imdb_series_id lookup is not accidentally sent an episode id.
         // The resolver is cached and bounded; it can never hold up playback.
-        val candidates = listOfNotNull(
-            currentVideoId?.takeIf { it.isNotBlank() },
-            id.takeIf { it.isNotBlank() }
-        )
+        val candidates = if (isSeries) {
+            listOfNotNull(
+                id.takeIf { it.isNotBlank() },
+                currentVideoId?.takeIf { it.isNotBlank() }
+            )
+        } else {
+            listOfNotNull(
+                currentVideoId?.takeIf { it.isNotBlank() },
+                id.takeIf { it.isNotBlank() }
+            )
+        }
         val imdbId = candidates.asSequence()
             .mapNotNull(::extractImdbId)
             .firstOrNull()
@@ -679,7 +688,14 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
         }
         val tmdbId = candidates.mapNotNull(::extractTmdbId).firstOrNull()
 
-        val key = "$imdbId:${season ?: 0}:${episode ?: 0}:$skipSettingsFingerprint"
+        val lookupDurationMs = currentPlaybackDurationMs().takeIf { it > 0L }
+            ?: expectedRuntimeMinutes?.toLong()?.times(60_000L)?.takeIf { it > 0L }
+        // A startup lookup can happen before the player has a duration. Keep
+        // that lookup separate from the later duration-aware request: SkipMe's
+        // movie endpoint requires duration_ms, and an early empty response must
+        // never poison the cache for the rest of the session.
+        val durationKey = lookupDurationMs ?: 0L
+        val key = "$imdbId:${season ?: 0}:${episode ?: 0}:$durationKey:$skipSettingsFingerprint"
         if (skipIntroFetchedKey == key) return@launch
         skipIntroFetchedKey = key
 
@@ -691,8 +707,7 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
                 episode = episode ?: 0,
                 title = currentEpisodeTitle ?: title,
                 mediaType = contentType,
-                durationMs = currentPlaybackDurationMs().takeIf { it > 0L }
-                    ?: expectedRuntimeMinutes?.toLong()?.times(60_000L),
+                durationMs = lookupDurationMs,
                 releaseYear = year,
                 tmdbId = tmdbId
             )
