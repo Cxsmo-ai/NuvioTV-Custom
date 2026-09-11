@@ -76,7 +76,7 @@ jobs:
 
           unexpected_changes="$(
             git diff --name-only "${CURRENT_BUMP}..${RELEASE_COMMIT}" \
-              | grep -Ev '^(\.github/workflows/(android-release|beta-release)\.yml|scripts/release-metadata\.sh|scripts/generate-release-notes\.sh|scripts/generate_release_notes\.py|scripts/release_notes/.*|scripts/tests/.*)$' \
+              | grep -Ev '^(\.github/workflows/(android-release|beta-release)\.yml|scripts/release-metadata\.sh|scripts/generate-release-notes\.sh|scripts/generate_release_notes\.py|scripts/release_notes/.*|scripts/tests/.*|README\.md|docs/.*)$' \
               || true
           )"
           if [[ -n "${unexpected_changes}" ]]; then
@@ -187,12 +187,17 @@ jobs:
           set_property NUVIO_RELEASE_KEY_PASSWORD "${RELEASE_KEY_PASSWORD}"
           set_property NUVIO_RELEASE_STORE_PASSWORD "${RELEASE_STORE_PASSWORD}"
 
+          # These values are required for the production app to reach the
+          # normal Nuvio account/TV-login backend. Tracker app credentials are
+          # intentionally optional at build time: Trakt and Simkl can be
+          # connected from the app's Tracking settings, just like upstream.
           required_properties=(
             NUVIO_RELEASE_STORE_PASSWORD
             NUVIO_RELEASE_KEY_ALIAS
             NUVIO_RELEASE_KEY_PASSWORD
-            TRAKT_CLIENT_ID
-            TRAKT_CLIENT_SECRET
+            NUVIO_SUPABASE_URL
+            NUVIO_SUPABASE_ANON_KEY
+            TV_LOGIN_WEB_BASE_URL
           )
           for property_name in "${required_properties[@]}"; do
             if ! grep -Eq "^[[:space:]]*${property_name}[[:space:]]*=[[:space:]]*.+$" local.properties; then

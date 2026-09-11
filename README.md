@@ -73,9 +73,18 @@ In addition to the playback and library work below, this fork includes:
   keep seek, pause, menu, and player actions from firing twice on noisy Shield remotes.
 - **Correct skip matching** -- TMDB-backed movies and episodes are resolved to IMDb identifiers
   before skip metadata is queried, avoiding silent misses when an addon returns TMDB IDs.
-- **Post-play recommendation source selection** -- choose Auto, Trakt, TMDB, Kurato AI, or BingeCat AI.
+- **Post-play recommendation source selection** -- choose Auto, Trakt, TMDB, Kurato AI, BingeCat AI,
+  Simkl, or MDBList. Trakt, Simkl, and MDBList use the accounts/providers connected in the app;
+  Kurato and BingeCat are addon/catalog providers discovered from the installed addon set.
 - **Kurato and BingeCat discovery** -- the app detects their installed Stremio catalogs, including when they are exposed through AIOStreams, and uses their full paginated result set rather than a four-item rail.
 - **Metadata-aware trailers** -- post-play trailers use the same all-addon metadata routing as Nuvio's detail/player screens, then fall back to addon-supplied, TMDB, or IMDb trailer sources.
+- **Provider-aware post-play behavior** -- Auto tries the configured AI catalog providers first,
+  then falls back to the normal metadata/recommendation providers. A provider that is not installed,
+  not connected, disabled, or has no compatible catalog is skipped without blocking the player.
+- **Native skip metadata** -- the player can query IntroDB, TheIntroDB, PublicMetaDB, MovieHavenDB,
+  and VideoSkip for time intervals such as intros, recaps, credits, jumpscares, profanity, and other
+  supported categories. It receives metadata only; it never proxies, rewrites, or downloads the
+  video stream. Provider failures and no-match responses are isolated so playback continues.
 - **Progressive AIOStreams scraping** -- the stream screen can consume cumulative NDJSON snapshots from the forked AIOStreams progressive endpoint, so usable results appear while slower addons continue.
 - **Unlocked user scrape timeout** -- the user-facing timeout choices include instant, bounded, and unlimited modes; internal safety bounds remain in place to prevent a dead UI.
 
