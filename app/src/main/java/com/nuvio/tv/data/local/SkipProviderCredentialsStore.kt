@@ -22,11 +22,10 @@ import javax.inject.Singleton
 data class SkipProviderCredentials(
     val publicMetaDbApiKey: String = "",
     val introDbAppApiKey: String = "",
-    val theIntroDbApiKey: String = "",
-    val notScareApiKey: String = ""
+    val theIntroDbApiKey: String = ""
 ) {
     val configuredCount: Int
-        get() = listOf(publicMetaDbApiKey, introDbAppApiKey, theIntroDbApiKey, notScareApiKey)
+        get() = listOf(publicMetaDbApiKey, introDbAppApiKey, theIntroDbApiKey)
             .count { it.isNotBlank() }
 }
 
@@ -52,7 +51,6 @@ class SkipProviderCredentialsStore @Inject constructor(
     private val publicMetaDbKey = stringPreferencesKey("publicmetadb_api_key")
     private val introDbAppKey = stringPreferencesKey("introdb_app_api_key")
     private val theIntroDbKey = stringPreferencesKey("theintrodb_api_key")
-    private val notScareKey = stringPreferencesKey("notscare_api_key")
 
     private fun store(profileId: Int = profileManager.activeProfileId.value) =
         factory.get(profileId, FEATURE)
@@ -63,8 +61,7 @@ class SkipProviderCredentialsStore @Inject constructor(
                 SkipProviderCredentials(
                     publicMetaDbApiKey = decryptOrEmpty(prefs[publicMetaDbKey]),
                     introDbAppApiKey = decryptOrEmpty(prefs[introDbAppKey]),
-                    theIntroDbApiKey = decryptOrEmpty(prefs[theIntroDbKey]),
-                    notScareApiKey = decryptOrEmpty(prefs[notScareKey])
+                    theIntroDbApiKey = decryptOrEmpty(prefs[theIntroDbKey])
                 )
             }
         }
@@ -72,7 +69,6 @@ class SkipProviderCredentialsStore @Inject constructor(
     suspend fun setPublicMetaDbApiKey(value: String) = set(publicMetaDbKey, value)
     suspend fun setIntroDbAppApiKey(value: String) = set(introDbAppKey, value)
     suspend fun setTheIntroDbApiKey(value: String) = set(theIntroDbKey, value)
-    suspend fun setNotScareApiKey(value: String) = set(notScareKey, value)
 
     private suspend fun set(
         key: androidx.datastore.preferences.core.Preferences.Key<String>,

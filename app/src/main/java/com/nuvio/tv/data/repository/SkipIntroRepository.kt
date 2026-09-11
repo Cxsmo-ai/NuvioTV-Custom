@@ -18,6 +18,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.Normalizer
 import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -57,7 +58,8 @@ class SkipIntroRepository @Inject constructor(
         episode: Int,
         title: String? = null,
         mediaType: String? = null,
-        durationMs: Long? = null
+        durationMs: Long? = null,
+        releaseYear: String? = null
     ): List<SkipInterval> {
         val normalizedId = imdbId?.trim()?.takeIf { it.matches(Regex("tt\\d+")) } ?: return emptyList()
         val settings = playerSettingsDataStore.playerSettings.first()
@@ -69,11 +71,11 @@ class SkipIntroRepository @Inject constructor(
         val categoryKey = settings.skipEnabledSegmentTypes.map { it.storedValue }.sorted().joinToString(",")
         val key = listOf(
             normalizedId, season, episode, mediaType.orEmpty(),
+            title.orEmpty(), releaseYear.orEmpty(),
             settings.skipSourcePolicy.name, sources.joinToString { it.storedValue }, categoryKey,
             credentials.publicMetaDbApiKey.isNotBlank(),
             credentials.introDbAppApiKey.isNotBlank(),
-            credentials.theIntroDbApiKey.isNotBlank(),
-            credentials.notScareApiKey.isNotBlank()
+            credentials.theIntroDbApiKey.isNotBlank()
         ).joinToString(":")
         val now = System.currentTimeMillis()
         cache[key]?.takeIf { now - it.storedAtMs < CACHE_TTL_MS }?.let { return it.intervals }
@@ -101,8 +103,8 @@ class SkipIntroRepository @Inject constructor(
                                 SkipSource.VIDEO_SKIP -> fetchFromVideoSkip(
                                     normalizedId, title, isSeries, season, episode
                                 )
-                                SkipSource.NOT_SCARE -> if (credentials.notScareApiKey.isNotBlank()) {
-                                    fetchFromNotScare(normalizedId, credentials.notScareApiKey)
+                                SkipSource.NOT_SCARE -> if (!isSeries && !title.isNullOrBlank() && !releaseYear.isNullOrBlank()) {
+                                    fetchFromNotScare(title, releaseYear)
                                 } else emptyList()
                             }
                         }.getOrElse { error ->
@@ -142,16 +144,27 @@ class SkipIntroRepository @Inject constructor(
         ).filter { it in enabled }
     }
 
-    private suspend fun fetchFromNotScare(imdbId: String, apiKey: String): List<SkipInterval> {
+    private suspend fun fetchFromNotScare(title: String, releaseYear: String): List<SkipInterval> {
+        val slug = slugifyNotScareTitle(title)
+        if (slug.isBlank()) return emptyList()
         val headers = mapOf(
-            "Accept" to "application/json",
-            "User-Agent" to "NuvioTV/skip-metadata",
-            "x-api-key" to apiKey
+            "Accept" to "text/html,application/xhtml+xml",
+            "User-Agent" to "NuvioTV/skip-metadata"
         )
-        return getText("https://notscare.me/api/v1/movie/$imdbId", headers = headers)
-            ?.let { SkipMetadataParser.parseNotScare(it, "notscare") }
+        val url = "https://notscare.me/movies/jump-scares-in-$slug-${releaseYear.trim()}"
+        return getText(url, headers = headers)
+            ?.let { SkipMetadataParser.parseNotScarePage(it, "notscare") }
             .orEmpty()
     }
+
+    private fun slugifyNotScareTitle(title: String): String =
+        Normalizer.normalize(title.trim(), Normalizer.Form.NFKD)
+            .replace(Regex("\\p{M}+"), "")
+            .lowercase(Locale.US)
+            .replace("&", " and ")
+            .replace(Regex("[’']"), "")
+            .replace(Regex("[^a-z0-9]+"), "-")
+            .trim('-')
 
     private suspend fun fetchFromIntroDb(
         imdbId: String,
@@ -381,47 +394,63 @@ internal object SkipMetadataParser {
         }
     }.getOrDefault(emptyList())
 
-    /** Parses the official NotScare API payload; no website scraping or RPC is used. */
-    fun parseNotScare(raw: String, provider: String): List<SkipInterval> = runCatching {
-        val root = JSONObject(raw)
-        val items = sequenceOf(
-            root.optJSONArray("jumpscares"),
-            root.optJSONArray("jumpScares"),
-            root.optJSONArray("scares"),
-            root.optJSONObject("movie")?.optJSONArray("jumpscares"),
-            root.optJSONObject("data")?.optJSONArray("jumpscares"),
-            root.optJSONObject("data")?.optJSONArray("scares")
-        ).filterNotNull().firstOrNull() ?: JSONArray()
-        buildList {
-            for (index in 0 until items.length()) {
-                val item = items.optJSONObject(index) ?: continue
-                val timestampValue = item.opt("timestamp") ?: item.opt("time") ?: item.opt("start")
-                val start = when (timestampValue) {
-                    is Number -> timestampValue.toDouble()
-                    else -> timestampValue?.toString()?.let(::parseTimestamp)
-                } ?: continue
-                val end = item.opt("end")?.let { value ->
-                    when (value) {
-                        is Number -> value.toDouble()
-                        else -> parseTimestamp(value.toString())
-                    }
-                }?.takeIf { it > start } ?: (start + 4.0)
-                val major = item.optString("type", item.optString("severity", "minor"))
-                    .equals("major", ignoreCase = true)
-                add(
-                    SkipInterval(
-                        startTime = start,
-                        endTime = end,
-                        type = "jumpscare",
-                        provider = provider,
-                        action = "warn",
-                        confidence = if (major) 0.9 else 0.84,
-                        severity = if (major) "high" else "medium"
-                    )
-                )
-            }
-        }
+    /** Parses visible NotScare page text; scripts and markup are intentionally ignored. */
+    fun parseNotScarePage(rawHtml: String, provider: String): List<SkipInterval> = runCatching {
+        val plain = decodeHtmlEntities(visibleHtmlText(rawHtml))
+        val matches = Regex(
+            "(?:^|\\n)\\s*((?:\\d{1,2}:)?\\d{1,2}:\\d{2})\\s+(Major|Minor)\\b",
+            RegexOption.IGNORE_CASE
+        ).findAll(plain)
+        matches.map { match ->
+            val start = parseTimestamp(match.groupValues[1]) ?: return@map null
+            val major = match.groupValues[2].equals("Major", ignoreCase = true)
+            SkipInterval(
+                startTime = start,
+                endTime = start + if (major) 6.0 else 4.0,
+                type = "jumpscare",
+                provider = provider,
+                action = "warn",
+                confidence = 0.76,
+                severity = if (major) "major" else "minor"
+            )
+        }.filterNotNull().toList()
     }.getOrDefault(emptyList())
+
+    private fun visibleHtmlText(html: String): String {
+        val output = StringBuilder()
+        val lower = html.lowercase(Locale.US)
+        var cursor = 0
+        while (cursor < html.length) {
+            if (lower.startsWith("<script", cursor) || lower.startsWith("<style", cursor)) {
+                val closing = if (lower.startsWith("<script", cursor)) "</script>" else "</style>"
+                val end = lower.indexOf(closing, cursor + 7)
+                if (end < 0) break
+                cursor = end + closing.length
+                output.append('\n')
+                continue
+            }
+            if (html[cursor] == '<') {
+                val end = html.indexOf('>', cursor + 1)
+                if (end < 0) break
+                cursor = end + 1
+                output.append('\n')
+                continue
+            }
+            val nextTag = html.indexOf('<', cursor).let { if (it < 0) html.length else it }
+            output.append(html, cursor, nextTag)
+            cursor = nextTag
+        }
+        return output.toString()
+    }
+
+    private fun decodeHtmlEntities(value: String): String = value
+        .replace("&nbsp;", " ", ignoreCase = true)
+        .replace("&amp;", "&", ignoreCase = true)
+        .replace("&lt;", "<", ignoreCase = true)
+        .replace("&gt;", ">", ignoreCase = true)
+        .replace(Regex("&#(\\d+);")) { match ->
+            match.groupValues[1].toIntOrNull()?.let { code -> code.toChar().toString() } ?: match.value
+        }
 
     private fun timeSeconds(item: JSONObject, millisKey: String, secondsKey: String): Double? {
         val millis = item.opt(millisKey)

@@ -94,19 +94,20 @@ class SkipMetadataParserTest {
     }
 
     @Test
-    fun notScareParserReadsMajorAndMinorJumpscares() {
-        val intervals = SkipMetadataParser.parseNotScare(
-            """{"jumpscares":[
-                {"timestamp":"00:03:22","type":"Major"},
-                {"timestamp":220.5,"type":"Minor","end":224.0}
-            ]}""",
+    fun notScarePageParserReadsMajorAndMinorJumpscares() {
+        val intervals = SkipMetadataParser.parseNotScarePage(
+            """<script>00:00:01 Major</script><main>
+                <div>00:03:22</div><strong>Major</strong>
+                <div>03:40</div><strong>Minor</strong>
+            </main>""",
             "notscare"
         )
 
         assertEquals(2, intervals.size)
         assertEquals(202.0, intervals[0].startTime, 0.001)
-        assertEquals(206.0, intervals[0].endTime, 0.001)
-        assertEquals("high", intervals[0].severity)
+        assertEquals(208.0, intervals[0].endTime, 0.001)
+        assertEquals("major", intervals[0].severity)
+        assertEquals(220.0, intervals[1].startTime, 0.001)
         assertEquals(224.0, intervals[1].endTime, 0.001)
     }
 }

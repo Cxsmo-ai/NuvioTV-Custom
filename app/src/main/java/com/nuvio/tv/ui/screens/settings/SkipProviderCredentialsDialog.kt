@@ -45,13 +45,11 @@ internal fun SkipProviderCredentialsDialog(
     onSavePublicMetaDb: (String) -> Unit,
     onSaveIntroDbApp: (String) -> Unit,
     onSaveTheIntroDb: (String) -> Unit,
-    onSaveNotScare: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var publicMetaDb by remember(current.publicMetaDbApiKey) { mutableStateOf(current.publicMetaDbApiKey) }
     var introDbApp by remember(current.introDbAppApiKey) { mutableStateOf(current.introDbAppApiKey) }
     var theIntroDb by remember(current.theIntroDbApiKey) { mutableStateOf(current.theIntroDbApiKey) }
-    var notScare by remember(current.notScareApiKey) { mutableStateOf(current.notScareApiKey) }
     val firstFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
@@ -85,13 +83,6 @@ internal fun SkipProviderCredentialsDialog(
             onValueChange = { theIntroDb = it },
             keyboardController = keyboard
         )
-        Spacer(Modifier.height(NuvioTheme.spacing.sm))
-        CredentialInput(
-            label = "NotScare API key",
-            value = notScare,
-            onValueChange = { notScare = it },
-            keyboardController = keyboard
-        )
         Spacer(Modifier.height(NuvioTheme.spacing.md))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -106,7 +97,6 @@ internal fun SkipProviderCredentialsDialog(
                     onSavePublicMetaDb(publicMetaDb)
                     onSaveIntroDbApp(introDbApp)
                     onSaveTheIntroDb(theIntroDb)
-                    onSaveNotScare(notScare)
                     onDismiss()
                 }
             )

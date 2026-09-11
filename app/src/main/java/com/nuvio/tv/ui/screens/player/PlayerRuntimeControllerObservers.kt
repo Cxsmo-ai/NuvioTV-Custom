@@ -689,7 +689,8 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
                 season = season ?: 0,
                 episode = episode ?: 0,
                 title = currentEpisodeTitle ?: title,
-                mediaType = contentType
+                mediaType = contentType,
+                releaseYear = year
             )
         } ?: emptyList()
         // The nt4 capture could not answer why the next-episode card fired at

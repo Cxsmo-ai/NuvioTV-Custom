@@ -477,7 +477,7 @@ internal fun PlaybackSettingsSections(
                     NavigationSettingsItem(
                         icon = Icons.Default.Lock,
                         title = "Provider credentials",
-                        subtitle = "Optional encrypted keys for PublicMetaDB, IntroDB.app, TheIntroDB, and NotScare",
+                        subtitle = "Optional encrypted keys for PublicMetaDB, IntroDB.app, and TheIntroDB",
                         onClick = onShowSkipProviderCredentials,
                         onFocused = { focusedSection = PlaybackSection.GENERAL }
                     )

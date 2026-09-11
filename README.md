@@ -82,7 +82,7 @@ In addition to the playback and library work below, this fork includes:
   then falls back to the normal metadata/recommendation providers. A provider that is not installed,
   not connected, disabled, or has no compatible catalog is skipped without blocking the player.
 - **Native skip metadata** -- the player can query IntroDB, TheIntroDB, PublicMetaDB, MovieHavenDB,
-  VideoSkip, and the official NotScare API for time intervals such as intros, recaps, credits,
+  VideoSkip, and NotScare’s public movie pages for time intervals such as intros, recaps, credits,
   jumpscares, profanity, and other
   supported categories. It receives metadata only; it never proxies, rewrites, or downloads the
   video stream. Provider failures and no-match responses are isolated so playback continues.

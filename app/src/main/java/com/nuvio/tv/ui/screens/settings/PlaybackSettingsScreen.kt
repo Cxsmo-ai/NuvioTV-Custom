@@ -638,7 +638,6 @@ fun PlaybackSettingsContent(
             onSavePublicMetaDb = { value -> coroutineScope.launch { viewModel.setPublicMetaDbApiKey(value) } },
             onSaveIntroDbApp = { value -> coroutineScope.launch { viewModel.setIntroDbAppApiKey(value) } },
             onSaveTheIntroDb = { value -> coroutineScope.launch { viewModel.setTheIntroDbApiKey(value) } },
-            onSaveNotScare = { value -> coroutineScope.launch { viewModel.setNotScareApiKey(value) } },
             onDismiss = ::dismissAllDialogs
         )
     }

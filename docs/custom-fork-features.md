@@ -85,7 +85,7 @@ The current provider set is:
 | **PublicMetaDB** | Movie and series skip metadata through IMDb-to-TMDB mapping. A PublicMetaDB API key is required. |
 | **MovieHavenDB** | Movie scene metadata served from the public MovieHavenDB dataset; the current client does not use it for series episodes. |
 | **VideoSkip** | Title-search plus server-returned timeline metadata. It is queried as metadata only; the client does not download or host video. |
-| **NotScare** | Official jumpscare metadata API queried directly from the device with the user’s encrypted API key. It is metadata-only and does not use Ascend Media RPC. |
+| **NotScare** | Public movie-page fallback queried directly from the device by title/year. The client parses only visible timestamp markers; it is metadata-only and does not use Ascend Media RPC or a private API. |
 
 Skip settings support **Auto** (all enabled sources) and a provider-only policy for each source. You
 can also enable or disable segment categories, including intro, recap, outro/credits, preview, and
