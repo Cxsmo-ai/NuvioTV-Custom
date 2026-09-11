@@ -533,6 +533,8 @@ class PlayerRuntimeController(
     internal var skipIntroEnabled: Boolean = true
     internal var parentalGuideEnabled: Boolean = false
     internal var autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet()
+    internal var skipEnabledSegmentTypes: Set<AutoSkipSegmentType> = AutoSkipSegmentType.values().toSet()
+    internal var skipSettingsFingerprint: String = ""
     internal var playerSettingsInitialized: Boolean = false
     internal var skipIntroFetchedKey: String? = null
     internal val autoSkippedIntervalKeys: MutableSet<String> = mutableSetOf()

@@ -278,6 +278,10 @@ data class PlayerSettings(
     val skipIntroEnabled: Boolean = true,
     val parentalGuideEnabled: Boolean = true,
     val autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet(),
+    /** Categories eligible for the player skip button. Auto-skip is controlled separately. */
+    val skipEnabledSegmentTypes: Set<AutoSkipSegmentType> = AutoSkipSegmentType.values().toSet(),
+    val skipSourcePolicy: SkipSourcePolicy = SkipSourcePolicy.AUTO,
+    val skipEnabledSources: Set<SkipSource> = SkipSource.values().toSet(),
     // Dolby Vision settings (libdovi conversion). dv7HandlingMode == HDR10_BASE_LAYER
     // replaces the legacy mapDV7ToHevc boolean (strip DV7, play HEVC base layer).
     val dv5ToDv81Enabled: Boolean = false,
@@ -469,7 +473,15 @@ enum class MpvHardwareDecodeMode {
 enum class AutoSkipSegmentType(val storedValue: String) {
     INTRO("intro"),
     RECAP("recap"),
-    OUTRO("outro");
+    OUTRO("outro"),
+    PREVIEW("preview"),
+    JUMPSCARE("jumpscare"),
+    NUDITY("nudity"),
+    SEX("sex"),
+    GORE("gore"),
+    VIOLENCE("violence"),
+    PROFANITY("profanity"),
+    CUSTOM("custom");
 
     companion object {
         fun fromStoredValue(value: String): AutoSkipSegmentType? =
@@ -479,8 +491,38 @@ enum class AutoSkipSegmentType(val storedValue: String) {
             "op", "opening", "mixed-op", "intro" -> INTRO
             "recap" -> RECAP
             "ed", "ending", "mixed-ed", "outro", "credits" -> OUTRO
+            "preview", "filler" -> PREVIEW
+            "jumpscare", "frightening", "scare", "intense" -> JUMPSCARE
+            "nudity" -> NUDITY
+            "sex" -> SEX
+            "gore" -> GORE
+            "violence" -> VIOLENCE
+            "profanity", "language" -> PROFANITY
+            "custom", "drugs", "substance", "other" -> CUSTOM
             else -> null
         }
+    }
+}
+
+/** Direct on-device skip providers. AUTO uses enabled providers in built-in priority order. */
+enum class SkipSource(val storedValue: String) {
+    INTRO_DB("introdb"),
+    MOVIE_HAVEN_DB("moviehavendb"),
+    VIDEO_SKIP("videoskip");
+
+    companion object {
+        fun fromStoredValue(value: String): SkipSource? = values().firstOrNull { it.storedValue == value }
+    }
+}
+
+enum class SkipSourcePolicy {
+    AUTO,
+    INTRO_DB_ONLY,
+    MOVIE_HAVEN_DB_ONLY,
+    VIDEO_SKIP_ONLY;
+
+    companion object {
+        fun fromStoredValue(value: String?): SkipSourcePolicy = values().firstOrNull { it.name == value } ?: AUTO
     }
 }
 
@@ -608,6 +650,9 @@ class PlayerSettingsDataStore @Inject constructor(
     private val skipIntroEnabledKey = booleanPreferencesKey("skip_intro_enabled")
     private val parentalGuideEnabledKey = booleanPreferencesKey("parental_guide_enabled")
     private val autoSkipSegmentTypesKey = stringSetPreferencesKey("auto_skip_segment_types")
+    private val skipEnabledSegmentTypesKey = stringSetPreferencesKey("skip_enabled_segment_types")
+    private val skipSourcePolicyKey = stringPreferencesKey("skip_source_policy")
+    private val skipEnabledSourcesKey = stringSetPreferencesKey("skip_enabled_sources")
 
     // DV Keys
     // NOTE: pref-key STRINGS retain the legacy `experimental_*` names so users upgrading
@@ -992,6 +1037,15 @@ class PlayerSettingsDataStore @Inject constructor(
                     ?.mapNotNull(AutoSkipSegmentType::fromStoredValue)
                     ?.toSet()
                     ?: emptySet(),
+                skipEnabledSegmentTypes = prefs[skipEnabledSegmentTypesKey]
+                    ?.mapNotNull(AutoSkipSegmentType::fromStoredValue)
+                    ?.toSet()
+                    ?: AutoSkipSegmentType.values().toSet(),
+                skipSourcePolicy = SkipSourcePolicy.fromStoredValue(prefs[skipSourcePolicyKey]),
+                skipEnabledSources = prefs[skipEnabledSourcesKey]
+                    ?.mapNotNull(SkipSource::fromStoredValue)
+                    ?.toSet()
+                    ?: SkipSource.values().toSet(),
                 dv5ToDv81Enabled = prefs[dv5ToDv81EnabledKey] ?: false,
                 dv7HandlingMode = when {
                     prefs[dv7HandlingModeKey] != null ->
@@ -1359,6 +1413,32 @@ class PlayerSettingsDataStore @Inject constructor(
                 ?: emptySet()
             val updated = if (enabled) current + segmentType else current - segmentType
             prefs[autoSkipSegmentTypesKey] = updated.map { it.storedValue }.toSet()
+        }
+    }
+
+    suspend fun setSkipEnabledSegmentType(segmentType: AutoSkipSegmentType, enabled: Boolean) {
+        store().edit { prefs ->
+            val current = prefs[skipEnabledSegmentTypesKey]
+                ?.mapNotNull(AutoSkipSegmentType::fromStoredValue)
+                ?.toSet()
+                ?: AutoSkipSegmentType.values().toSet()
+            val updated = if (enabled) current + segmentType else current - segmentType
+            prefs[skipEnabledSegmentTypesKey] = updated.map { it.storedValue }.toSet()
+        }
+    }
+
+    suspend fun setSkipSourcePolicy(policy: SkipSourcePolicy) {
+        store().edit { prefs -> prefs[skipSourcePolicyKey] = policy.name }
+    }
+
+    suspend fun setSkipSourceEnabled(source: SkipSource, enabled: Boolean) {
+        store().edit { prefs ->
+            val current = prefs[skipEnabledSourcesKey]
+                ?.mapNotNull(SkipSource::fromStoredValue)
+                ?.toSet()
+                ?: SkipSource.values().toSet()
+            val updated = if (enabled) current + source else current - source
+            prefs[skipEnabledSourcesKey] = updated.map { it.storedValue }.toSet()
         }
     }
 

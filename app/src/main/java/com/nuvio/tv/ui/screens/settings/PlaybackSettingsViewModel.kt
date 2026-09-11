@@ -17,6 +17,8 @@ import com.nuvio.tv.data.local.StreamAutoPlayMode
 import com.nuvio.tv.data.local.StreamAutoPlaySource
 import com.nuvio.tv.data.local.AudioOutputChannels
 import com.nuvio.tv.data.local.AutoSkipSegmentType
+import com.nuvio.tv.data.local.SkipSource
+import com.nuvio.tv.data.local.SkipSourcePolicy
 import com.nuvio.tv.data.local.MpvHardwareDecodeMode
 import com.nuvio.tv.data.local.SubtitleOrganizationMode
 import com.nuvio.tv.data.local.TrailerSettings
@@ -193,6 +195,18 @@ class PlaybackSettingsViewModel @Inject constructor(
 
     suspend fun setAutoSkipSegmentTypeEnabled(segmentType: AutoSkipSegmentType, enabled: Boolean) {
         playerSettingsDataStore.setAutoSkipSegmentTypeEnabled(segmentType, enabled)
+    }
+
+    suspend fun setSkipEnabledSegmentType(segmentType: AutoSkipSegmentType, enabled: Boolean) {
+        playerSettingsDataStore.setSkipEnabledSegmentType(segmentType, enabled)
+    }
+
+    suspend fun setSkipSourcePolicy(policy: SkipSourcePolicy) {
+        playerSettingsDataStore.setSkipSourcePolicy(policy)
+    }
+
+    suspend fun setSkipSourceEnabled(source: SkipSource, enabled: Boolean) {
+        playerSettingsDataStore.setSkipSourceEnabled(source, enabled)
     }
 
     suspend fun setFrameRateMatchingMode(mode: FrameRateMatchingMode) {

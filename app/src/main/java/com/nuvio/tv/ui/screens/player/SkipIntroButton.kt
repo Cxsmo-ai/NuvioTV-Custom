@@ -241,5 +241,12 @@ private fun getSkipLabel(type: String?): String = when (type?.trim()?.lowercase(
     "op", "opening", "mixed-op", "intro" -> stringResource(R.string.skip_intro)
     "ed", "ending", "mixed-ed", "outro", "credits" -> stringResource(R.string.skip_ending)
     "recap" -> stringResource(R.string.skip_recap)
+    "jumpscare", "frightening", "scare" -> "Skip scare"
+    "nudity" -> "Skip nudity"
+    "sex" -> "Skip sexual content"
+    "gore" -> "Skip gore"
+    "violence" -> "Skip violence"
+    "profanity", "language" -> "Skip language"
+    "preview", "filler" -> "Skip preview"
     else -> stringResource(R.string.skip_generic)
 }

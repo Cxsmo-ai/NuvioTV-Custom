@@ -33,12 +33,14 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Composable
@@ -81,6 +83,8 @@ import com.nuvio.tv.data.local.InternalPlayerEngine
 import com.nuvio.tv.data.local.LibassRenderType
 import com.nuvio.tv.data.local.PlayerPreference
 import com.nuvio.tv.data.local.PlayerSettings
+import com.nuvio.tv.data.local.SkipSource
+import com.nuvio.tv.data.local.SkipSourcePolicy
 import com.nuvio.tv.data.local.VodCacheSizeMode
 import com.nuvio.tv.ui.components.NuvioDialog
 
@@ -158,6 +162,9 @@ internal fun PlaybackSettingsSections(
     onSetPauseOverlayEnabled: (Boolean) -> Unit,
     onSetOsdClockEnabled: (Boolean) -> Unit,
     onSetSkipIntroEnabled: (Boolean) -> Unit,
+    onSetSkipSourcePolicy: (SkipSourcePolicy) -> Unit,
+    onSetSkipSourceEnabled: (SkipSource, Boolean) -> Unit,
+    onSetSkipEnabledSegmentType: (AutoSkipSegmentType, Boolean) -> Unit,
     onSetParentalGuideEnabled: (Boolean) -> Unit,
     onSetAutoSkipSegmentTypeEnabled: (AutoSkipSegmentType, Boolean) -> Unit,
     onSetFrameRateMatchingMode: (FrameRateMatchingMode) -> Unit,
@@ -220,6 +227,8 @@ internal fun PlaybackSettingsSections(
     var generalExpanded by rememberSaveable { mutableStateOf(false) }
     var afrExpanded by rememberSaveable { mutableStateOf(false) }
     var autoSkipExpanded by rememberSaveable { mutableStateOf(false) }
+    var skipSourcesExpanded by rememberSaveable { mutableStateOf(false) }
+    var skipCategoriesExpanded by rememberSaveable { mutableStateOf(false) }
     var streamExpanded by rememberSaveable { mutableStateOf(false) }
     var audioTrailerExpanded by rememberSaveable { mutableStateOf(false) }
     var subtitlesExpanded by rememberSaveable { mutableStateOf(false) }
@@ -229,6 +238,7 @@ internal fun PlaybackSettingsSections(
     val defaultGeneralHeaderFocus = remember { FocusRequester() }
     val afrHeaderFocus = remember { FocusRequester() }
     val autoSkipHeaderFocus = remember { FocusRequester() }
+    val skipSourcesHeaderFocus = remember { FocusRequester() }
     val streamHeaderFocus = remember { FocusRequester() }
     val audioTrailerHeaderFocus = remember { FocusRequester() }
     val subtitlesHeaderFocus = remember { FocusRequester() }
@@ -452,6 +462,86 @@ internal fun PlaybackSettingsSections(
                 )
             }
 
+            item(key = "general_skip_sources_header") {
+                PlaybackSectionHeader(
+                    title = "Skip sources & content filters",
+                    description = "Choose on-device metadata sources and which categories can appear in the player.",
+                    expanded = skipSourcesExpanded,
+                    onToggle = { skipSourcesExpanded = !skipSourcesExpanded },
+                    focusRequester = skipSourcesHeaderFocus,
+                    onFocused = { focusedSection = PlaybackSection.GENERAL },
+                    enabled = !generalUi.isExternalPlayer && playerSettings.skipIntroEnabled
+                )
+            }
+
+            if (skipSourcesExpanded) {
+                item(key = "general_skip_policy") {
+                    NavigationSettingsItem(
+                        icon = Icons.Default.Tune,
+                        title = "Source policy",
+                        subtitle = when (playerSettings.skipSourcePolicy) {
+                            SkipSourcePolicy.AUTO -> "Auto: use all enabled sources"
+                            SkipSourcePolicy.INTRO_DB_ONLY -> "IntroDB only"
+                            SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY -> "MovieHavenDB only"
+                            SkipSourcePolicy.VIDEO_SKIP_ONLY -> "VideoSkip only"
+                        },
+                        onClick = {
+                            val next = when (playerSettings.skipSourcePolicy) {
+                                SkipSourcePolicy.AUTO -> SkipSourcePolicy.INTRO_DB_ONLY
+                                SkipSourcePolicy.INTRO_DB_ONLY -> SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY
+                                SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY -> SkipSourcePolicy.VIDEO_SKIP_ONLY
+                                SkipSourcePolicy.VIDEO_SKIP_ONLY -> SkipSourcePolicy.AUTO
+                            }
+                            onSetSkipSourcePolicy(next)
+                        },
+                        onFocused = { focusedSection = PlaybackSection.GENERAL }
+                    )
+                }
+                SkipSource.values().forEach { source ->
+                    item(key = "general_skip_source_${source.storedValue}") {
+                        ToggleSettingsItem(
+                            icon = Icons.Default.Extension,
+                            title = when (source) {
+                                SkipSource.INTRO_DB -> "IntroDB"
+                                SkipSource.MOVIE_HAVEN_DB -> "MovieHavenDB"
+                                SkipSource.VIDEO_SKIP -> "VideoSkip"
+                            },
+                            subtitle = "Fetch skip metadata directly on this device",
+                            isChecked = source in playerSettings.skipEnabledSources,
+                            onCheckedChange = { onSetSkipSourceEnabled(source, it) },
+                            onFocused = { focusedSection = PlaybackSection.GENERAL },
+                            enabled = !generalUi.isExternalPlayer && playerSettings.skipIntroEnabled
+                        )
+                    }
+                }
+                item(key = "general_skip_categories_header") {
+                    PlaybackSectionHeader(
+                        title = "Available skip categories",
+                        description = "Disable categories you never want to see as player buttons.",
+                        expanded = skipCategoriesExpanded,
+                        onToggle = { skipCategoriesExpanded = !skipCategoriesExpanded },
+                        focusRequester = skipSourcesHeaderFocus,
+                        onFocused = { focusedSection = PlaybackSection.GENERAL },
+                        enabled = !generalUi.isExternalPlayer && playerSettings.skipIntroEnabled
+                    )
+                }
+                if (skipCategoriesExpanded) {
+                    AutoSkipSegmentType.values().forEach { segmentType ->
+                        item(key = "general_skip_category_${segmentType.storedValue}") {
+                            ToggleSettingsItem(
+                                icon = Icons.Default.Warning,
+                                title = segmentType.storedValue.replaceFirstChar { it.uppercase() },
+                                subtitle = "Allow this category in the player skip button",
+                                isChecked = segmentType in playerSettings.skipEnabledSegmentTypes,
+                                onCheckedChange = { onSetSkipEnabledSegmentType(segmentType, it) },
+                                onFocused = { focusedSection = PlaybackSection.GENERAL },
+                                enabled = !generalUi.isExternalPlayer && playerSettings.skipIntroEnabled
+                            )
+                        }
+                    }
+                }
+            }
+
             item(key = "general_parental_guide") {
                 ToggleSettingsItem(
                     icon = Icons.Default.Info,
@@ -518,6 +608,28 @@ internal fun PlaybackSettingsSections(
                         enabled = !generalUi.isExternalPlayer && playerSettings.skipIntroEnabled
                     )
                 }
+
+                AutoSkipSegmentType.values()
+                    .filterNot {
+                        it == AutoSkipSegmentType.INTRO ||
+                            it == AutoSkipSegmentType.RECAP ||
+                            it == AutoSkipSegmentType.OUTRO
+                    }
+                    .forEach { segmentType ->
+                        item(key = "general_auto_skip_${segmentType.storedValue}") {
+                            ToggleSettingsItem(
+                                icon = Icons.Default.SkipNext,
+                                title = "Auto-skip ${segmentType.storedValue.replaceFirstChar { it.uppercase() }}",
+                                subtitle = "Automatically skip this category when available",
+                                isChecked = segmentType in playerSettings.autoSkipSegmentTypes,
+                                onCheckedChange = {
+                                    onSetAutoSkipSegmentTypeEnabled(segmentType, it)
+                                },
+                                onFocused = { focusedSection = PlaybackSection.GENERAL },
+                                enabled = !generalUi.isExternalPlayer && playerSettings.skipIntroEnabled
+                            )
+                        }
+                    }
             }
 
         }

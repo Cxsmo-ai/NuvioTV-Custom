@@ -488,6 +488,8 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
             skipIntroEnabled = settings.skipIntroEnabled
             parentalGuideEnabled = settings.parentalGuideEnabled
             autoSkipSegmentTypes = settings.autoSkipSegmentTypes
+            skipEnabledSegmentTypes = settings.skipEnabledSegmentTypes
+            skipSettingsFingerprint = settings.skipSettingsFingerprint()
             playerSettingsInitialized = true
 
             // Fetch parental guide on first settings emission (after we know
@@ -504,7 +506,9 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
                     _uiState.update { it.copy(activeSkipInterval = null, skipIntervalDismissed = true) }
                 }
             } else {
-                if (!wasEnabled || skipIntroFetchedKey == null) {
+                if (!wasEnabled || skipIntroFetchedKey == null ||
+                    !skipIntroFetchedKey.orEmpty().contains(skipSettingsFingerprint)
+                ) {
                     _uiState.update { it.copy(skipIntervalDismissed = false) }
                     fetchSkipIntervals(contentId, currentSeason, currentEpisode)
                 }
@@ -651,16 +655,23 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
     val effectiveId = currentVideoId?.takeIf { it.isNotBlank() } ?: id
 
     val imdbId = effectiveId.split(":").firstOrNull()?.takeIf { it.startsWith("tt") } ?: return
-    if (season == null || episode == null) return
+    val isSeries = contentType?.lowercase() in setOf("series", "tv", "show")
+    if (isSeries && (season == null || episode == null)) return
 
-    val key = "$imdbId:$season:$episode"
+    val key = "$imdbId:${season ?: 0}:${episode ?: 0}:$skipSettingsFingerprint"
     if (skipIntroFetchedKey == key) return
     skipIntroFetchedKey = key
 
     scope.launch {
         val fetchT0 = android.os.SystemClock.elapsedRealtime()
-        skipIntervals = withTimeoutOrNull(15_000L) {
-            skipIntroRepository.getSkipIntervals(imdbId, season, episode)
+        skipIntervals = withTimeoutOrNull(8_000L) {
+            skipIntroRepository.getSkipIntervals(
+                imdbId = imdbId,
+                season = season ?: 0,
+                episode = episode ?: 0,
+                title = currentEpisodeTitle ?: title,
+                mediaType = contentType
+            )
         } ?: emptyList()
         // The nt4 capture could not answer why the next-episode card fired at
         // the 99% threshold rather than at the start of a two-minute credit
@@ -686,6 +697,10 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
         )
     }
 }
+
+private fun com.nuvio.tv.data.local.PlayerSettings.skipSettingsFingerprint(): String =
+    "${skipSourcePolicy.name}:${skipEnabledSources.map { it.storedValue }.sorted().joinToString(",")}:" +
+        skipEnabledSegmentTypes.map { it.storedValue }.sorted().joinToString(",")
 
 internal fun PlayerRuntimeController.tryApplyPendingResumeProgress(player: Player) {
     val saved = pendingResumeProgress ?: return

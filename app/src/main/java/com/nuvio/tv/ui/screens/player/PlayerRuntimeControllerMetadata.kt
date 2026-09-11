@@ -506,6 +506,7 @@ internal fun PlayerRuntimeController.updateActiveSkipInterval(positionMs: Long) 
         if (
             segmentType != null &&
             segmentType in autoSkipSegmentTypes &&
+            active.action != "warn" &&
             activeKey !in autoSkippedIntervalKeys
         ) {
             autoSkippedIntervalKeys.add(activeKey)

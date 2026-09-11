@@ -283,6 +283,13 @@ fun PlaybackSettingsContent(
                 onSetPauseOverlayEnabled = { enabled -> coroutineScope.launch { viewModel.setPauseOverlayEnabled(enabled) } },
                 onSetOsdClockEnabled = { enabled -> coroutineScope.launch { viewModel.setOsdClockEnabled(enabled) } },
                 onSetSkipIntroEnabled = { enabled -> coroutineScope.launch { viewModel.setSkipIntroEnabled(enabled) } },
+                onSetSkipSourcePolicy = { policy -> coroutineScope.launch { viewModel.setSkipSourcePolicy(policy) } },
+                onSetSkipSourceEnabled = { source, enabled ->
+                    coroutineScope.launch { viewModel.setSkipSourceEnabled(source, enabled) }
+                },
+                onSetSkipEnabledSegmentType = { segmentType, enabled ->
+                    coroutineScope.launch { viewModel.setSkipEnabledSegmentType(segmentType, enabled) }
+                },
                 onSetParentalGuideEnabled = { enabled -> coroutineScope.launch { viewModel.setParentalGuideEnabled(enabled) } },
                 onSetAutoSkipSegmentTypeEnabled = { segmentType, enabled ->
                     coroutineScope.launch { viewModel.setAutoSkipSegmentTypeEnabled(segmentType, enabled) }
