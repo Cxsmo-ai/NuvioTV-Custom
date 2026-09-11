@@ -58,10 +58,16 @@ import com.nuvio.tv.data.trailer.TrailerService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.OkHttpClient
+import tv.seekr.previews.android.Seekr
+import tv.seekr.previews.android.SeekrTrack
 import javax.inject.Inject
 
 @HiltViewModel
@@ -117,6 +123,8 @@ class PlayerViewModel @Inject constructor(
     private val screensaverController: com.nuvio.tv.core.player.ScreensaverController,
     private val tvRecommendationManager: com.nuvio.tv.core.recommendations.TvRecommendationManager,
     private val themeDataStore: ThemeDataStore,
+    private val seekrCredentialsStore: com.nuvio.tv.data.local.SeekrCredentialsStore,
+    private val okHttpClient: OkHttpClient,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -218,6 +226,59 @@ class PlayerViewModel @Inject constructor(
 
     val exoPlayer: ExoPlayer?
         get() = controller.exoPlayer
+
+    /**
+     * Seekr track loading is entirely separate from playback preparation. It is
+     * cancellable on a title/key change and does not open or inspect the media
+     * URL, so a missing preview can never delay or break playback.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val seekrTrack: StateFlow<SeekrTrack?> =
+        combine(
+            seekrCredentialsStore.apiKey.distinctUntilChanged(),
+            controller.playbackTimeline.map { it.duration }.distinctUntilChanged(),
+            controller.uiState
+                .map { state ->
+                    SeekrEpisodeContext(
+                        season = state.currentSeason,
+                        episode = state.currentEpisode
+                    )
+                }
+                .distinctUntilChanged()
+        ) { apiKey, durationMs, episodeContext ->
+            SeekrLoadRequest(apiKey, durationMs, episodeContext)
+        }
+            .mapLatest { request ->
+                val apiKey = request.apiKey
+                val durationMs = request.durationMs
+                if (apiKey.isBlank() || durationMs <= 0L) return@mapLatest null
+                val content = seekrContentFor(
+                    contentId = controller.contentId,
+                    contentType = controller.contentType,
+                    season = request.episodeContext.season,
+                    episode = request.episodeContext.episode
+                ) ?: return@mapLatest null
+                try {
+                    Seekr.create(apiKey, httpClient = okHttpClient)
+                        .loadTrack(content, durationMs)
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (_: Throwable) {
+                    null
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private data class SeekrEpisodeContext(
+        val season: Int?,
+        val episode: Int?
+    )
+
+    private data class SeekrLoadRequest(
+        val apiKey: String,
+        val durationMs: Long,
+        val episodeContext: SeekrEpisodeContext
+    )
 
     /** Release filename for the current stream, surfaced for the loading overlay. */
     val currentFilename: String?

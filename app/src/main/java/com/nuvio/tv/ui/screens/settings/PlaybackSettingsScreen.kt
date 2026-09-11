@@ -124,6 +124,7 @@ fun PlaybackSettingsContent(
     val skipProviderCredentials by viewModel.skipProviderCredentials.collectAsStateWithLifecycle(
         initialValue = com.nuvio.tv.data.local.SkipProviderCredentials()
     )
+    val seekrApiKey by viewModel.seekrApiKey.collectAsStateWithLifecycle(initialValue = "")
     val coroutineScope = rememberCoroutineScope()
     var memoryUsageTrigger by remember { mutableStateOf(0) }
     var showMemoryUsage by remember { mutableStateOf(false) }
@@ -293,6 +294,10 @@ fun PlaybackSettingsContent(
                     coroutineScope.launch { viewModel.setSkipSourceEnabled(source, enabled) }
                 },
                 onShowSkipProviderCredentials = { openDialog { showSkipProviderCredentialsDialog = true } },
+                seekrApiKey = seekrApiKey,
+                onSetSeekrApiKey = { value ->
+                    coroutineScope.launch { viewModel.setSeekrApiKey(value) }
+                },
                 onSetSkipEnabledSegmentType = { segmentType, enabled ->
                     coroutineScope.launch { viewModel.setSkipEnabledSegmentType(segmentType, enabled) }
                 },

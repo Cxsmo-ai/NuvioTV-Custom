@@ -58,11 +58,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
-import android.widget.Toast
 import kotlinx.coroutines.launch
-import com.nuvio.tv.core.player.thumbnail.SeekThumbnailPreferences
-import com.nuvio.tv.core.player.thumbnail.ThumbnailCache
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -166,6 +162,8 @@ internal fun PlaybackSettingsSections(
     onSetSkipSourcePolicy: (SkipSourcePolicy) -> Unit,
     onSetSkipSourceEnabled: (SkipSource, Boolean) -> Unit,
     onShowSkipProviderCredentials: () -> Unit,
+    seekrApiKey: String = "",
+    onSetSeekrApiKey: (String) -> Unit = {},
     onSetSkipEnabledSegmentType: (AutoSkipSegmentType, Boolean) -> Unit,
     onSetParentalGuideEnabled: (Boolean) -> Unit,
     onSetAutoSkipSegmentTypeEnabled: (AutoSkipSegmentType, Boolean) -> Unit,
@@ -414,41 +412,11 @@ internal fun PlaybackSettingsSections(
             }
 
             item(key = "general_seek_thumbnails") {
-                val seekThumbsEnabled by SeekThumbnailPreferences.enabledFlow(context)
-                    .collectAsState(initial = false)
-                val seekThumbsScope = rememberCoroutineScope()
-                ToggleSettingsItem(
-                    icon = Icons.Default.Image,
-                    title = "Seek preview thumbnails",
-                    subtitle = "Show a preview image above the scrubber while seeking. Experimental; off by default.",
-                    isChecked = seekThumbsEnabled,
-                    onCheckedChange = { enabled ->
-                        seekThumbsScope.launch { SeekThumbnailPreferences.setEnabled(context, enabled) }
-                    },
+                SeekPreviewSettingsItem(
+                    apiKey = seekrApiKey,
+                    onSetApiKey = onSetSeekrApiKey,
                     onFocused = { focusedSection = PlaybackSection.GENERAL },
                     enabled = !generalUi.isExternalPlayer
-                )
-            }
-
-            item(key = "general_seek_thumbnails_clear") {
-                val clearThumbsScope = rememberCoroutineScope()
-                NavigationSettingsItem(
-                    icon = Icons.Default.Image,
-                    title = "Clear seek thumbnail cache",
-                    subtitle = "Delete all saved preview images. They rebuild on next playback.",
-                    onClick = {
-                        clearThumbsScope.launch {
-                            ThumbnailCache.clearAll(context)
-                            Toast.makeText(
-                                context,
-                                "Seek thumbnail cache cleared",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    },
-                    onFocused = { focusedSection = PlaybackSection.GENERAL },
-                    enabled = true,
-                    showChevron = false
                 )
             }
 

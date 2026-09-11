@@ -138,8 +138,6 @@ import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
 import com.nuvio.tv.ui.util.localizeEpisodeTitle
 import com.nuvio.tv.data.local.InternalPlayerEngine
-import com.nuvio.tv.core.player.thumbnail.SeekThumbnailPreferences
-import com.nuvio.tv.core.player.thumbnail.SeekThumbnails
 import com.nuvio.tv.data.local.LibassRenderType
 import com.nuvio.tv.data.local.SubtitleStyleSettings
 import com.nuvio.tv.data.local.StreamAutoPlayMode
@@ -432,21 +430,6 @@ fun PlayerScreen(
     }
 
     // Frame rate matching lifecycle.
-    // T-series Build 3 (seek-thumbnail): worker lifecycle. Toggle default OFF; P3 main-file
-    // provider, <=1080p SDR only; gate + eligibility live in SeekThumbnails. Log tag ThumbWorker.
-    val seekThumbsEnabled = SeekThumbnailPreferences.enabledFlow(context).collectAsState(initial = false)
-    LaunchedEffect(seekThumbsEnabled.value, uiState.currentStreamUrl) {
-        SeekThumbnails.stopSession()
-        val thumbSourceUrl = uiState.currentStreamUrl
-        if (!seekThumbsEnabled.value || thumbSourceUrl.isNullOrBlank()) return@LaunchedEffect
-        SeekThumbnails.startWhenEligible(
-            context = context.applicationContext,
-            url = thumbSourceUrl,
-            titleKey = uiState.title,
-            playerProvider = { viewModel.exoPlayer }
-        )
-    }
-    DisposableEffect(Unit) { onDispose { SeekThumbnails.stopSession() } }
     val activity = LocalContext.current as? android.app.Activity
     LaunchedEffect(activity) {
         viewModel.attachHostActivity(activity)
@@ -1032,8 +1015,11 @@ fun PlayerScreen(
                 delay(1_000L)
             }
         }
-        // T-series Build 3: seek-thumbnail pane (renders only during held-key preview seek).
-        SeekThumbnailOverlayHost(uiState = uiState, viewModel = viewModel, modifier = Modifier.zIndex(2.65f))
+        // Seekr three-frame preview (renders only during preview seeking).
+        SeekrPreviewThumbnailHost(viewModel = viewModel, modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 180.dp)
+            .zIndex(2.65f))
 
         PlaybackStatsOverlay(
             visible = uiState.showPlaybackStatsOverlay && uiState.error == null,

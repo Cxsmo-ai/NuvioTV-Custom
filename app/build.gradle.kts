@@ -462,6 +462,8 @@ dependencies {
     implementation(libs.media3.decoder)
     implementation(libs.media3.session)
     implementation(libs.media3.container)
+    // Seekr sprite-backed seek previews. The app owns key storage and rendering.
+    implementation("tv.seekr:seekr-android:0.2.0")
 
     // Transitive dependencies required by forked local AARs (not bundled in AARs):
     // - Guava: needed by lib-common (ImmutableList/ImmutableSet in Tracks, Player API)

@@ -21,6 +21,7 @@ import com.nuvio.tv.data.local.SkipSource
 import com.nuvio.tv.data.local.SkipSourcePolicy
 import com.nuvio.tv.data.local.SkipProviderCredentials
 import com.nuvio.tv.data.local.SkipProviderCredentialsStore
+import com.nuvio.tv.data.local.SeekrCredentialsStore
 import com.nuvio.tv.data.local.MpvHardwareDecodeMode
 import com.nuvio.tv.data.local.SubtitleOrganizationMode
 import com.nuvio.tv.data.local.TrailerSettings
@@ -44,13 +45,15 @@ class PlaybackSettingsViewModel @Inject constructor(
     private val addonRepository: AddonRepository,
     private val pluginManager: PluginManager,
     private val torrentSettings: TorrentSettings,
-    private val skipProviderCredentialsStore: SkipProviderCredentialsStore
+    private val skipProviderCredentialsStore: SkipProviderCredentialsStore,
+    private val seekrCredentialsStore: SeekrCredentialsStore
 ) : ViewModel() {
 
     val playerSettings: Flow<PlayerSettings> = playerSettingsDataStore.playerSettings
     val trailerSettings: Flow<TrailerSettings> = trailerSettingsDataStore.settings
     val torrentSettingsFlow: Flow<TorrentSettingsData> = torrentSettings.settings
     val skipProviderCredentials: Flow<SkipProviderCredentials> = skipProviderCredentialsStore.credentials
+    val seekrApiKey: Flow<String> = seekrCredentialsStore.apiKey
 
     suspend fun setPublicMetaDbApiKey(value: String) =
         skipProviderCredentialsStore.setPublicMetaDbApiKey(value)
@@ -60,6 +63,9 @@ class PlaybackSettingsViewModel @Inject constructor(
 
     suspend fun setTheIntroDbApiKey(value: String) =
         skipProviderCredentialsStore.setTheIntroDbApiKey(value)
+
+    suspend fun setSeekrApiKey(value: String) =
+        seekrCredentialsStore.setApiKey(value)
 
     fun setP2pEnabled(enabled: Boolean) = torrentSettings.setP2pEnabled(enabled)
     fun setHideTorrentStats(enabled: Boolean) = torrentSettings.setHideTorrentStats(enabled)
