@@ -78,7 +78,8 @@ class SkipIntroRepository @Inject constructor(
         tvdbId: Int? = null,
         anilistId: Int? = null
     ): List<SkipInterval> {
-        val normalizedId = imdbId?.trim()?.takeIf { it.matches(Regex("tt\\d+")) } ?: return emptyList()
+        val normalizedId = imdbId?.trim()?.takeIf { it.matches(Regex("tt\\d+")) }
+        if (normalizedId == null && tmdbId == null && tvdbId == null && anilistId == null) return emptyList()
         val settings = playerSettingsDataStore.playerSettings.first()
         val credentials = credentialsStore.credentials.first()
         if (!settings.skipIntroEnabled) return emptyList()
@@ -87,7 +88,7 @@ class SkipIntroRepository @Inject constructor(
         if (sources.isEmpty()) return emptyList()
         val categoryKey = settings.skipEnabledSegmentTypes.map { it.storedValue }.sorted().joinToString(",")
         val key = listOf(
-            normalizedId, season, episode, mediaType.orEmpty(),
+            normalizedId.orEmpty(), season, episode, mediaType.orEmpty(),
             title.orEmpty(), releaseYear.orEmpty(),
             tmdbId ?: 0, tvdbId ?: 0, anilistId ?: 0,
             durationMs?.takeIf { it > 0L } ?: 0L,
@@ -111,21 +112,25 @@ class SkipIntroRepository @Inject constructor(
                                     normalizedId, season, episode, isSeries, durationMs,
                                     tmdbId, tvdbId, anilistId
                                 )
-                                SkipSource.INTRO_DB -> if (isSeries && introDbConfigured) {
+                                SkipSource.INTRO_DB -> if (normalizedId != null && isSeries && introDbConfigured) {
                                     fetchFromIntroDb(normalizedId, season, episode, credentials.introDbAppApiKey)
                                 } else emptyList()
-                                SkipSource.THE_INTRO_DB -> fetchFromTheIntroDb(
-                                    normalizedId, season, episode, isSeries, durationMs, credentials.theIntroDbApiKey
-                                )
-                                SkipSource.PUBLIC_META_DB -> fetchFromPublicMetaDb(
-                                    normalizedId, season, episode, isSeries, credentials.publicMetaDbApiKey
-                                )
-                                SkipSource.MOVIE_HAVEN_DB -> if (!isSeries) {
+                                SkipSource.THE_INTRO_DB -> if (normalizedId != null) {
+                                    fetchFromTheIntroDb(
+                                        normalizedId, season, episode, isSeries, durationMs, credentials.theIntroDbApiKey
+                                    )
+                                } else emptyList()
+                                SkipSource.PUBLIC_META_DB -> if (normalizedId != null) {
+                                    fetchFromPublicMetaDb(
+                                        normalizedId, season, episode, isSeries, credentials.publicMetaDbApiKey
+                                    )
+                                } else emptyList()
+                                SkipSource.MOVIE_HAVEN_DB -> if (!isSeries && normalizedId != null) {
                                     fetchFromMovieHavenDb(normalizedId)
                                 } else emptyList()
-                                SkipSource.VIDEO_SKIP -> fetchFromVideoSkip(
-                                    normalizedId, title, isSeries, season, episode
-                                )
+                                SkipSource.VIDEO_SKIP -> if (isSeries || normalizedId != null) {
+                                    fetchFromVideoSkip(normalizedId.orEmpty(), title, isSeries, season, episode)
+                                } else emptyList()
                                 SkipSource.NOT_SCARE -> if (!isSeries && !title.isNullOrBlank() && !releaseYear.isNullOrBlank()) {
                                     fetchFromNotScare(title, releaseYear)
                                 } else emptyList()
@@ -168,7 +173,7 @@ class SkipIntroRepository @Inject constructor(
     }
 
     private suspend fun fetchFromSkipMe(
-        imdbId: String,
+        imdbId: String?,
         season: Int,
         episode: Int,
         isSeries: Boolean,
@@ -178,7 +183,7 @@ class SkipIntroRepository @Inject constructor(
         anilistId: Int?
     ): List<SkipInterval> {
         val movieLookup = JSONObject().apply {
-            put("imdb_id", imdbId)
+            imdbId?.let { put("imdb_id", it) }
             tmdbId?.let { put("tmdb_id", it) }
             tvdbId?.let { put("tvdb_id", it) }
             anilistId?.let { put("anilist_id", it) }
@@ -205,7 +210,7 @@ class SkipIntroRepository @Inject constructor(
         }
         if (!isSeries || season <= 0 || episode <= 0) return emptyList()
         val showLookup = JSONObject().apply {
-            put("imdb_series_id", imdbId)
+            imdbId?.let { put("imdb_series_id", it) }
             tmdbId?.let { put("tmdb_id", it) }
             tvdbId?.let { put("tvdb_series_id", it) }
             anilistId?.let { put("anilist_id", it) }

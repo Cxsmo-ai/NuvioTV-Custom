@@ -682,11 +682,11 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
                 }
                 resolved
             }
-        if (imdbId.isNullOrBlank()) {
+        val tmdbId = candidates.mapNotNull(::extractTmdbId).firstOrNull()
+        if (imdbId.isNullOrBlank() && tmdbId == null) {
             Log.d(PlayerRuntimeController.TAG, "Skip lookup skipped: no IMDb/TMDB ID for $candidates")
             return@launch
         }
-        val tmdbId = candidates.mapNotNull(::extractTmdbId).firstOrNull()
 
         val lookupDurationMs = currentPlaybackDurationMs().takeIf { it > 0L }
             ?: expectedRuntimeMinutes?.toLong()?.times(60_000L)?.takeIf { it > 0L }
@@ -695,7 +695,7 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
         // movie endpoint requires duration_ms, and an early empty response must
         // never poison the cache for the rest of the session.
         val durationKey = lookupDurationMs ?: 0L
-        val key = "$imdbId:${season ?: 0}:${episode ?: 0}:$durationKey:$skipSettingsFingerprint"
+        val key = "${imdbId.orEmpty()}:tmdb=${tmdbId ?: 0}:${season ?: 0}:${episode ?: 0}:$durationKey:$skipSettingsFingerprint"
         if (skipIntroFetchedKey == key) return@launch
         skipIntroFetchedKey = key
 
