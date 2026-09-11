@@ -5,6 +5,26 @@ Upstream code, license notices, and attribution remain in place. Support for thi
 provided through its issue tracker and release discussions. The following describes the
 additional work maintained in this fork.
 
+## Current custom UI and playback features
+
+- **Top navigation** is an optional TV-friendly top rail with profile switching, primary tabs,
+  settings/exit actions, a readable clock/app status capsule, and deterministic D-pad focus paths.
+  On Home, the rail is followed by the rotating hero stage; moving down restores the normal
+  catalog backdrop, artwork, metadata, and Continue Watching behavior.
+- **Calendar** is a native tab for watched and tracked shows. It merges episode dates from connected
+  metadata addons with local watch history, library state, Nuvio Sync, Trakt, Simkl, and MDBList
+  where available. It supports upcoming/recent filters, artwork fallbacks, and live spoiler-safe
+  updates after an episode is marked watched.
+- **Seekr thumbnails** provide a lightweight three-frame preview around the selected seek point.
+  **Preview Sync** is available from the player’s More Actions controls when Seekr has a track. It
+  nudges thumbnail lookup timing only (not playback), resets for a new release, and supports fine
+  250 ms adjustments, held-key coarse adjustments, reset, and a duration-gap suggestion.
+- **App Dimmer** is a native overlay that applies to the whole app, including the player and its
+  dialogs. It can be adjusted in Appearance settings or live from the player controls.
+
+These features are intentionally implemented without committing account credentials, API keys,
+private manifest URLs, or signed build material.
+
 ## Post-play recommendations
 
 The post-play screen keeps Nuvio's original full-screen hero presentation and adds a source picker:
@@ -52,9 +72,27 @@ The public release channel uses explicit ABI-specific APK names:
 
 - `NuvioTV-Custom-<version>-armeabi-v7a.apk`
 - `NuvioTV-Custom-<version>-arm64-v8a.apk`
+- `NuvioTV-Custom-<version>-universal.apk`
 
 Do not commit signed APKs, keystores, local properties, API keys, or private manifest URLs. Public
-APKs are uploaded as GitHub Release assets by the release workflow.
+APKs are uploaded as GitHub Release assets by the release workflow, together with generated
+release notes, Downloader install entries, and `SHA256SUMS.txt`.
+
+## Release policy
+
+Every published release is built by the GitHub Actions Android release workflow from a versioned
+commit. The workflow:
+
+1. validates the version bump and release-note tooling;
+2. runs the release-note quality checks;
+3. builds the full Android TV APK set;
+4. normalizes ABI-specific filenames;
+5. generates direct Downloader URLs and SHA-256 checksums; and
+6. publishes the generated changelog in the GitHub release and as a downloadable asset.
+
+Release builds require repository-held signing and configuration secrets in CI. They are never
+stored in the repository or printed in logs. The normal Android CI workflow remains available for
+pull requests and non-release validation.
 
 ## Compatibility and attribution
 

@@ -230,6 +230,16 @@ jobs:
             mv -- "${apk}" "${apk_dir}/NuvioTV-Custom-${RELEASE_VERSION}-${abi}.apk"
           done
 
+      - name: Generate release verification assets
+        if: inputs.mode != 'dry-run'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          apk_dir="app/build/outputs/apk/full/release"
+          sha256sum "${apk_dir}"/NuvioTV-Custom-*.apk > SHA256SUMS.txt
+          cp release-notes.md "CHANGELOG-${RELEASE_VERSION}.md"
+
           for abi in universal arm64-v8a armeabi-v7a; do
             if [[ ! -f "${apk_dir}/NuvioTV-Custom-${RELEASE_VERSION}-${abi}.apk" ]]; then
               echo "Expected ${abi} APK was not produced." >&2
@@ -278,10 +288,21 @@ jobs:
             downloader-install-entries.md
           if-no-files-found: error
 
+      - name: Upload release verification assets
+        if: inputs.mode != 'dry-run'
+        uses: actions/upload-artifact@v6
+        with:
+          name: nuviotv-${{ steps.release.outputs.version }}-release-verification
+          path: |
+            SHA256SUMS.txt
+            CHANGELOG-${{ steps.release.outputs.version }}.md
+          if-no-files-found: error
+
       - name: Create GitHub release
         if: inputs.mode != 'dry-run'
         env:
           RELEASE_MODE: ${{ inputs.mode }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_TITLE: ${{ steps.release.outputs.title }}
           RELEASE_TARGET: ${{ steps.release.outputs.current_bump }}
@@ -304,4 +325,6 @@ jobs:
           gh release create "${release_args[@]}" \
             "${release_apks[@]}" \
             downloader-install-entries.txt \
-            downloader-install-entries.md
+            downloader-install-entries.md \
+            SHA256SUMS.txt \
+            "CHANGELOG-${RELEASE_VERSION}.md"

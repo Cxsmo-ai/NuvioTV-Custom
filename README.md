@@ -5,6 +5,10 @@ An independently maintained Android TV fork of [ysosrs123/NuvioTV-Fork](https://
 
 [![Android CI](https://github.com/Cxsmo-ai/NuvioTV-Custom/actions/workflows/android-ci.yml/badge.svg)](https://github.com/Cxsmo-ai/NuvioTV-Custom/actions/workflows/android-ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/Cxsmo-ai/NuvioTV-Custom?display_name=tag&include_prereleases&label=latest%20release)](https://github.com/Cxsmo-ai/NuvioTV-Custom/releases/latest)
+
+> A focused, TV-first NuvioTV fork for fast source discovery, dependable playback, and
+> high-bitrate 4K/HDR content.
 
 ## About
 
@@ -28,11 +32,47 @@ This fork is a set of targeted optimisations layered on top of their work, not a
 
 ---
 
+## Download and install
+
+Use the [latest GitHub release](https://github.com/Cxsmo-ai/NuvioTV-Custom/releases/latest). Each
+published release contains three installable APKs:
+
+| APK | Best for |
+| --- | --- |
+| `...-armeabi-v7a.apk` | 32-bit Android TV devices, including many Amlogic boxes |
+| `...-arm64-v8a.apk` | 64-bit Android TV devices |
+| `...-universal.apk` | Devices where the ABI is unknown or when one APK is preferred |
+
+The release also includes `downloader-install-entries.md` and `downloader-install-entries.txt`.
+They contain the exact, versioned GitHub URLs to paste into Downloader by AFTVnews. No short-code
+service is required. `SHA256SUMS.txt` is included so the downloaded APK can be verified.
+
+Do not install APKs from commits, issue comments, or copied private URLs. Use a published release
+asset and select the ABI that matches the device whenever possible.
+
+---
+
 ## What this fork adds
 
 The fork-specific features are documented in [docs/custom-fork-features.md](docs/custom-fork-features.md).
 In addition to the playback and library work below, this fork includes:
 
+- **Top navigation and full-screen hero flow** -- an optional top navigation rail with profile and
+  status controls, rotating hero artwork/trailers, and the original catalog backdrop/description
+  behavior restored when moving down into rows.
+- **Native calendar** -- a dedicated calendar tab that combines watched/tracked series with
+  metadata-addon episode dates, artwork fallbacks, past/upcoming filters, and live watched-state
+  updates.
+- **Seekr preview thumbnails with Preview Sync** -- a performant three-frame seek preview plus a
+  manual per-session nudge control for sources whose thumbnail cue timing drifts from playback.
+- **Full-app dimmer** -- a fine-grained dimmer available in Appearance settings and directly in
+  the player, applied consistently over screens, menus, dialogs, and video.
+- **Skip metadata pipeline** -- configurable skip providers with safe fallbacks and player skip
+  controls when matching metadata is available.
+- **Remote-control hardening** -- deterministic D-pad handling and duplicate-click suppression
+  keep seek, pause, menu, and player actions from firing twice on noisy Shield remotes.
+- **Correct skip matching** -- TMDB-backed movies and episodes are resolved to IMDb identifiers
+  before skip metadata is queried, avoiding silent misses when an addon returns TMDB IDs.
 - **Post-play recommendation source selection** -- choose Auto, Trakt, TMDB, Kurato AI, or BingeCat AI.
 - **Kurato and BingeCat discovery** -- the app detects their installed Stremio catalogs, including when they are exposed through AIOStreams, and uses their full paginated result set rather than a four-item rail.
 - **Metadata-aware trailers** -- post-play trailers use the same all-addon metadata routing as Nuvio's detail/player screens, then fall back to addon-supplied, TMDB, or IMDb trailer sources.
@@ -153,8 +193,8 @@ of person who tunes buffer settings for fun.
 - **IAMF** and **MPEG-H** audio decoder components, and an unused UI component -- dropped to slim
   the build. No user-facing loss.
 - **Android TV channel / preview-program sync** -- not used on this fork's target setup.
-- **In-app update check** -- disabled, because this is a personal fork; it does not phone the
-  upstream update feed.
+- **Upstream update feed** -- the updater is pointed at this fork's own GitHub releases, so a
+  custom build does not silently offer an unrelated upstream APK.
 
 **Not removed** (sometimes assumed otherwise): all **34 language translations**, the **add-on
 manager**, and **subtitle add-on support** are intact. Only the layout picker was removed.
