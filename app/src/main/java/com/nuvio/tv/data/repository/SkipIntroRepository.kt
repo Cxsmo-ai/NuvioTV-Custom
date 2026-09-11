@@ -194,32 +194,17 @@ class SkipIntroRepository @Inject constructor(
             if (durationMs != null && durationMs > 0L) put("duration_ms", durationMs)
         }
 
-        // SkipMe uses the show endpoint when an episode runtime is not known,
-        // which is the common early-playback case on Android TV. For movies,
-        // the duration is required by the service and we fail closed rather
-        // than sending an incomplete lookup.
-        if (durationMs.isNullOrPositive()) {
-            val moviePayload = postJson(
-                "https://db.skipme.workers.dev/v1/movies",
-                JSONArray().put(movieLookup).toString()
-            )
-            val movieIntervals = moviePayload?.let {
-                SkipMetadataParser.parseSkipMe(it, "skipme", isSeries, season, episode)
-            }.orEmpty()
-            if (movieIntervals.isNotEmpty() || !isSeries) return movieIntervals
-        }
-        if (!isSeries || season <= 0 || episode <= 0) return emptyList()
-        val showLookup = JSONObject().apply {
-            imdbId?.let { put("imdb_series_id", it) }
-            tmdbId?.let { put("tmdb_id", it) }
-            tvdbId?.let { put("tvdb_series_id", it) }
-            anilistId?.let { put("anilist_id", it) }
-        }
-        val showPayload = postJson(
-            "https://db.skipme.workers.dev/v1/shows",
-            JSONArray().put(showLookup).toString()
+        // SkipMe's playback lookup is POST /v1/movies for both movies and
+        // episodes. It requires a positive runtime; do not call /v1/shows
+        // here because that endpoint is the bulk series-sync path and is not
+        // required to resolve the current episode. The player retries when a
+        // runtime becomes available, so an early startup lookup is harmless.
+        if (!durationMs.isNullOrPositive()) return emptyList()
+        val moviePayload = postJson(
+            "https://db.skipme.workers.dev/v1/movies",
+            JSONArray().put(movieLookup).toString()
         ) ?: return emptyList()
-        return SkipMetadataParser.parseSkipMe(showPayload, "skipme", true, season, episode)
+        return SkipMetadataParser.parseSkipMe(moviePayload, "skipme", isSeries, season, episode)
     }
 
     private suspend fun fetchFromNotScare(title: String, releaseYear: String): List<SkipInterval> {
