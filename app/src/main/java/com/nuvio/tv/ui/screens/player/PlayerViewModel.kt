@@ -251,6 +251,7 @@ class PlayerViewModel @Inject constructor(
             .mapLatest { request ->
                 val apiKey = request.apiKey
                 val durationMs = request.durationMs
+                controller.onEvent(PlayerEvent.OnSetSeekPreviewOffset(0))
                 if (apiKey.isBlank() || durationMs <= 0L) return@mapLatest null
                 val content = seekrContentFor(
                     contentId = controller.contentId,
@@ -268,6 +269,16 @@ class PlayerViewModel @Inject constructor(
                 }
             }
             .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** Duration difference is offered as a suggestion only; it is never applied automatically. */
+    val seekPreviewSuggestedOffsetMs: StateFlow<Long> =
+        combine(
+            seekrTrack,
+            controller.playbackTimeline.map { it.duration }.distinctUntilChanged()
+        ) { track, durationMs ->
+            val sourceDurationMs = track?.sourceDurationMs ?: 0L
+            if (sourceDurationMs > 0L && durationMs > 0L) sourceDurationMs - durationMs else 0L
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
 
     private data class SeekrEpisodeContext(
         val season: Int?,

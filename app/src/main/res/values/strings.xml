@@ -363,6 +363,11 @@
     <string name="player_dimmer_title">App Dimmer</string>
     <string name="player_dimmer_subtitle">Dim overall display brightness</string>
     <string name="cd_app_dimmer">App Dimmer</string>
+    <string name="player_seek_preview_sync">Preview Sync</string>
+    <string name="player_seek_preview_sync_hint">Nudge the offset until the thumbnail matches the frame playing behind this panel.</string>
+    <string name="player_seek_preview_sync_keys">Left/Right adjust · OK resets · Down uses the suggested value · Up or Back closes</string>
+    <string name="player_seek_preview_sync_suggested">Suggested: %1$s (duration gap from the preview source)</string>
+    <string name="cd_seek_preview_sync">Preview sync</string>
     <string name="settings_style_classic">Default</string>
     <string name="settings_style_classic_desc">Standard layout with cards</string>
     <string name="settings_style_zen">Minimal</string>

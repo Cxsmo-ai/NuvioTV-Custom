@@ -71,6 +71,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.RestartAlt
@@ -306,6 +307,8 @@ fun PlayerScreen(
             viewModel.onEvent(PlayerEvent.OnDismissSubtitleTimingDialog)
         } else if (uiState.showSubtitleDelayOverlay) {
             viewModel.onEvent(PlayerEvent.OnHideSubtitleDelayOverlay)
+        } else if (uiState.isSeekPreviewSyncVisible) {
+            viewModel.onEvent(PlayerEvent.OnHideSeekPreviewSyncOverlay)
         } else if (uiState.showSubtitleStylePanel) {
             viewModel.onEvent(PlayerEvent.OnDismissSubtitleStylePanel)
         } else if (uiState.showSourcesPanel) {
@@ -469,6 +472,7 @@ fun PlayerScreen(
         uiState.showSourcesPanel,
         uiState.showSubtitleStylePanel,
         uiState.showSubtitleDelayOverlay,
+        uiState.showSeekPreviewSyncOverlay,
         uiState.showSubtitleTimingDialog,
         uiState.showAudioOverlay,
         uiState.showSubtitleOverlay,
@@ -477,6 +481,7 @@ fun PlayerScreen(
         postPlayRecommendationState.isVisible,
     ) {
         if (shouldConfirmNextEpisodeOnEnd || postPlayRecommendationState.isVisible) return@LaunchedEffect
+        if (uiState.showSeekPreviewSyncOverlay) return@LaunchedEffect
         if (uiState.showControls && !uiState.showEpisodesPanel && !uiState.showSourcesPanel &&
             !uiState.showAudioOverlay && !uiState.showSubtitleOverlay &&
             !uiState.showSubtitleStylePanel && !uiState.showSubtitleDelayOverlay &&
@@ -525,6 +530,7 @@ fun PlayerScreen(
         uiState.showAudioOverlay || uiState.showSubtitleOverlay ||
         uiState.showSubtitleStylePanel || uiState.showSpeedDialog ||
         uiState.showSubtitleDelayOverlay || uiState.showSubtitleTimingDialog ||
+        uiState.showSeekPreviewSyncOverlay ||
         uiState.showMoreDialog || shouldConfirmNextEpisodeOnEnd ||
         uiState.postPlayMode is PostPlayMode.StillWatching ||
         postPlayRecommendationState.isVisible
@@ -606,6 +612,7 @@ fun PlayerScreen(
                 if (uiState.showSubtitleDelayOverlay) {
                     viewModel.onEvent(PlayerEvent.OnHideSubtitleDelayOverlay)
                 } else if (
+                    !uiState.showSeekPreviewSyncOverlay &&
                     !uiState.showEpisodesPanel &&
                     !uiState.showSourcesPanel &&
                     !uiState.showAudioOverlay &&
@@ -1383,9 +1390,22 @@ fun PlayerScreen(
         }
 
         AnimatedVisibility(
+            visible = uiState.isSeekPreviewSyncVisible,
+            enter = fadeIn(animationSpec = tween(120)),
+            exit = fadeOut(animationSpec = tween(120)),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 44.dp)
+                .zIndex(2.32f)
+        ) {
+            SeekPreviewSyncOverlayHost(viewModel = viewModel)
+        }
+
+        AnimatedVisibility(
             visible = uiState.showSeekOverlay && !uiState.showControls && uiState.error == null &&
                 !uiState.showLoadingOverlay && !uiState.showPauseOverlay &&
                 !uiState.showSubtitleDelayOverlay && !uiState.showSubtitleTimingDialog &&
+                !uiState.showSeekPreviewSyncOverlay &&
                 !uiState.showMoreDialog &&
                 !viewModel.playbackTimeline.collectAsState().value.isLive,
             enter = fadeIn(animationSpec = tween(150)),
@@ -2255,6 +2275,12 @@ private fun PlayerControlsOverlay(
                             onUpKey = onHideControls,
                             onFocused = onResetHideTimer
                         )
+                        SeekPreviewSyncControlButtonHost(
+                            viewModel = viewModel,
+                            upFocusRequester = progressBarUpFocusRequester ?: streamInfoFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
                         ControlButton(
                             icon = Icons.Default.SwapHoriz,
                             contentDescription = stringResource(R.string.cd_switch_player_engine),
@@ -2529,6 +2555,26 @@ private fun PillControlButton(
         Spacer(modifier = Modifier.width(8.dp))
         Text(text = label, style = MaterialTheme.typography.labelLarge)
     }
+}
+
+@Composable
+private fun SeekPreviewSyncControlButtonHost(
+    viewModel: PlayerViewModel,
+    upFocusRequester: FocusRequester,
+    onDownKey: () -> Unit,
+    onFocused: () -> Unit
+) {
+    val track by viewModel.seekrTrack.collectAsState()
+    if (track == null) return
+
+    ControlButton(
+        icon = Icons.Default.Tune,
+        contentDescription = stringResource(R.string.cd_seek_preview_sync),
+        onClick = { viewModel.onEvent(PlayerEvent.OnShowSeekPreviewSyncOverlay) },
+        upFocusRequester = upFocusRequester,
+        onDownKey = onDownKey,
+        onFocused = onFocused
+    )
 }
 
 @Composable

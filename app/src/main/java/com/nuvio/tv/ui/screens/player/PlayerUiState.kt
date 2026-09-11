@@ -79,6 +79,9 @@ data class PlayerUiState(
     val showSeekOverlay: Boolean = false,
     val pendingPreviewSeekPosition: Long? = null,
     val previewThumbPositionMs: Long? = null,
+    val showSeekPreviewSyncOverlay: Boolean = false,
+    /** Manual correction applied to Seekr preview lookups for the active release. */
+    val seekPreviewOffsetMs: Int = 0,
     val playbackSpeed: Float = 1f,
     val loadingOverlayEnabled: Boolean = true,
     val showPlayerLoadingStatus: Boolean = false,
@@ -302,6 +305,10 @@ sealed class PlayerEvent {
     data object OnHideSubtitleDelayOverlay : PlayerEvent()
     data class OnAdjustSubtitleDelay(val deltaMs: Int, val showOverlay: Boolean = true) : PlayerEvent()
     data class OnResetSubtitleDelay(val showOverlay: Boolean = true) : PlayerEvent()
+    data object OnShowSeekPreviewSyncOverlay : PlayerEvent()
+    data object OnHideSeekPreviewSyncOverlay : PlayerEvent()
+    data class OnAdjustSeekPreviewOffset(val deltaMs: Int) : PlayerEvent()
+    data class OnSetSeekPreviewOffset(val offsetMs: Int) : PlayerEvent()
     data object OnShowSpeedDialog : PlayerEvent()
     data object OnShowMoreDialog : PlayerEvent()
     data object OnDismissMoreDialog : PlayerEvent()
@@ -347,6 +354,9 @@ sealed class PlayerEvent {
     data object OnToggleTorrentStats : PlayerEvent()
     data object OnTogglePlaybackStats : PlayerEvent()
 }
+
+internal val PlayerUiState.isSeekPreviewSyncVisible: Boolean
+    get() = showSeekPreviewSyncOverlay && error == null && !showLoadingOverlay
 
 data class ParentalWarning(
     val label: String,

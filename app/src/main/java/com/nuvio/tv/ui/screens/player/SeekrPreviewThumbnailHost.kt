@@ -56,15 +56,17 @@ fun SeekrPreviewThumbnailHost(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val timeline by viewModel.playbackTimeline.collectAsStateWithLifecycle()
     val requestedPosition = uiState.previewThumbPositionMs
+    val offsetMs = uiState.seekPreviewOffsetMs.toLong()
     val duration = timeline.duration
     val visible = track != null && requestedPosition != null && duration > 0L
 
     var frames by remember(track) { mutableStateOf(PreviewFrames()) }
     var visiblePosition by remember(track) { mutableStateOf<Long?>(null) }
 
-    LaunchedEffect(track, requestedPosition, duration) {
+    LaunchedEffect(track, requestedPosition, duration, offsetMs) {
         val active = track ?: return@LaunchedEffect
         val position = requestedPosition ?: return@LaunchedEffect
+        active.offsetMs = offsetMs
         val centerPosition = position.coerceIn(0L, max(0L, duration - 1L))
         visiblePosition = centerPosition
 

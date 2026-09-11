@@ -28,6 +28,7 @@ internal fun PlayerRuntimeController.filterEpisodeStreamsByAddon(addonName: Stri
 }
 
 internal fun PlayerRuntimeController.showControlsTemporarily() {
+    if (_uiState.value.showSeekPreviewSyncOverlay) return
     hideSeekOverlayJob?.cancel()
     _uiState.update { it.copy(showControls = true, showSeekOverlay = false, streamInfoData = buildStreamInfoData()) }
     scheduleHideControls()
