@@ -451,6 +451,7 @@ internal fun PlaybackSettingsSections(
                         title = "Source policy",
                         subtitle = when (playerSettings.skipSourcePolicy) {
                             SkipSourcePolicy.AUTO -> "Auto: use all enabled sources"
+                            SkipSourcePolicy.SKIP_ME_ONLY -> "SkipMe.db only"
                             SkipSourcePolicy.INTRO_DB_ONLY -> "IntroDB only"
                             SkipSourcePolicy.THE_INTRO_DB_ONLY -> "TheIntroDB only"
                             SkipSourcePolicy.PUBLIC_META_DB_ONLY -> "PublicMetaDB only"
@@ -460,7 +461,8 @@ internal fun PlaybackSettingsSections(
                         },
                         onClick = {
                             val next = when (playerSettings.skipSourcePolicy) {
-                                SkipSourcePolicy.AUTO -> SkipSourcePolicy.INTRO_DB_ONLY
+                                SkipSourcePolicy.AUTO -> SkipSourcePolicy.SKIP_ME_ONLY
+                                SkipSourcePolicy.SKIP_ME_ONLY -> SkipSourcePolicy.INTRO_DB_ONLY
                                 SkipSourcePolicy.INTRO_DB_ONLY -> SkipSourcePolicy.THE_INTRO_DB_ONLY
                                 SkipSourcePolicy.THE_INTRO_DB_ONLY -> SkipSourcePolicy.PUBLIC_META_DB_ONLY
                                 SkipSourcePolicy.PUBLIC_META_DB_ONLY -> SkipSourcePolicy.MOVIE_HAVEN_DB_ONLY
@@ -487,6 +489,7 @@ internal fun PlaybackSettingsSections(
                         ToggleSettingsItem(
                             icon = Icons.Default.Extension,
                             title = when (source) {
+                                SkipSource.SKIP_ME -> "SkipMe.db"
                                 SkipSource.INTRO_DB -> "IntroDB"
                                 SkipSource.THE_INTRO_DB -> "TheIntroDB"
                                 SkipSource.PUBLIC_META_DB -> "PublicMetaDB"

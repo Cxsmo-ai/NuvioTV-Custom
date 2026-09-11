@@ -81,11 +81,12 @@ In addition to the playback and library work below, this fork includes:
 - **Provider-aware post-play behavior** -- Auto tries the configured AI catalog providers first,
   then falls back to the normal metadata/recommendation providers. A provider that is not installed,
   not connected, disabled, or has no compatible catalog is skipped without blocking the player.
-- **Native skip metadata** -- the player can query IntroDB, TheIntroDB, PublicMetaDB, MovieHavenDB,
-  VideoSkip, and NotScare’s public movie pages for time intervals such as intros, recaps, credits,
-  jumpscares, profanity, and other
-  supported categories. It receives metadata only; it never proxies, rewrites, or downloads the
-  video stream. Provider failures and no-match responses are isolated so playback continues.
+- **Native skip metadata** -- the player can query SkipMe.db, IntroDB, TheIntroDB, PublicMetaDB,
+  MovieHavenDB, VideoSkip, and NotScare’s public movie pages for time intervals such as intros,
+  recaps, credits, jumpscares, profanity, and other supported categories. Overlapping reports retain
+  provider evidence and use bounded confidence merging. It receives metadata only; it never proxies,
+  rewrites, or downloads the video stream. Provider failures and no-match responses are isolated so
+  playback continues.
 - **Progressive AIOStreams scraping** -- the stream screen can consume cumulative NDJSON snapshots from the forked AIOStreams progressive endpoint, so usable results appear while slower addons continue.
 - **Unlocked user scrape timeout** -- the user-facing timeout choices include instant, bounded, and unlimited modes; internal safety bounds remain in place to prevent a dead UI.
 

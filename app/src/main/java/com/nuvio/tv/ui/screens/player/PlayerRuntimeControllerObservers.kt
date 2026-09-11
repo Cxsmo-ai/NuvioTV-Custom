@@ -677,6 +677,7 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
             Log.d(PlayerRuntimeController.TAG, "Skip lookup skipped: no IMDb/TMDB ID for $candidates")
             return@launch
         }
+        val tmdbId = candidates.mapNotNull(::extractTmdbId).firstOrNull()
 
         val key = "$imdbId:${season ?: 0}:${episode ?: 0}:$skipSettingsFingerprint"
         if (skipIntroFetchedKey == key) return@launch
@@ -690,7 +691,10 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
                 episode = episode ?: 0,
                 title = currentEpisodeTitle ?: title,
                 mediaType = contentType,
-                releaseYear = year
+                durationMs = currentPlaybackDurationMs().takeIf { it > 0L }
+                    ?: expectedRuntimeMinutes?.toLong()?.times(60_000L),
+                releaseYear = year,
+                tmdbId = tmdbId
             )
         } ?: emptyList()
         // The nt4 capture could not answer why the next-episode card fired at

@@ -110,4 +110,58 @@ class SkipMetadataParserTest {
         assertEquals(220.0, intervals[1].startTime, 0.001)
         assertEquals(224.0, intervals[1].endTime, 0.001)
     }
+
+    @Test
+    fun skipMeParserReadsMovieCategoriesAndSubmissionConfidence() {
+        val intervals = SkipMetadataParser.parseSkipMe(
+            """[{"intro":[{"start_ms":12000,"end_ms":60000,"submissions":15}],
+                "credits":[{"start_ms":1800000,"end_ms":1860000,"submissions":1}],
+                "preview":[{"start_ms":2000,"end_ms":1000,"submissions":99}]}]""",
+            "skipme",
+            isSeries = false,
+            season = 0,
+            episode = 0
+        )
+
+        assertEquals(listOf("intro", "credits"), intervals.map { it.type })
+        assertEquals(12.0, intervals[0].startTime, 0.001)
+        assertEquals(0.99, intervals[0].confidence, 0.001)
+        assertEquals(15, intervals[0].evidence.single().submissions)
+    }
+
+    @Test
+    fun skipMeParserFiltersToRequestedSeriesEpisode() {
+        val intervals = SkipMetadataParser.parseSkipMe(
+            """[{"segments":[
+                {"season":1,"episode":1,"segment":"intro","start_ms":1000,"end_ms":30000,"submissions":3},
+                {"season":1,"episode":2,"segment":"intro","start_ms":2000,"end_ms":31000,"submissions":3},
+                {"season":1,"episode":1,"segment":"unknown","start_ms":40000,"end_ms":45000}
+            ]}]""",
+            "skipme",
+            isSeries = true,
+            season = 1,
+            episode = 2
+        )
+
+        assertEquals(1, intervals.size)
+        assertEquals(2.0, intervals.single().startTime, 0.001)
+        assertEquals("intro", intervals.single().type)
+    }
+
+    @Test
+    fun overlappingEvidenceMergesConfidenceAndKeepsDifferentActionsSeparate() {
+        val merged = mergeSkipIntervals(
+            listOf(
+                SkipInterval(10.0, 30.0, "intro", "introdb", confidence = 0.86),
+                SkipInterval(11.0, 31.0, "intro", "skipme", confidence = 0.80),
+                SkipInterval(12.0, 14.0, "intro", "videoskip", action = "mute", confidence = 0.90)
+            )
+        )
+
+        assertEquals(2, merged.size)
+        val skip = merged.first { it.action == "skip" }
+        assertEquals(2, skip.evidence.map { it.provider }.toSet().size)
+        assertTrue(skip.confidence > 0.86)
+        assertEquals("mute", merged.first { it.action == "mute" }.action)
+    }
 }

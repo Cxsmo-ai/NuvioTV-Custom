@@ -80,6 +80,7 @@ The current provider set is:
 
 | Provider | Coverage and credentials |
 | --- | --- |
+| **SkipMe.db** | Public direct metadata API for movie and episode intro, recap, credits, and preview timestamps. Movie lookups use runtime-aware `/v1/movies` requests; episode lookups use `/v1/shows` when runtime is not available. No key is required. |
 | **IntroDB** | Series episode intro/recap/outro metadata. Optional IntroDB app key can be entered in the skip-provider settings. |
 | **TheIntroDB** | Movie and series metadata, including intro/recap/credits/preview where returned. Optional bearer key is supported. |
 | **PublicMetaDB** | Movie and series skip metadata through IMDb-to-TMDB mapping. A PublicMetaDB API key is required. |
@@ -89,8 +90,10 @@ The current provider set is:
 
 Skip settings support **Auto** (all enabled sources) and a provider-only policy for each source. You
 can also enable or disable segment categories, including intro, recap, outro/credits, preview, and
-content-warning categories supported by the returned metadata. Results are normalized, sorted, deduplicated,
-bounded, and cached for a short period. Provider requests run in parallel with per-provider timeouts,
+content-warning categories supported by the returned metadata. Results are normalized, sorted, evidence-merged,
+bounded, and cached for a short period. Overlapping reports with the same category and action are combined
+using confidence-weighted timing; each unique provider report is retained as evidence and adds only a capped
+confidence boost. Conflicting actions such as skip versus mute remain separate. Provider requests run in parallel with per-provider timeouts,
 so a slow or unavailable source cannot delay playback or prevent another provider from returning a
 usable interval.
 
@@ -102,8 +105,8 @@ for titles or episodes that a provider has not indexed yet.
 For correct matching, the client normalizes the current content to an IMDb identifier before querying.
 This is important for metadata addons that start with a TMDB movie or episode ID. MovieHavenDB and
 VideoSkip are best treated as supplemental sources because their coverage and category vocabulary can
-vary by title. The player keeps the provider and confidence information internally so future UI can
-explain why an interval was offered without exposing credentials.
+vary by title. The player keeps provider, confidence, timing, action, and submission evidence internally
+so future UI can explain why an interval was offered without exposing credentials.
 
 ## Progressive AIOStreams scraping
 

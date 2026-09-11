@@ -506,6 +506,7 @@ enum class AutoSkipSegmentType(val storedValue: String) {
 
 /** Direct on-device skip providers. AUTO uses enabled providers in built-in priority order. */
 enum class SkipSource(val storedValue: String) {
+    SKIP_ME("skipme"),
     INTRO_DB("introdb"),
     THE_INTRO_DB("theintrodb"),
     PUBLIC_META_DB("publicmetadb"),
@@ -520,6 +521,7 @@ enum class SkipSource(val storedValue: String) {
 
 enum class SkipSourcePolicy {
     AUTO,
+    SKIP_ME_ONLY,
     INTRO_DB_ONLY,
     THE_INTRO_DB_ONLY,
     PUBLIC_META_DB_ONLY,
