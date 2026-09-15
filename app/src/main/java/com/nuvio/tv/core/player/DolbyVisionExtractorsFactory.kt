@@ -269,8 +269,8 @@ private fun dvProfileOf(codecs: String?): Int? {
  * P7/P8.1 only; leaves an already-HDR (ST2084) Format untouched.
  */
 @UnstableApi
-private class HdrColorSignalingExtractor(
-    private val delegate: Extractor
+internal class HdrColorSignalingExtractor(
+    internal val delegate: Extractor
 ) : Extractor {
     override fun init(output: ExtractorOutput) =
         delegate.init(HdrColorSignalingExtractorOutput(output))

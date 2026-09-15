@@ -119,6 +119,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.Tracks
+import androidx.media3.common.C
+import androidx.media3.common.MimeTypes
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Border
@@ -1712,6 +1714,7 @@ private fun ExoPlayerSurface(
     val latestAspectMode by rememberUpdatedState(aspectMode)
     val latestBindSubtitleView by rememberUpdatedState(onBindSubtitleView)
     val latestSubtitleStyle by rememberUpdatedState(subtitleStyle)
+    val latestUseLibass by rememberUpdatedState(useLibass)
     val playerView = remember(context, player) {
         PlayerView(context).apply {
             useController = false
@@ -1786,7 +1789,7 @@ private fun ExoPlayerSurface(
                 // Re-apply subtitle style when tracks change so style is applied
                 // even when subtitles are enabled after initial player setup.
                 playerView.post {
-                    playerView.applySubtitleStyleIfNeeded(latestSubtitleStyle)
+                    playerView.applySubtitleStyleIfNeeded(latestSubtitleStyle, player, latestUseLibass)
                 }
             }
         }
@@ -1830,8 +1833,8 @@ private fun ExoPlayerSurface(
         )
     }
 
-    LaunchedEffect(playerView, subtitleStyle) {
-        playerView.applySubtitleStyleIfNeeded(subtitleStyle)
+    LaunchedEffect(playerView, subtitleStyle, player, useLibass) {
+        playerView.applySubtitleStyleIfNeeded(subtitleStyle, player, useLibass)
     }
 }
 
@@ -1848,8 +1851,13 @@ private fun PlayerView.applyExoAspectMode(mode: AspectMode) {
     applyExoAspectMode(this, mode)
 }
 
-private fun PlayerView.applySubtitleStyleIfNeeded(subtitleStyle: SubtitleStyleSettings) {
-    if (getTag(R.id.player_view_subtitle_style_tag) == subtitleStyle) {
+private fun PlayerView.applySubtitleStyleIfNeeded(
+    subtitleStyle: SubtitleStyleSettings,
+    player: ExoPlayer,
+    useLibass: Boolean
+) {
+    val styleKey = SubtitleStyleApplicationKey(subtitleStyle, useLibass, player.hasSelectedAssTrack())
+    if (getTag(R.id.player_view_subtitle_style_tag) == styleKey) {
         return
     }
     val subView = subtitleView
@@ -1858,8 +1866,13 @@ private fun PlayerView.applySubtitleStyleIfNeeded(subtitleStyle: SubtitleStyleSe
         // tag so that when subtitles become active the style is re-applied.
         return
     }
-    setTag(R.id.player_view_subtitle_style_tag, subtitleStyle)
+    setTag(R.id.player_view_subtitle_style_tag, styleKey)
     subView.apply {
+        if (!useLibass && player.hasSelectedAssTrack()) {
+            applyEmbeddedAssStyle()
+            return@apply
+        }
+
         val baseFontSize = 24f
         val scaledFontSize = baseFontSize * (subtitleStyle.size / 100f)
         setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, scaledFontSize)
@@ -1894,10 +1907,26 @@ private fun PlayerView.applySubtitleStyleIfNeeded(subtitleStyle: SubtitleStyleSe
             (0.06f + (subtitleStyle.verticalOffset / 250f)).coerceIn(0f, 0.4f)
         setBottomPaddingFraction(bottomPaddingFraction)
 
+        val expectedStyleKey = styleKey
         post {
+            if (getTag(R.id.player_view_subtitle_style_tag) != expectedStyleKey) return@post
             val extraPadding = (height * (subtitleStyle.verticalOffset / 400f)).toInt().coerceAtLeast(0)
             setPadding(paddingLeft, paddingTop, paddingRight, extraPadding)
         }
+    }
+}
+
+private data class SubtitleStyleApplicationKey(
+    val style: SubtitleStyleSettings,
+    val useLibass: Boolean,
+    val selectedAss: Boolean
+)
+
+private fun ExoPlayer.hasSelectedAssTrack(): Boolean = currentTracks.groups.any { group ->
+    if (group.type != C.TRACK_TYPE_TEXT || !group.isSelected) return@any false
+    (0 until group.length).any { index ->
+        val format = group.getTrackFormat(index)
+        format.sampleMimeType == MimeTypes.TEXT_SSA || format.codecs == MimeTypes.TEXT_SSA
     }
 }
 

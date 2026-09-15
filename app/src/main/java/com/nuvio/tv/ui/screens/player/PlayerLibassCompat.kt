@@ -11,9 +11,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.RenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.Extractor
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.mkv.MatroskaExtractor as StockMatroskaExtractor
 import androidx.media3.extractor.text.SubtitleParser
+import com.nuvio.tv.core.player.HdrColorSignalingExtractor
 import com.nuvio.tv.core.player.dvmkv.MatroskaExtractor as DvMatroskaExtractor
 import io.github.peerless2012.ass.media.AssHandler
 import io.github.peerless2012.ass.media.kt.withAssSupport
@@ -101,21 +103,33 @@ private fun ExtractorsFactory.withAssMkvSupportCompat(
     return ExtractorsFactory {
         val extractors = delegate.createExtractors()
         extractors.forEachIndexed { index, extractor ->
-            // Stock MatroskaExtractor: replace with ASS-aware variant for libass support.
-            if (extractor is StockMatroskaExtractor) {
-                extractors[index] = NuvioAssMatroskaExtractor(subtitleParserFactory, assHandler)
-            }
-            // The DV7 factory swaps in a vendored DvMatroskaExtractor for DV conversion.
-            // Preserve its Dolby Vision transformer while enabling libass and zlib subtitle
-            // decompression from the same vendored Matroska extractor base class.
-            if (extractor is DvMatroskaExtractor) {
-                extractors[index] = NuvioAssMatroskaExtractor(
-                    subtitleParserFactory = subtitleParserFactory,
-                    assHandler = assHandler,
-                    dolbyVisionSampleTransformer = extractor.dolbyVisionSampleTransformer
-                )
+            // Replace Matroska extractors while preserving any outer HDR color-signaling
+            // wrapper installed by the Dolby Vision factory.
+            extractors[index] = extractor.mapSubtitleExtractor { subtitleExtractor ->
+                when (subtitleExtractor) {
+                    is StockMatroskaExtractor ->
+                        NuvioAssMatroskaExtractor(subtitleParserFactory, assHandler)
+
+                    // Preserve DV conversion and DTS detection from the vendored extractor.
+                    is DvMatroskaExtractor -> NuvioAssMatroskaExtractor(
+                        subtitleParserFactory = subtitleParserFactory,
+                        assHandler = assHandler,
+                        dolbyVisionSampleTransformer = subtitleExtractor.dolbyVisionSampleTransformer
+                    )
+
+                    else -> subtitleExtractor
+                }
             }
         }
         extractors
     }
 }
+
+/** Replace the wrapped Matroska extractor without dropping HDR color signaling. */
+@OptIn(UnstableApi::class)
+internal fun Extractor.mapSubtitleExtractor(transform: (Extractor) -> Extractor): Extractor =
+    if (this is HdrColorSignalingExtractor) {
+        HdrColorSignalingExtractor(delegate.mapSubtitleExtractor(transform))
+    } else {
+        transform(this)
+    }
