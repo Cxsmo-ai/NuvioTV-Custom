@@ -240,6 +240,8 @@ fun SkipIntroButton(
 private fun getSkipLabel(type: String?): String = when (type?.trim()?.lowercase()) {
     "op", "opening", "mixed-op", "intro" -> stringResource(R.string.skip_intro)
     "ed", "ending", "mixed-ed", "outro", "credits" -> stringResource(R.string.skip_ending)
+    "movie-credits" -> stringResource(R.string.skip_movie_credits)
+    "post-credits" -> stringResource(R.string.skip_post_credits)
     "recap" -> stringResource(R.string.skip_recap)
     "jumpscare", "frightening", "scare" -> "Skip scare"
     "nudity" -> "Skip nudity"

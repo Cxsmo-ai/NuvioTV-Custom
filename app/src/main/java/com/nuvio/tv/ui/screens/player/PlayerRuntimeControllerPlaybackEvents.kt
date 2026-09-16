@@ -76,7 +76,10 @@ internal fun PlayerRuntimeController.skipInterval(interval: SkipInterval): Boole
     } else {
         (interval.endTime * 1000).toLong()
     }
-    seekPlaybackTo(seekMs.coerceAtMost(duration), SeekParameters.NEXT_SYNC)
+    val seekParameters = if (interval.type == "movie-credits" || interval.type == "post-credits") {
+        SeekParameters.EXACT
+    } else SeekParameters.NEXT_SYNC
+    seekPlaybackTo(seekMs.coerceAtMost(duration), seekParameters)
     scheduleProgressSyncAfterSeek()
     _uiState.update { it.copy(activeSkipInterval = null, skipIntervalDismissed = true) }
     return true

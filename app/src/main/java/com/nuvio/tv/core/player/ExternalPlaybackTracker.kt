@@ -449,12 +449,30 @@ class ExternalPlaybackTracker @Inject constructor(
         // videoId carries the episode-specific id (e.g. imdb); fall back to contentId.
         val effectiveId = metadata.videoId.takeIf { it.isNotBlank() } ?: metadata.contentId
 
+        val isMovie = metadata.contentType.equals("movie", ignoreCase = true)
         val intervals = withTimeoutOrNull(SKIP_RESOLVE_TIMEOUT_MS) {
-            val imdbId = effectiveId.split(":").firstOrNull()?.takeIf { it.startsWith("tt") }
+            val imdbId = effectiveId.split(":").firstOrNull()
+                ?.takeIf { it.matches(Regex("tt\\d+")) }
                 ?: return@withTimeoutOrNull null
-            val s = metadata.season ?: return@withTimeoutOrNull null
-            val e = metadata.episode ?: return@withTimeoutOrNull null
-            skipIntroRepository.getSkipIntervals(imdbId, s, e)
+            if (isMovie) {
+                // Movies use the movie-specific IntroDB shape (credits plus
+                // post-credits) and deliberately use 0/0 for season/episode.
+                skipIntroRepository.getSkipIntervals(
+                    imdbId = imdbId,
+                    season = 0,
+                    episode = 0,
+                    mediaType = "movie"
+                )
+            } else {
+                val s = metadata.season ?: return@withTimeoutOrNull null
+                val e = metadata.episode ?: return@withTimeoutOrNull null
+                skipIntroRepository.getSkipIntervals(
+                    imdbId = imdbId,
+                    season = s,
+                    episode = e,
+                    mediaType = metadata.contentType
+                )
+            }
         }
         if (intervals.isNullOrEmpty()) return null
 

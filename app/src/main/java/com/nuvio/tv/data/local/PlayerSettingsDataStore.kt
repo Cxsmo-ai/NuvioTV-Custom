@@ -474,6 +474,8 @@ enum class AutoSkipSegmentType(val storedValue: String) {
     INTRO("intro"),
     RECAP("recap"),
     OUTRO("outro"),
+    MOVIE_CREDITS("movie-credits"),
+    POST_CREDITS("post-credits"),
     PREVIEW("preview"),
     JUMPSCARE("jumpscare"),
     NUDITY("nudity"),
@@ -491,6 +493,8 @@ enum class AutoSkipSegmentType(val storedValue: String) {
             "op", "opening", "mixed-op", "intro" -> INTRO
             "recap" -> RECAP
             "ed", "ending", "mixed-ed", "outro", "credits" -> OUTRO
+            "movie-credits" -> MOVIE_CREDITS
+            "post-credits" -> POST_CREDITS
             "preview", "filler" -> PREVIEW
             "jumpscare", "frightening", "scare", "intense" -> JUMPSCARE
             "nudity" -> NUDITY
