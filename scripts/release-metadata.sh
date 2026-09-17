@@ -89,7 +89,7 @@ fi
 
 printf 'version=%s\n' "$current_version"
 printf 'version_code=%s\n' "$current_version_code"
-printf 'tag=%s\n' "$current_version"
+printf 'tag=%s\n' "v$current_version"
 printf 'title=%s\n' "$release_title"
 printf 'release_commit=%s\n' "$(git rev-parse "${target_ref}^{commit}")"
 printf 'current_bump=%s\n' "$current_bump"
