@@ -15,10 +15,33 @@ additional work maintained in this fork.
   metadata addons with local watch history, library state, Nuvio Sync, Trakt, Simkl, and MDBList
   where available. It supports upcoming/recent filters, artwork fallbacks, and live spoiler-safe
   updates after an episode is marked watched.
-- **Seekr thumbnails** provide a lightweight three-frame preview around the selected seek point.
-  **Preview Sync** is available from the player’s More Actions controls when Seekr has a track. It
-  nudges thumbnail lookup timing only (not playback), resets for a new release, and supports fine
-  250 ms adjustments, held-key coarse adjustments, reset, and a duration-gap suggestion.
+- **Seekr thumbnails and automatic Preview Sync** provide a lightweight three-frame preview around
+  the selected seek point. **Preview Sync** is available from the player’s More Actions controls
+  when Seekr has a track. It nudges thumbnail lookup timing only (not playback), resets for a new
+  release, and supports fine 250 ms adjustments, held-key coarse adjustments, reset, and a
+  duration-gap suggestion.
+
+  The custom fork also performs a one-time, release-local calibration when ExoPlayer has a usable
+  rendered surface. It samples three safe timeline anchors, compares the 320×180 Seekr thumbnail
+  against frames captured from the real player surface, searches the documented ±3-second Seekr
+  keyframe-error window, and uses a robust median/outlier filter before applying a bounded offset.
+  Weak or ambiguous matches are rejected and leave the offset at zero. The calibration is designed
+  around the limitations of normal Seekr integration:
+
+  | Normal Seekr integration | NuvioTV Custom calibration |
+  | --- | --- |
+  | Looks up a fixed-interval/keyframe thumbnail directly | Aligns the thumbnail track to the actual rendered release |
+  | Uses a client offset/scale chosen by metadata or duration | Estimates a bounded offset from multiple local frame matches |
+  | Can drift when the source release differs | Rejects low-confidence or conflicting anchors instead of guessing |
+  | May require an external preview proxy or second decoder in custom solutions | Uses the existing player surface; no proxy, upload, or second decoder |
+  | A bad match can silently mislead the seek preview | Falls back safely to the unshifted track and keeps playback independent |
+
+  This improves timing rather than changing the video position. It is not a mathematical guarantee
+  of pixel identity: Seekr’s source thumbnails may be keyframe approximations or originate from a
+  different release. The player therefore treats the calibration as advisory, keeps it bounded to
+  the current release, and only applies it when the local evidence is strong enough. The startup
+  gate is limited to calibration and then releases the normal player; if the track is unavailable
+  or the player surface cannot be captured, playback continues normally without calibration.
 - **App Dimmer** is a native overlay that applies to the whole app, including the player and its
   dialogs. It can be adjusted in Appearance settings or live from the player controls.
 

@@ -63,8 +63,12 @@ In addition to the playback and library work below, this fork includes:
 - **Native calendar** -- a dedicated calendar tab that combines watched/tracked series with
   metadata-addon episode dates, artwork fallbacks, past/upcoming filters, and live watched-state
   updates.
-- **Seekr preview thumbnails with Preview Sync** -- a performant three-frame seek preview plus a
-  manual per-session nudge control for sources whose thumbnail cue timing drifts from playback.
+- **Seekr preview thumbnails with Preview Sync and frame calibration** -- a performant three-frame
+  seek preview, a manual per-session nudge control, and an automatic local alignment pass for
+  sources whose thumbnail cue timing drifts from playback. Unlike normal Seekr integration, the
+  calibration compares Seekr's thumbnails with frames rendered by the actual player release at
+  multiple timeline anchors, rejects weak or ambiguous matches, and applies only a bounded,
+  per-release offset. It never uploads frames, proxies the stream, or starts a second decoder.
 - **Full-app dimmer** -- a fine-grained dimmer available in Appearance settings and directly in
   the player, applied consistently over screens, menus, dialogs, and video.
 - **Skip metadata pipeline** -- configurable skip providers with safe fallbacks and player skip
