@@ -1,6 +1,5 @@
 package com.nuvio.tv.ui.screens.player
 
-import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
+import tv.seekr.previews.android.SeekrThumbnail
 import tv.seekr.previews.android.SeekrTrack
 import kotlin.math.max
 
@@ -36,10 +36,30 @@ private const val PREVIEW_STEP_MS = 10_000L
 private const val PREVIEW_LINGER_MS = 1_500L
 
 private data class PreviewFrames(
-    val previous: Bitmap? = null,
-    val center: Bitmap? = null,
-    val next: Bitmap? = null
+    val previous: SeekrThumbnail? = null,
+    val center: SeekrThumbnail? = null,
+    val next: SeekrThumbnail? = null
 )
+
+/**
+ * Seekr's lookup is a floor lookup over cue intervals. After the midpoint of
+ * an interval, the next cue is visually closer to the requested position.
+ */
+internal suspend fun SeekrTrack.thumbnailNearestTo(positionMs: Long): SeekrThumbnail? {
+    val cue = thumbnailFor(positionMs) ?: return null
+    return if (preferSuccessorCue(positionMs, cue.cueStartMs, cue.cueEndMs)) {
+        thumbnailFor(cue.cueEndMs) ?: cue
+    } else {
+        cue
+    }
+}
+
+internal fun preferSuccessorCue(positionMs: Long, cueStartMs: Long, cueEndMs: Long): Boolean {
+    if (cueEndMs <= cueStartMs) return false
+    val before = positionMs - cueStartMs
+    val after = cueEndMs - positionMs
+    return before > after
+}
 
 /**
  * Seekr-backed three-frame preview. The center thumbnail is requested first so
@@ -73,16 +93,16 @@ fun SeekrPreviewThumbnailHost(
         // Center-first means the first useful frame can render without waiting
         // for the context frames. Seekr's internal sheet cache makes subsequent
         // adjacent lookups cheap when they share the same sprite sheet.
-        val center = active.thumbnailAt(centerPosition)
+        val center = active.thumbnailNearestTo(centerPosition)
         frames = PreviewFrames(center = center)
 
         val previous = if (centerPosition >= PREVIEW_STEP_MS) {
-            active.thumbnailAt(centerPosition - PREVIEW_STEP_MS)
+            active.thumbnailNearestTo(centerPosition - PREVIEW_STEP_MS)
         } else {
             null
         }
         val next = if (centerPosition + PREVIEW_STEP_MS < duration) {
-            active.thumbnailAt(centerPosition + PREVIEW_STEP_MS)
+            active.thumbnailNearestTo(centerPosition + PREVIEW_STEP_MS)
         } else {
             null
         }
@@ -109,7 +129,7 @@ fun SeekrPreviewThumbnailHost(
 }
 
 @Composable
-private fun PreviewFrame(bitmap: Bitmap?, emphasized: Boolean) {
+private fun PreviewFrame(thumbnail: SeekrThumbnail?, emphasized: Boolean) {
     Box(
         modifier = Modifier
             .size(if (emphasized) 176.dp else 112.dp, if (emphasized) 99.dp else 63.dp)
@@ -121,7 +141,7 @@ private fun PreviewFrame(bitmap: Bitmap?, emphasized: Boolean) {
                 shape = RoundedCornerShape(6.dp)
             )
     ) {
-        bitmap?.let {
+        thumbnail?.bitmap?.let {
             Image(
                 bitmap = it.asImageBitmap(),
                 contentDescription = null,

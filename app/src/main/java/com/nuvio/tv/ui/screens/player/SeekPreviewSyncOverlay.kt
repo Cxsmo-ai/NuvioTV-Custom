@@ -236,7 +236,8 @@ private fun SyncPreviewImage(track: SeekrTrack?, positionMs: Long, offsetMs: Int
         requestFlow.collectLatest { (position, offset) ->
             val active = track ?: return@collectLatest
             active.offsetMs = offset.toLong()
-            active.thumbnailAt(position)?.let { bitmap = it }
+            bitmap = null
+            active.thumbnailNearestTo(position)?.let { bitmap = it.bitmap }
         }
     }
     Box(
