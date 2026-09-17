@@ -133,6 +133,7 @@ import com.nuvio.tv.core.auth.DeviceSessionRegistration
 import com.nuvio.tv.core.deeplink.DeepLinkHandler
 import com.nuvio.tv.core.deeplink.DeepLinkParser
 import com.nuvio.tv.core.profile.ProfileManager
+import com.nuvio.tv.core.profile.resolveProfileAvatarImageUrl
 import com.nuvio.tv.core.sync.ProfileSyncService
 import com.nuvio.tv.core.sync.StartupSyncService
 import com.nuvio.tv.core.tracking.TrackingProgressRefreshCoordinator
@@ -450,15 +451,22 @@ class MainActivity : ComponentActivity() {
                 .includes(CosmeticEntitlement.PROFILE_AVATARS)
 
             LaunchedEffect(hasProfileAvatarAccess) {
-                avatarCatalog = runCatching {
-                    avatarRepository.getAvatarCatalog(hasProfileAvatarAccess)
+                repeat(3) { attempt ->
+                    val loadedCatalog = runCatching {
+                        avatarRepository.getAvatarCatalog(hasProfileAvatarAccess)
+                    }
+                    if (loadedCatalog.isSuccess) {
+                        avatarCatalog = loadedCatalog.getOrThrow()
+                        return@LaunchedEffect
+                    }
+                    if (attempt < 2) kotlinx.coroutines.delay(400L * (attempt + 1))
                 }
-                    .getOrDefault(emptyList())
             }
 
             val activeProfileAvatarImageUrl = remember(activeProfile, avatarCatalog) {
-                activeProfile?.avatarUrl?.takeIf { it.isNotBlank() }
-                    ?: activeProfile?.avatarId?.let { avatarRepository.getAvatarImageUrl(it, avatarCatalog) }
+                resolveProfileAvatarImageUrl(activeProfile) { avatarId ->
+                    avatarRepository.getAvatarImageUrl(avatarId, avatarCatalog)
+                }
             }
 
             val mainUiPrefsFlow = remember(

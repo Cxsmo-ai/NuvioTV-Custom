@@ -94,6 +94,7 @@ import androidx.tv.material3.Text
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
 import com.nuvio.tv.core.sync.SetProfilePinResult
+import com.nuvio.tv.core.profile.resolveProfileAvatarImageUrl
 import com.nuvio.tv.data.remote.supabase.AvatarCatalogItem
 import com.nuvio.tv.data.remote.supabase.ProfileBackgroundCatalogItem
 import com.nuvio.tv.domain.model.UserProfile
@@ -880,8 +881,10 @@ private fun ProfileGrid(
                 profiles.forEachIndexed { index, profile ->
                     ProfileCard(
                         profile = profile,
-                        avatarImageUrl = profile.avatarUrl?.takeIf { it.isNotBlank() }
-                            ?: profile.avatarId?.let(avatarImageUrlsById::get),
+                        avatarImageUrl = resolveProfileAvatarImageUrl(
+                            profile = profile,
+                            resolveCatalogAvatar = avatarImageUrlsById::get
+                        ),
                         focusRequester = focusRequesters[index],
                         compact = useCompactCards,
                         onFocused = { onProfileFocused(profile) },
@@ -1541,8 +1544,10 @@ private fun EditProfileOverlay(
     val hasChangedAvatarSelection = selectedAvatarId != profile.avatarId
     val previewAvatarImageUrl = when {
         selectedAvatar != null -> selectedAvatar.imageUrl
-        !hasChangedAvatarSelection -> profile.avatarUrl?.takeIf { it.isNotBlank() }
-            ?: avatarUrlResolver(profile.avatarId)
+        !hasChangedAvatarSelection -> resolveProfileAvatarImageUrl(
+            profile = profile,
+            resolveCatalogAvatar = { avatarId -> avatarUrlResolver(avatarId) }
+        )
         else -> null
     }
     val nameFocusRequester = remember { FocusRequester() }

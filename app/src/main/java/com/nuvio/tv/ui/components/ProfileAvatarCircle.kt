@@ -60,6 +60,16 @@ fun ProfileAvatarCircle(
             ),
         contentAlignment = Alignment.Center
     ) {
+        // Keep the deterministic initials fallback underneath the image. Coil
+        // can fail silently for an expired or unreachable URL; leaving the
+        // initial visible prevents a blank avatar while the image retries or
+        // when a legacy profile contains a stale direct URL.
+        Text(
+            text = initial,
+            color = Color.White,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Bold
+        )
         if (imageRequest != null) {
             AsyncImage(
                 model = imageRequest,
@@ -68,13 +78,6 @@ fun ProfileAvatarCircle(
                     .size(size)
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop
-            )
-        } else {
-            Text(
-                text = initial,
-                color = Color.White,
-                fontSize = fontSize,
-                fontWeight = FontWeight.Bold
             )
         }
     }

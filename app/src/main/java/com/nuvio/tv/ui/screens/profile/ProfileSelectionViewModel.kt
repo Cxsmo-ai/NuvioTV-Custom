@@ -103,12 +103,16 @@ class ProfileSelectionViewModel @Inject constructor(
     }
 
     private suspend fun loadAvatarCatalog(hasMemberAccess: Boolean) {
-        try {
-            _avatarCatalog.value = avatarRepository.getAvatarCatalog(hasMemberAccess)
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            Log.e("ProfileSelectionVM", "Failed to load avatar catalog", error)
+        repeat(3) { attempt ->
+            try {
+                _avatarCatalog.value = avatarRepository.getAvatarCatalog(hasMemberAccess)
+                return
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.w("ProfileSelectionVM", "Avatar catalog load attempt ${attempt + 1} failed", error)
+                if (attempt < 2) delay(400L * (attempt + 1))
+            }
         }
     }
 

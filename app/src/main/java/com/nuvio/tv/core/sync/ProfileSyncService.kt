@@ -73,13 +73,22 @@ class ProfileSyncService @Inject constructor(
                 put("p_profiles", buildJsonArray {
                     profiles.forEach { profile ->
                         addJsonObject {
+                            val avatarId = profile.avatarId
+                                ?.trim()
+                                ?.takeIf { it.isNotEmpty() }
+                            val avatarUrl = profile.avatarUrl
+                                ?.trim()
+                                ?.takeIf { it.isNotEmpty() }
                             put("profile_index", profile.id)
                             put("name", profile.name)
                             put("avatar_color_hex", profile.avatarColorHex)
                             put("uses_primary_addons", profile.usesPrimaryAddons)
                             put("uses_primary_plugins", profile.usesPrimaryPlugins)
-                            put("avatar_id", if (profile.avatarUrl.isNullOrBlank()) profile.avatarId else null)
-                            put("avatar_url", profile.avatarUrl?.takeIf { it.isNotBlank() })
+                            // A selected catalog avatar is identified by ID. Do
+                            // not let a stale legacy URL suppress that durable
+                            // ID during sync; URL-only profiles remain supported.
+                            put("avatar_id", avatarId)
+                            put("avatar_url", avatarUrl.takeIf { avatarId == null })
                             put("profile_background_id", profile.profileBackgroundId)
                             put("profile_background_url", profile.profileBackgroundUrl?.takeIf { it.isNotBlank() })
                         }
