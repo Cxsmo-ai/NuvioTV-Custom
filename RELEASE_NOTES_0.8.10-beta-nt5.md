@@ -4,6 +4,11 @@ This release packages the verified Seekr frame-calibration work on top of the ex
 It is built from the `custom-dimmer` branch and preserves the prior top navigation, calendar,
 dimmer, skip-metadata, playback, HDR, audio, and recommendation features.
 
+The published prerelease assets are TV benchmark APKs from the exact tested build. The automated
+production-release workflow still requires the repository's signing and private Nuvio build
+configuration secrets; those were unavailable for this run, so this prerelease is intentionally
+labelled as a benchmark build rather than represented as a production-signed release.
+
 ## Seekr improvements over a normal integration
 
 - Adds automatic per-release Preview Sync using frames rendered by the active ExoPlayer surface.
