@@ -14,7 +14,7 @@ SPECIAL_RULES = [
         "Improved Seekr startup performance by reducing calibration seeks",
     ),
     (
-        r"version\s+custom\s+fork\s+release\s+0\.8\.10-beta-nt5",
+        r"version\s+custom\s+fork\s+release\s+0\.8\.10-beta-nt(?:5|6)",
         "Updated the custom fork release metadata",
     ),
     (
