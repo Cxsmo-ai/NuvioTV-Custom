@@ -87,7 +87,7 @@ internal object SeekrFrameCalibrator {
         )
     }
 
-    /** Candidate offsets are wide enough for Seekr's documented keyframe error. */
+    /** Candidate offsets cover Seekr's documented keyframe error with low startup cost. */
     fun candidatePositions(expectedPlaybackMs: Long): List<Long> =
         CALIBRATION_OFFSETS_MS.map { expectedPlaybackMs + it }
 
@@ -152,7 +152,7 @@ internal object SeekrFrameCalibrator {
 
     private const val SAMPLE_WIDTH = 32
     private const val SAMPLE_HEIGHT = 18
-    private val CALIBRATION_OFFSETS_MS = listOf(-4_000L, -2_000L, 0L, 2_000L, 4_000L)
+    private val CALIBRATION_OFFSETS_MS = listOf(-3_000L, 0L, 3_000L)
 }
 
 /** A local frame source used by the bounded calibration pass. */
