@@ -159,6 +159,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.media3.exoplayer.ExoPlayer
+import tv.seekr.previews.android.SeekrTrack
 import io.github.peerless2012.ass.media.widget.AssSubtitleView
 import kotlin.math.abs
 import androidx.compose.ui.graphics.graphicsLayer
@@ -203,6 +204,8 @@ fun PlayerScreen(
     var externalHandoffInProgress by remember { mutableStateOf(false) }
     val appDimPercent by viewModel.appDimPercent.collectAsState()
     var showDimmerDialog by remember { mutableStateOf(false) }
+    val seekrTrack by viewModel.seekrTrack.collectAsState()
+    var seekrCalibrationActive by remember { mutableStateOf(false) }
     // One press/release owner shared by the player root and the scrubber. This
     // prevents a focus change during a held key from losing the release event.
     val remoteInputRouter = remember { PlayerRemoteInputRouter() }
@@ -820,6 +823,17 @@ fun PlayerScreen(
                         ExoPlayerSurface(
                             player = player,
                             controller = viewModel.controller,
+                            seekrTrack = seekrTrack,
+                            onSeekrCalibrationStateChanged = { active ->
+                                seekrCalibrationActive = active
+                            },
+                            onSeekrCalibrationComplete = { alignment ->
+                                if (alignment.calibrated) {
+                                    viewModel.onEvent(
+                                        PlayerEvent.OnSetSeekPreviewOffset(alignment.seekrOffsetMs)
+                                    )
+                                }
+                            },
                             isPlaying = uiState.isPlaying,
                             isBuffering = uiState.isBuffering,
                             aspectMode = uiState.aspectMode,
@@ -890,11 +904,16 @@ fun PlayerScreen(
         }
 
         LoadingOverlay(
-            visible = uiState.showLoadingOverlay && uiState.error == null && !postPlayRecommendationState.isVisible,
+            visible = (uiState.showLoadingOverlay || seekrCalibrationActive) &&
+                uiState.error == null && !postPlayRecommendationState.isVisible,
             backdropUrl = uiState.backdrop,
             logoUrl = uiState.logo,
             title = uiState.title,
-            message = uiState.loadingMessage.takeIf { uiState.showPlayerLoadingStatus || uiState.isTorrentStream },
+            message = if (seekrCalibrationActive) {
+                stringResource(R.string.player_loading_preview_sync)
+            } else {
+                uiState.loadingMessage.takeIf { uiState.showPlayerLoadingStatus || uiState.isTorrentStream }
+            },
             sourceLine = run {
                 val provider = resolveStreamProvider(
                     streamName = uiState.currentStreamName,
@@ -1701,6 +1720,9 @@ private fun MpvPlayerSurface(
 private fun ExoPlayerSurface(
     player: ExoPlayer,
     controller: PlayerRuntimeController,
+    seekrTrack: SeekrTrack?,
+    onSeekrCalibrationStateChanged: (Boolean) -> Unit,
+    onSeekrCalibrationComplete: (SeekrFrameAlignment) -> Unit,
     isPlaying: Boolean,
     isBuffering: Boolean,
     aspectMode: AspectMode,
@@ -1835,6 +1857,36 @@ private fun ExoPlayerSurface(
 
     LaunchedEffect(playerView, subtitleStyle, player, useLibass) {
         playerView.applySubtitleStyleIfNeeded(subtitleStyle, player, useLibass)
+    }
+
+    // Compare Seekr's reference sprites with frames already rendered by this
+    // player. No media URL is sent to Seekr and no proxy/second decoder is used.
+    LaunchedEffect(player, playerView, seekrTrack) {
+        val track = seekrTrack
+        if (track == null || track.isEmpty) {
+            onSeekrCalibrationStateChanged(false)
+            return@LaunchedEffect
+        }
+        onSeekrCalibrationStateChanged(true)
+        try {
+            var surfaceReady = false
+            repeat(40) {
+                if (!surfaceReady) {
+                    val surface = playerView.videoSurfaceView
+                    surfaceReady = player.playbackState == androidx.media3.common.Player.STATE_READY &&
+                        (surface?.width ?: 0) > 0 && (surface?.height ?: 0) > 0
+                    if (!surfaceReady) delay(50L)
+                }
+            }
+            val alignment = calibrateSeekrTrack(
+                track = track,
+                playbackDurationMs = player.duration,
+                frameSource = ExoSeekrFrameCapture(player, playerView)::captureAt
+            )
+            if (alignment != null) onSeekrCalibrationComplete(alignment)
+        } finally {
+            onSeekrCalibrationStateChanged(false)
+        }
     }
 }
 

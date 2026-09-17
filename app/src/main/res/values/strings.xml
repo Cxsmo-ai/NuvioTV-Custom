@@ -1728,6 +1728,7 @@
     <string name="player_loading_subtitles_addon">Subtitles: %1$s (%2$d / %3$d)</string>
     <string name="player_loading_building">Building player…</string>
     <string name="player_loading_starting">Starting stream…</string>
+    <string name="player_loading_preview_sync">Aligning preview to this release…</string>
     <string name="player_loading_buffering">Buffering…</string>
     <string name="player_loading_fallback_pcm_audio">Audio track init failed - switching to PCM audio…</string>
     <string name="player_loading_fallback_hevc_decoder">Decoder init failed - switching to HEVC decoder…</string>
