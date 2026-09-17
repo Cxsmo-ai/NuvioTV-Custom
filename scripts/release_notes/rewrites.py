@@ -2,6 +2,22 @@ from __future__ import annotations
 
 SPECIAL_RULES = [
     (
+        r"align\s+Seekr\s+previews\s+to\s+nearest\s+cue",
+        "Improved Seekr preview timing against the nearest available cue",
+    ),
+    (
+        r"calibrate\s+Seekr\s+previews\s+against\s+rendered\s+frames",
+        "Added automatic local frame calibration for Seekr previews",
+    ),
+    (
+        r"reduce\s+Seekr\s+calibration\s+seeks",
+        "Improved Seekr startup performance by reducing calibration seeks",
+    ),
+    (
+        r"version\s+custom\s+fork\s+release\s+0\.8\.10-beta-nt5",
+        "Updated the custom fork release metadata",
+    ),
+    (
         r"upgrade\s+ass-media\s+so\s+Nuvio's\s+custom\s+ASS\s+Matroska\s+extractor\s+"
         r"can\s+register\s+embedded\s+MKV\s+font\s+attachments\s+through\s+"
         r"AssHandler\.addFont\(\.\.\.\)",
