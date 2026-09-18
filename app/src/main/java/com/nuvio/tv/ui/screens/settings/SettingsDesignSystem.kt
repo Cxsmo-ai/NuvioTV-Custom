@@ -1154,11 +1154,13 @@ internal fun SettingsDialogActionButton(
     text: String,
     onClick: () -> Unit,
     primary: Boolean = false,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
+        modifier = modifier,
         colors = ButtonDefaults.colors(
             containerColor = if (primary) NuvioTheme.colors.Secondary.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f),
             contentColor = NuvioTheme.colors.TextPrimary,

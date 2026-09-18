@@ -10,6 +10,7 @@ import com.nuvio.tv.core.health.HealthOutcome
 import com.nuvio.tv.core.player.StreamAutoPlayPolicy
 import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.core.tmdb.TmdbMetadataService
+import com.nuvio.tv.core.tmdb.TmdbMovieCollection
 import com.nuvio.tv.core.tmdb.TmdbService
 import com.nuvio.tv.data.local.LayoutPreferenceDataStore
 import com.nuvio.tv.data.local.MDBListSettingsDataStore
@@ -115,7 +116,8 @@ class MetaDetailsViewModel @Inject constructor(
     private val prefetchSelectionSupplier: com.nuvio.tv.core.stream.PrefetchSelectionSupplier,
     savedStateHandle: SavedStateHandle,
     private val healthStore: AddonHealthStore,
-    private val trackingProgressRefreshCoordinator: TrackingProgressRefreshCoordinator
+    private val trackingProgressRefreshCoordinator: TrackingProgressRefreshCoordinator,
+    private val profileManager: com.nuvio.tv.core.profile.ProfileManager
 ) : ViewModel() {
     private val itemId: String = savedStateHandle["itemId"] ?: ""
     private val itemType: String = savedStateHandle["itemType"] ?: ""
@@ -739,14 +741,17 @@ class MetaDetailsViewModel @Inject constructor(
         if (providerProgressMap.isEmpty()) return
         val hasCompletedEntries = providerProgressMap.values.any { it.isCompleted() }
         if (!hasCompletedEntries) return
+        val profileId = profileManager.activeProfileId.value
 
         viewModelScope.launch(Dispatchers.IO) {
             if (!watchProgressRepository.activeProviderOwnsCompletedHistoryProjection()) return@launch
+            if (profileManager.activeProfileId.value != profileId) return@launch
 
             val contentId = _effectiveContentId.value
             val localWatched = watchedItemsPreferences
                 .getWatchedEpisodesForContent(contentId)
                 .first()
+            if (profileManager.activeProfileId.value != profileId) return@launch
             if (localWatched.isEmpty()) return@launch
 
             val staleEpisodes = localWatched.filter { (season, episode) ->
@@ -758,7 +763,8 @@ class MetaDetailsViewModel @Inject constructor(
                 Log.d(TAG, "revalidateWatchedEpisodes: pruning ${staleEpisodes.size} stale entries for $contentId")
                 watchedItemsPreferences.unmarkAsWatchedBatch(
                     contentId = contentId,
-                    episodes = staleEpisodes.toList()
+                    episodes = staleEpisodes.toList(),
+                    profileId = profileId
                 )
             }
         }
@@ -1576,25 +1582,28 @@ class MetaDetailsViewModel @Inject constructor(
                 return@launch
             }
 
-            val items = runCatching {
+            val collection = runCatching {
                 tmdbMetadataService.fetchMovieCollection(
                     collectionId = collectionId,
                     language = settings.language
                 )
             }.getOrElse {
                 Log.w(TAG, "Failed to load collection $collectionId: ${it.message}")
-                emptyList()
+                TmdbMovieCollection(name = null, items = emptyList())
             }
 
             val filteredItems = if (hideUnreleasedContent) {
                 val today = LocalDate.now()
-                items.filterNot { it.isUnreleased(today) }
+                collection.items.filterNot { it.isUnreleased(today) }
             } else {
-                items
+                collection.items
             }
 
             _uiState.update { state ->
-                state.copy(collection = filteredItems, collectionName = collectionName)
+                state.copy(
+                    collection = filteredItems,
+                    collectionName = collection.name ?: collectionName
+                )
             }
         }
     }
@@ -1694,14 +1703,36 @@ class MetaDetailsViewModel @Inject constructor(
                     tmdbId = tmdbId
                 )
 
+                val effectiveRatings = if (ratings.isEmpty() && tmdbIdString != null) {
+                    val tmdbSettings = tmdbSettingsDataStore.settings.first()
+                    val seasons = meta.videos.mapNotNull { it.season }.distinct()
+                    val tmdbEpisodeMap = runCatching {
+                        withContext(Dispatchers.IO) {
+                            tmdbMetadataService.fetchEpisodeEnrichment(
+                                tmdbId = tmdbIdString,
+                                seasonNumbers = seasons,
+                                language = tmdbSettings.language
+                            )
+                        }
+                    }.getOrDefault(emptyMap())
+                    val tmdbRatings = tmdbEpisodeMap.mapNotNull { (key, ep) ->
+                        ep.rating?.takeIf { it > 0.0 }?.let { key to it }
+                    }.toMap()
+                    addonRatings + tmdbRatings
+                } else {
+                    addonRatings + ratings
+                }
+
                 _uiState.update { state ->
                     if (state.meta == null || state.meta.id != meta.id) {
                         state
                     } else {
                         state.copy(
-                            episodeImdbRatings = addonRatings + ratings,
+                            episodeImdbRatings = effectiveRatings,
                             isEpisodeRatingsLoading = false,
-                            episodeRatingsError = null
+                            episodeRatingsError = if (effectiveRatings.isEmpty()) {
+                                localizedContext.getString(R.string.ratings_unavailable)
+                            } else null
                         )
                     }
                 }
@@ -1897,9 +1928,18 @@ class MetaDetailsViewModel @Inject constructor(
                 // somehow is not, skip rather than resurrect a stale meta.
                 val current = state.meta ?: return@update state
                 val enrichedVideos = enrichVideosWithEpisodes(current.videos, episodeMap, settings)
+                val tmdbRatings = episodeMap.mapNotNull { (key, ep) ->
+                    ep.rating?.takeIf { it > 0.0 }?.let { key to it }
+                }.toMap()
+                val updatedRatings = if (state.episodeImdbRatings.isEmpty()) {
+                    tmdbRatings
+                } else {
+                    tmdbRatings + state.episodeImdbRatings
+                }
                 state.copy(
                     meta = current.copy(videos = enrichedVideos),
-                    episodesForSeason = getEpisodesForSeason(enrichedVideos, state.selectedSeason)
+                    episodesForSeason = getEpisodesForSeason(enrichedVideos, state.selectedSeason),
+                    episodeImdbRatings = updatedRatings
                 )
             }
         }
@@ -1921,7 +1961,8 @@ class MetaDetailsViewModel @Inject constructor(
                 useTmdbReleaseDates = settings.useReleaseDates
             ),
             thumbnail = if (settings.useEpisodes) ep?.thumbnail ?: video.thumbnail else video.thumbnail,
-            runtime = if (settings.useEpisodes) ep?.runtimeMinutes ?: video.runtime else video.runtime
+            runtime = if (settings.useEpisodes) ep?.runtimeMinutes ?: video.runtime else video.runtime,
+            rating = if (settings.useEpisodes) ep?.rating ?: video.rating else video.rating
         )
     }
 

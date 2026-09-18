@@ -95,7 +95,7 @@ fun EpisodeRatingsSection(
         episodesForSeason.mapNotNull { episode ->
             val season = episode.season ?: return@mapNotNull null
             val episodeNumber = episode.episode ?: return@mapNotNull null
-            val rating = ratings[season to episodeNumber]
+            val rating = ratings[season to episodeNumber] ?: episode.rating
             val ratingText = rating?.let { String.format("%.1f", it) } ?: "—"
             val chipColor = rating?.let(::ratingColor) ?: defaultChipColor
             val chipTextColor = rating?.let(::ratingTextColor) ?: defaultChipTextColor

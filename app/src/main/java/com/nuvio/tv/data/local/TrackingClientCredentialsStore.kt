@@ -44,6 +44,9 @@ class TrackingClientCredentialsStore @Inject constructor(
 
     private fun read(key: String): String {
         val stored = preferences.getString(key, null) ?: return ""
+        if (stored.startsWith("raw:")) {
+            return runCatching { stored.removePrefix("raw:").fromBase64().toString(Charsets.UTF_8) }.getOrDefault("").trim()
+        }
         return runCatching { decrypt(stored) }
             .onFailure { preferences.edit().remove(key).apply() }
             .getOrDefault("")
@@ -53,7 +56,13 @@ class TrackingClientCredentialsStore @Inject constructor(
     private fun write(key: String, value: String) {
         val normalized = value.trim()
         preferences.edit().apply {
-            if (normalized.isBlank()) remove(key) else putString(key, encrypt(normalized))
+            if (normalized.isBlank()) {
+                remove(key)
+            } else {
+                val encrypted = runCatching { encrypt(normalized) }.getOrNull()
+                val payload = encrypted ?: "raw:${normalized.toByteArray().toBase64()}"
+                putString(key, payload)
+            }
         }.apply()
     }
 

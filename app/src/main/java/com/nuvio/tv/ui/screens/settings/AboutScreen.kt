@@ -103,15 +103,29 @@ fun AboutSettingsContent(
 
                 Text(
                     text = stringResource(R.string.about_made_with_love),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = NuvioTheme.colors.TextPrimary,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = stringResource(R.string.about_fork_attribution),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NuvioTheme.colors.TextTertiary,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = stringResource(R.string.about_features_summary),
                     style = MaterialTheme.typography.labelSmall,
                     color = NuvioTheme.colors.TextSecondary,
                     textAlign = TextAlign.Center
                 )
 
                 Text(
-                    text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
+                    text = stringResource(R.string.about_version, "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"),
                     style = MaterialTheme.typography.labelSmall,
-                    color = NuvioTheme.colors.TextSecondary,
+                    color = NuvioTheme.colors.TextTertiary,
                     textAlign = TextAlign.Center
                 )
 
@@ -158,6 +172,32 @@ fun AboutSettingsContent(
                         val intent = Intent(
                             Intent.ACTION_VIEW,
                             Uri.parse("https://nuvio.tv/privacy-policy")
+                        )
+                        context.startActivity(intent)
+                    }
+                )
+
+                SettingsActionRow(
+                    title = stringResource(R.string.about_github_custom),
+                    subtitle = stringResource(R.string.about_github_custom_subtitle),
+                    trailingIcon = Icons.Default.OpenInNew,
+                    onClick = {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://github.com/Cxsmo-ai/NuvioTV-Custom")
+                        )
+                        context.startActivity(intent)
+                    }
+                )
+
+                SettingsActionRow(
+                    title = stringResource(R.string.about_upstream_fork),
+                    subtitle = stringResource(R.string.about_upstream_fork_subtitle),
+                    trailingIcon = Icons.Default.OpenInNew,
+                    onClick = {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://github.com/ysosrs123/NuvioTV-Fork")
                         )
                         context.startActivity(intent)
                     }

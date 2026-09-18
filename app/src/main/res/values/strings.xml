@@ -379,8 +379,14 @@
     <string name="cd_selected">Selected</string>
 
     <string name="about_title">About</string>
-    <string name="about_subtitle">App information, updates, and legal links</string>
-    <string name="about_made_with_love">Made with ❤️ by Tapframe and friends</string>
+    <string name="about_subtitle">App information, fork details, and updates</string>
+    <string name="about_made_with_love">NuvioTV Custom by Cxsmo-ai</string>
+    <string name="about_fork_attribution">Based on ysosrs123/NuvioTV-Fork and Tapframe NuvioTV</string>
+    <string name="about_github_custom">GitHub Repository</string>
+    <string name="about_github_custom_subtitle">View source, changelogs, and releases on GitHub</string>
+    <string name="about_upstream_fork">Upstream Fork</string>
+    <string name="about_upstream_fork_subtitle">View ysosrs123/NuvioTV-Fork on GitHub</string>
+    <string name="about_features_summary">Top Navigation Bar · Full App Dimmer · TV Calendar · Seekr Preview Sync · Multi-Provider Skip Intro · Progressive Scraping</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_update_banner_title">Automatic update banner</string>
     <string name="about_update_banner_subtitle">Show a banner when a new version is available</string>

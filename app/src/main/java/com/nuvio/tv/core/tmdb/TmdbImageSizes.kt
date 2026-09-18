@@ -21,8 +21,8 @@ import android.content.res.Resources
 object TmdbImageSizes {
 
     val backdrop: String by lazy {
-        val dm = Resources.getSystem().displayMetrics
-        if (maxOf(dm.widthPixels, dm.heightPixels) > 1600) "original" else "w1280"
+        val dm = runCatching { Resources.getSystem()?.displayMetrics }.getOrNull()
+        if (dm != null && maxOf(dm.widthPixels, dm.heightPixels) > 1600) "original" else "w1280"
     }
 
     const val STILL: String = "original"

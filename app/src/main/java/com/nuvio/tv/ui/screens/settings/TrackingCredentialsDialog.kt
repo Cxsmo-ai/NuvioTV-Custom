@@ -51,13 +51,15 @@ internal fun TrackingCredentialsDialog(
     var traktId by remember(state.traktClientId) { mutableStateOf(state.traktClientId) }
     var traktSecret by remember { mutableStateOf("") }
     var simklId by remember(state.simklClientId) { mutableStateOf(state.simklClientId) }
-    val firstFocusRequester = remember { FocusRequester() }
+    val traktIdFocusRequester = remember { FocusRequester() }
     val secretFocusRequester = remember { FocusRequester() }
     val simklFocusRequester = remember { FocusRequester() }
+    val saveButtonFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
-        firstFocusRequester.requestFocus()
+        kotlinx.coroutines.delay(100L)
+        traktIdFocusRequester.requestFocus()
     }
 
     NuvioDialog(
@@ -71,7 +73,9 @@ internal fun TrackingCredentialsDialog(
             label = stringResource(R.string.tracking_credentials_trakt_id),
             value = traktId,
             onValueChange = { traktId = it },
-            focusRequester = firstFocusRequester,
+            textFieldFocusRequester = traktIdFocusRequester,
+            imeAction = ImeAction.Next,
+            onImeAction = { secretFocusRequester.requestFocus() },
             keyboardController = keyboardController
         )
         Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
@@ -79,11 +83,13 @@ internal fun TrackingCredentialsDialog(
             label = stringResource(R.string.tracking_credentials_trakt_secret),
             value = traktSecret,
             onValueChange = { traktSecret = it },
-            focusRequester = secretFocusRequester,
+            textFieldFocusRequester = secretFocusRequester,
             placeholder = if (state.traktSecretConfigured) {
                 stringResource(R.string.tracking_credentials_saved_secret)
             } else null,
             secret = true,
+            imeAction = ImeAction.Next,
+            onImeAction = { simklFocusRequester.requestFocus() },
             keyboardController = keyboardController
         )
         Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
@@ -91,7 +97,9 @@ internal fun TrackingCredentialsDialog(
             label = stringResource(R.string.tracking_credentials_simkl_id),
             value = simklId,
             onValueChange = { simklId = it },
-            focusRequester = simklFocusRequester,
+            textFieldFocusRequester = simklFocusRequester,
+            imeAction = ImeAction.Done,
+            onImeAction = { saveButtonFocusRequester.requestFocus() },
             keyboardController = keyboardController
         )
         Spacer(modifier = Modifier.height(NuvioTheme.spacing.md))
@@ -105,13 +113,25 @@ internal fun TrackingCredentialsDialog(
             )
             Spacer(modifier = Modifier.width(NuvioTheme.spacing.xs))
             SettingsDialogActionButton(
+                text = stringResource(R.string.action_clear),
+                onClick = {
+                    traktId = ""
+                    traktSecret = ""
+                    simklId = ""
+                    onSaveTrakt("", "")
+                    onSaveSimkl("")
+                }
+            )
+            Spacer(modifier = Modifier.width(NuvioTheme.spacing.xs))
+            SettingsDialogActionButton(
                 text = stringResource(R.string.action_save),
                 primary = true,
                 onClick = {
                     onSaveTrakt(traktId, traktSecret)
                     onSaveSimkl(simklId)
                     onDismiss()
-                }
+                },
+                modifier = Modifier.focusRequester(saveButtonFocusRequester)
             )
         }
     }
@@ -122,17 +142,26 @@ private fun CredentialInput(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    focusRequester: FocusRequester? = null,
+    textFieldFocusRequester: FocusRequester,
     placeholder: String? = null,
     secret: Boolean = false,
+    imeAction: ImeAction = ImeAction.Done,
+    onImeAction: () -> Unit = {},
     keyboardController: androidx.compose.ui.platform.SoftwareKeyboardController?
 ) {
-    var focused by remember { mutableStateOf(false) }
+    var isInputFocused by remember { mutableStateOf(false) }
     Card(
-        onClick = { focusRequester?.requestFocus() },
+        onClick = {
+            textFieldFocusRequester.requestFocus()
+            keyboardController?.show()
+        },
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
+            .onFocusChanged { state ->
+                if (state.isFocused && !isInputFocused) {
+                    textFieldFocusRequester.requestFocus()
+                }
+            },
         colors = CardDefaults.colors(
             containerColor = Color.Black.copy(alpha = 0.85f),
             focusedContainerColor = Color.Black.copy(alpha = 0.85f)
@@ -157,19 +186,28 @@ private fun CredentialInput(
                 onValueChange = onValueChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-                    .onFocusChanged { focused = it.isFocused || it.hasFocus },
+                    .focusRequester(textFieldFocusRequester)
+                    .onFocusChanged { isInputFocused = it.isFocused },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text,
-                    imeAction = ImeAction.Done
+                    imeAction = imeAction
                 ),
-                keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                        onImeAction()
+                    },
+                    onNext = {
+                        keyboardController?.hide()
+                        onImeAction()
+                    }
+                ),
                 visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
                 textStyle = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
                     color = NuvioTheme.colors.TextPrimary
                 ),
-                cursorBrush = SolidColor(if (focused) Color.White else Color.Transparent),
+                cursorBrush = SolidColor(if (isInputFocused) Color.White else Color.Transparent),
                 decorationBox = { inner ->
                     if (value.isBlank() && !placeholder.isNullOrBlank()) {
                         Text(placeholder, color = NuvioTheme.colors.TextTertiary)

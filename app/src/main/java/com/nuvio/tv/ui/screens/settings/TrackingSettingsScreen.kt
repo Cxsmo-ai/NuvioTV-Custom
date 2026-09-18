@@ -184,12 +184,16 @@ fun TrackingSettingsScreen(
         watchProgressFocusRequester = watchProgressFocusRequester,
         continueWatchingFocusRequester = continueWatchingFocusRequester,
         moreLikeThisFocusRequester = moreLikeThisFocusRequester,
-        credentialsSummary = if (
-            credentialsState.traktClientId.isNotBlank() &&
-                credentialsState.traktSecretConfigured &&
-                credentialsState.simklClientId.isNotBlank()
-        ) stringResource(R.string.tracking_credentials_configured) else
-            stringResource(R.string.tracking_credentials_not_set),
+        credentialsSummary = when {
+            credentialsState.traktClientId.isNotBlank() && credentialsState.simklClientId.isNotBlank() ->
+                stringResource(R.string.tracking_credentials_configured)
+            credentialsState.traktClientId.isNotBlank() ->
+                "Trakt configured"
+            credentialsState.simklClientId.isNotBlank() ->
+                "Simkl configured"
+            else ->
+                stringResource(R.string.tracking_credentials_not_set)
+        },
         onCredentialsClick = { showCredentialsDialog = true },
         onTraktClick = { openProvider(TrackingProviderId.TRAKT) },
         onSimklClick = { openProvider(TrackingProviderId.SIMKL) },
