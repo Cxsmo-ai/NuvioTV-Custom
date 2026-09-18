@@ -26,6 +26,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -109,7 +110,8 @@ fun SeasonTabs(
     selectedTabFocusRequester: FocusRequester,
     upFocusRequester: FocusRequester? = null,
     downFocusRequester: FocusRequester? = null,
-    isFocusEnabled: Boolean = true
+    isFocusEnabled: Boolean = true,
+    onRandomSeasonClick: ((Int) -> Unit)? = null
 ) {
     // Move season 0 (specials) to the end
     val sortedSeasons = remember(seasons) {
@@ -242,6 +244,44 @@ fun SeasonTabs(
                     },
                     modifier = Modifier.padding(vertical = 10.dp, horizontal = 20.dp)
                 )
+            }
+        }
+
+        if (onRandomSeasonClick != null) {
+            item(key = "random_season_tab") {
+                Card(
+                    onClick = { onRandomSeasonClick(selectedSeason) },
+                    modifier = Modifier.focusProperties {
+                        canFocus = isFocusEnabled
+                        if (upFocusRequester != null) up = upFocusRequester
+                        if (downFocusRequester != null) down = downFocusRequester
+                    },
+                    colors = CardDefaults.colors(
+                        containerColor = Color.White.copy(alpha = 0.08f),
+                        focusedContainerColor = NuvioTheme.colors.Secondary
+                    ),
+                    border = tabBorder,
+                    scale = tabScale,
+                    shape = CardDefaults.shape(shape = tabShape)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = stringResource(R.string.random_episode_title),
+                            modifier = Modifier.size(16.dp),
+                            tint = Color(0xFFE8E8EC)
+                        )
+                        Text(
+                            text = stringResource(R.string.random_episode_title),
+                            style = tabTextStyle,
+                            color = Color(0xFFE8E8EC)
+                        )
+                    }
+                }
             }
         }
     }

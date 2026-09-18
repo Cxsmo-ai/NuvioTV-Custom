@@ -958,12 +958,12 @@ fun PlayerScreen(
             onClose = { viewModel.onEvent(PlayerEvent.OnDismissPauseOverlay) },
             title = uiState.title,
             logo = uiState.logo,
-            episodeTitle = uiState.currentEpisodeTitle,
-            season = uiState.currentSeason,
-            episode = uiState.currentEpisode,
+            episodeTitle = if (uiState.mysteryMode) stringResource(R.string.random_episode_mystery_title) else uiState.currentEpisodeTitle,
+            season = if (uiState.mysteryMode) null else uiState.currentSeason,
+            episode = if (uiState.mysteryMode) null else uiState.currentEpisode,
             year = uiState.releaseYear,
             type = uiState.contentType,
-            description = uiState.description,
+            description = if (uiState.mysteryMode) null else uiState.description,
             cast = uiState.castMembers,
             showClock = !viewModel.playbackTimeline.collectAsState().value.isLive,
             modifier = Modifier
@@ -2232,7 +2232,16 @@ private fun PlayerControlsOverlay(
                         )
                     }
 
-                    if (uiState.currentSeason != null && uiState.currentEpisode != null) {
+                    if (uiState.mysteryMode) {
+                        Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
+                        Text(
+                            text = stringResource(R.string.random_episode_mystery_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White.copy(alpha = 0.9f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else if (uiState.currentSeason != null && uiState.currentEpisode != null) {
                         Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
                         val seasonEpisodeCode = stringResource(
                             R.string.season_episode_format,

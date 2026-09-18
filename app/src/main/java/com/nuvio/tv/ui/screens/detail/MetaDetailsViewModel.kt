@@ -426,6 +426,7 @@ class MetaDetailsViewModel @Inject constructor(
         }
         observeShowFullReleaseDate()
         observeHideUnreleasedContent()
+        observeRandomEpisodePreferences()
         loadMeta()
     }
 
@@ -436,6 +437,35 @@ class MetaDetailsViewModel @Inject constructor(
                 .collectLatest { enabled ->
                     hideUnreleasedContent = enabled
                 }
+        }
+    }
+
+    private fun observeRandomEpisodePreferences() {
+        viewModelScope.launch {
+            layoutPreferenceDataStore.randomEpisodeMysteryMode
+                .distinctUntilChanged()
+                .collectLatest { enabled ->
+                    _uiState.update { it.copy(randomEpisodeMysteryMode = enabled) }
+                }
+        }
+        viewModelScope.launch {
+            layoutPreferenceDataStore.randomEpisodeUnwatchedOnly
+                .distinctUntilChanged()
+                .collectLatest { enabled ->
+                    _uiState.update { it.copy(randomEpisodeUnwatchedOnly = enabled) }
+                }
+        }
+    }
+
+    private fun setRandomEpisodeMysteryMode(enabled: Boolean) {
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setRandomEpisodeMysteryMode(enabled)
+        }
+    }
+
+    private fun setRandomEpisodeUnwatchedOnly(enabled: Boolean) {
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setRandomEpisodeUnwatchedOnly(enabled)
         }
     }
 
@@ -608,6 +638,8 @@ class MetaDetailsViewModel @Inject constructor(
             MetaDetailsEvent.OnRemovalConfirmed -> confirmPickerRemoval()
             MetaDetailsEvent.OnRemovalCancelled -> cancelPickerRemoval()
             MetaDetailsEvent.OnClearMessage -> clearMessage()
+            is MetaDetailsEvent.SetRandomEpisodeMysteryMode -> setRandomEpisodeMysteryMode(event.enabled)
+            is MetaDetailsEvent.SetRandomEpisodeUnwatchedOnly -> setRandomEpisodeUnwatchedOnly(event.enabled)
             MetaDetailsEvent.OnLifecyclePause -> handleLifecyclePause()
             MetaDetailsEvent.OnLifecycleResume -> handleLifecycleResume()
         }

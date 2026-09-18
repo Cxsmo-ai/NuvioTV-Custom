@@ -335,7 +335,7 @@ fun NuvioNavHost(
                 onNavigateToDetail = { itemId, itemType, addonBaseUrl ->
                     navController.navigate(Screen.Detail.createRoute(itemId, itemType, addonBaseUrl))
                 },
-                onPlayClick = { videoId, contentType, contentId, title, poster, backdrop, logo, season, episode, episodeName, genres, year, runtime, contentLanguage ->
+                onPlayClick = { videoId, contentType, contentId, title, poster, backdrop, logo, season, episode, episodeName, genres, year, runtime, contentLanguage, mysteryMode ->
                     navController.navigate(
                         Screen.Stream.createRoute(
                             videoId = videoId,
@@ -353,7 +353,8 @@ fun NuvioNavHost(
                             contentName = title,
                             runtime = runtime,
                             returnToDetailOnBack = contentType.equals("series", ignoreCase = true),
-                            contentLanguage = contentLanguage
+                            contentLanguage = contentLanguage,
+                            mysteryMode = mysteryMode
                         )
                     )
                 },
@@ -491,6 +492,11 @@ fun NuvioNavHost(
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                },
+                navArgument("mysteryMode") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = "false"
                 }
             )
         ) { backStackEntry ->
@@ -583,7 +589,8 @@ fun NuvioNavHost(
                                 sources = playbackInfo.sources,
                                 contentLanguage = playbackInfo.contentLanguage,
                                 launchStartedAtMs = playbackInfo.launchStartedAtMs
-                                    ?: SystemClock.elapsedRealtime()
+                                    ?: SystemClock.elapsedRealtime(),
+                                mysteryMode = playbackInfo.mysteryMode
                             )
                         )
                     }
@@ -626,7 +633,8 @@ fun NuvioNavHost(
                                 sources = playbackInfo.sources,
                                 contentLanguage = playbackInfo.contentLanguage,
                                 launchStartedAtMs = playbackInfo.launchStartedAtMs
-                                    ?: SystemClock.elapsedRealtime()
+                                    ?: SystemClock.elapsedRealtime(),
+                                mysteryMode = playbackInfo.mysteryMode
                             )
                         ) {
                             popUpTo(Screen.Stream.route) { inclusive = true }
@@ -780,6 +788,11 @@ fun NuvioNavHost(
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                },
+                navArgument("mysteryMode") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = "false"
                 }
             )
         ) { backStackEntry ->

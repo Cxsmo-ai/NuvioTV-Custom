@@ -18,6 +18,7 @@ __pycache__/
 /captures
 .externalNativeBuild
 .cxx
+release_assets_*/
 local.properties
 libass-android
 Stremio addons refer

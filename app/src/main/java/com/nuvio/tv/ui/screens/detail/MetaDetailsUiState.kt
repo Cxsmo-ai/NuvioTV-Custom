@@ -67,6 +67,8 @@ data class MetaDetailsUiState(
     val overallRatingsVisibility: HomeImdbRatingsVisibility = HomeImdbRatingsVisibility.SHOW_ALL,
     val detailImdbRatingsVisibility: DetailImdbRatingsVisibility = DetailImdbRatingsVisibility.SHOW_ALL,
     val showFullReleaseDate: Boolean = true,
+    val randomEpisodeMysteryMode: Boolean = false,
+    val randomEpisodeUnwatchedOnly: Boolean = false,
     val moreLikeThis: List<MetaPreview> = emptyList(),
     val moreLikeThisSource: MoreLikeThisSource? = null,
     val collection: List<MetaPreview> = emptyList(),
@@ -126,6 +128,8 @@ sealed class MetaDetailsEvent {
     data object OnRemovalConfirmed : MetaDetailsEvent()
     data object OnRemovalCancelled : MetaDetailsEvent()
     data object OnClearMessage : MetaDetailsEvent()
+    data class SetRandomEpisodeMysteryMode(val enabled: Boolean) : MetaDetailsEvent()
+    data class SetRandomEpisodeUnwatchedOnly(val enabled: Boolean) : MetaDetailsEvent()
     data object OnLifecyclePause : MetaDetailsEvent()
     data object OnLifecycleResume : MetaDetailsEvent()
 }

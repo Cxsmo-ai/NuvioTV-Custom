@@ -152,6 +152,9 @@ class StreamScreenViewModel @Inject constructor(
     private val manualSelection: Boolean = savedStateHandle.get<String>("manualSelection")
         ?.toBooleanStrictOrNull()
         ?: false
+    private val mysteryMode: Boolean = savedStateHandle.get<String>("mysteryMode")
+        ?.toBooleanStrictOrNull()
+        ?: false
     private val streamCacheKey: String = "${contentType.lowercase()}|$videoId"
 
     private val _uiState = MutableStateFlow(
@@ -167,7 +170,8 @@ class StreamScreenViewModel @Inject constructor(
             episodeName = episodeName,
             runtime = runtime,
             genres = genres,
-            year = year
+            year = year,
+            mysteryMode = mysteryMode
         )
     )
     val uiState: StateFlow<StreamScreenUiState> = _uiState.asStateFlow()
@@ -253,7 +257,7 @@ class StreamScreenViewModel @Inject constructor(
                     externalPlaybackTracker.updateAutoNextOverlayStatus(message, progress)
                 }
         }
-        if (manualSelection) {
+        if (manualSelection && !mysteryMode) {
             // Returning from a playback error: keep the user on stream selection.
             autoPlayHandledForSession = true
             directAutoPlayModeInitializedForSession = true
@@ -345,6 +349,7 @@ class StreamScreenViewModel @Inject constructor(
         playerPreference: PlayerPreference,
         streamAutoPlayMode: StreamAutoPlayMode
     ): Boolean {
+        if (mysteryMode) return true
         return streamAutoPlayMode != StreamAutoPlayMode.MANUAL
     }
 
@@ -374,7 +379,7 @@ class StreamScreenViewModel @Inject constructor(
             val loadSplitT0 = SystemClock.elapsedRealtime()
             val playerSettings = playerSettingsDataStore.playerSettings.first()
             android.util.Log.i(TAG, "LOAD_SPLIT playerSettings=${SystemClock.elapsedRealtime() - loadSplitT0}ms")
-            if (manualSelection) {
+            if (manualSelection && !mysteryMode) {
                 directAutoPlayModeInitializedForSession = true
                 directAutoPlayFlowEnabledForSession = false
                 autoPlayHandledForSession = true
@@ -467,7 +472,8 @@ class StreamScreenViewModel @Inject constructor(
                                 videoSize = cached.videoSize,
                                 fileIdx = cached.fileIdx,
                                 sources = cached.sources,
-                                contentLanguage = cached.contentLanguage ?: contentLanguage
+                                contentLanguage = cached.contentLanguage ?: contentLanguage,
+                                mysteryMode = mysteryMode
                             ),
                             showDirectAutoPlayOverlay = showOverlay || it.showDirectAutoPlayOverlay,
                             isDirectAutoPlayFlow = showOverlay || it.isDirectAutoPlayFlow
@@ -1512,7 +1518,8 @@ class StreamScreenViewModel @Inject constructor(
             fileIdx = stream.getEffectiveFileIdx(),
             sources = stream.sources,
             contentLanguage = contentLanguage,
-            launchStartedAtMs = TtffTrace.t0ElapsedMsOrNull()
+            launchStartedAtMs = TtffTrace.t0ElapsedMsOrNull(),
+            mysteryMode = mysteryMode
         )
 
         val url = playbackInfo.url
@@ -2028,7 +2035,8 @@ data class StreamPlaybackInfo(
     val contentLanguage: String? = null,
     // TTFF T.1: SystemClock.elapsedRealtime() at the press that started this
     // launch (title press for auto-select, stream selection for manual).
-    val launchStartedAtMs: Long? = null
+    val launchStartedAtMs: Long? = null,
+    val mysteryMode: Boolean = false
 )
 
 private fun Stream.isReadyForDebridPreparation(): Boolean =

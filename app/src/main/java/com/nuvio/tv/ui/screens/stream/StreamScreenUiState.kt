@@ -36,7 +36,8 @@ data class StreamScreenUiState(
     val autoPlayStream: Stream? = null,
     val autoPlayPlaybackInfo: StreamPlaybackInfo? = null,
     val error: String? = null,
-    val playbackErrorMessage: String? = null
+    val playbackErrorMessage: String? = null,
+    val mysteryMode: Boolean = false
 ) {
     val isEpisode: Boolean get() = season != null && episode != null
 }

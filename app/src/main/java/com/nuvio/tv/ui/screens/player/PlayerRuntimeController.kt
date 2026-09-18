@@ -203,6 +203,7 @@ class PlayerRuntimeController(
     internal val rememberedAudioLanguage: String? = navigationArgs.rememberedAudioLanguage
     internal val rememberedAudioName: String? = navigationArgs.rememberedAudioName
     internal val cloudSessionToken: String? = navigationArgs.cloudSessionToken
+    internal val mysteryMode: Boolean = navigationArgs.mysteryMode
     internal val mediaSourceFactory = PlayerMediaSourceFactory(context.applicationContext)
 
     internal var currentVideoHash: String? = navigationArgs.videoHash
@@ -305,7 +306,8 @@ class PlayerRuntimeController(
             currentSeason = currentSeason,
             currentEpisode = currentEpisode,
             currentVideoId = currentVideoId,
-            currentEpisodeTitle = currentEpisodeTitle
+            currentEpisodeTitle = currentEpisodeTitle,
+            mysteryMode = mysteryMode
         )
     )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
