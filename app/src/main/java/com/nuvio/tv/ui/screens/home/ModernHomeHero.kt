@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -51,6 +52,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
@@ -104,8 +106,10 @@ internal fun ModernHeroScene(
     ModernHeroGradientLayer(
         bgColor = bgColor,
         isFullScreen = isFullScreen,
-        trailerShowing = { state().shouldPlayTrailer && state().trailerFirstFrameRendered },
-        modifier = modifier
+        // Keep the locandina scrim while the trailer plays so title/meta stay
+        // readable and the artwork does not jump to a full-bleed overlay.
+        trailerShowing = { false },
+        modifier = modifier.zIndex(1f)
     )
 }
 
@@ -162,7 +166,11 @@ internal fun ModernHeroMediaLayer(
         displayedBackdrop?.let { HeroBackdropState.update(it) }
     }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier
+            .clipToBounds()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    ) {
         androidx.compose.animation.Crossfade(
             targetState = imageModel,
             animationSpec = tween(durationMillis = NuvioMotion.tokens.durations.overlay),
@@ -202,10 +210,8 @@ internal fun ModernHeroMediaLayer(
             // TrailerPlayer's modifier lands on an AndroidView inside an
             // AnimatedVisibility, whose layout drops BoxScope.align parent-data
             // (three earlier attempts placed the player at the box's top-left for
-            // exactly this reason). So: wrapper Box pinned CenterEnd, offset LEFT by
-            // `huge` to cancel the outer bleed plus a screen-edge inset, exact dp
-            // width (cap computed screen-side in dp), full height; the player
-            // fills the wrapper and FIT letterboxes the 16:9 video inside it.
+            // exactly this reason). Crop to fill so the trailer matches the
+            // locandina backdrop (ContentScale.Crop) instead of letterboxing.
             if (isFullScreen()) {
                 key(playbackKeyVal ?: trailerUrlVal) {
                     TrailerPlayer(
@@ -216,7 +222,7 @@ internal fun ModernHeroMediaLayer(
                         onFirstFrameRendered = onFirstFrameRendered,
                         muted = mutedVal,
                         playerViewFocusable = false,
-                        cropToFill = false,
+                        cropToFill = true,
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
@@ -241,7 +247,7 @@ internal fun ModernHeroMediaLayer(
                             onFirstFrameRendered = onFirstFrameRendered,
                             muted = mutedVal,
                             playerViewFocusable = false,
-                            cropToFill = false,
+                            cropToFill = true,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {

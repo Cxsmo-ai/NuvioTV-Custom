@@ -8,7 +8,6 @@ package com.nuvio.tv.ui.screens.home
 
 import com.nuvio.tv.ui.theme.NuvioTheme
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -853,24 +852,6 @@ fun ModernHomeContent(
                 heroTrailerFirstFrameRendered = false
             }
 
-            // Collection hero videos should trigger the same fullscreen layout
-            // and content fade as catalog trailers — otherwise the video plays
-            // "behind" the collection cards instead of expanding into the hero area (#2683).
-            val isTrailerPlayingFullscreenState = remember(
-                fullScreenBackdrop,
-                shouldPlayCatalogHeroTrailerState,
-                shouldPlayCollectionHeroVideoState
-            ) {
-                derivedStateOf {
-                    fullScreenBackdrop &&
-                        (shouldPlayCatalogHeroTrailerState.value || shouldPlayCollectionHeroVideoState.value) &&
-                        heroTrailerFirstFrameRendered
-                }
-            }
-            BackHandler(enabled = isTrailerPlayingFullscreenState.value) {
-                focusedCatalogSelection.value = null
-                expandedCatalogFocusKey.value = null
-            }
             val liveHeroSceneState = remember(
                 resolvedHeroState,
                 shouldPlayHeroTrailerState,
@@ -1043,20 +1024,20 @@ fun ModernHomeContent(
             }
             val heroMediaModifier = remember(heroBackdropHeight, screenHeight, fullScreenBackdrop) {
                 if (fullScreenBackdrop) {
-                    Modifier.align(Alignment.TopStart).fillMaxWidth().height(screenHeight)
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .height(screenHeight)
+                        .zIndex(0f)
                 } else {
                     Modifier
                         .align(Alignment.TopEnd)
                         .offset(x = NuvioTheme.spacing.huge)
                         .fillMaxWidth(MODERN_HERO_MEDIA_WIDTH_FRACTION)
                         .height(heroBackdropHeight)
+                        .zIndex(0f)
                 }
             }
-
-            val fullScreenBackdropUpdated by rememberUpdatedState(fullScreenBackdrop)
-            val shouldPlayCatalogHeroTrailerUpdated by rememberUpdatedState(shouldPlayCatalogHeroTrailerState.value)
-            val shouldPlayCollectionHeroVideoUpdated by rememberUpdatedState(shouldPlayCollectionHeroVideoState.value)
-            val heroTrailerFirstFrameRenderedUpdated by rememberUpdatedState(heroTrailerFirstFrameRendered)
 
             val onTrailerEndedLambda = remember {
                 {
@@ -1153,16 +1134,8 @@ fun ModernHomeContent(
                 )
             }
 
-            // Fade content rows when ANY hero media (catalog trailer or collection
-            // hero video) is playing in fullscreen — not just catalog trailers.
-            val trailerContentAlphaState = animateFloatAsState(
-                targetValue = if (fullScreenBackdropUpdated && (shouldPlayCatalogHeroTrailerUpdated || shouldPlayCollectionHeroVideoUpdated) && heroTrailerFirstFrameRenderedUpdated) 0f else 1f,
-                animationSpec = tween(durationMillis = 480),
-                label = "trailerContentFade"
-            )
-
-            val shouldPlayTrailerLambda = remember { { shouldPlayCatalogHeroTrailerUpdated || shouldPlayCollectionHeroVideoUpdated } }
-            val heroTrailerRenderedLambda = remember { { heroTrailerFirstFrameRenderedUpdated } }
+            // Keep catalog rows fully visible over the hero locandina. Fading them
+            // made Hero-media trailers look like a homepage overlay.
 
             val heroMetadataModifier = remember(
                 rowHorizontalPadding,
@@ -1176,6 +1149,7 @@ fun ModernHomeContent(
                         bottom = rowsViewportHeight + NuvioTheme.spacing.lg
                     )
                     .fillMaxWidth(MODERN_HERO_TEXT_WIDTH_FRACTION)
+                    .zIndex(1f)
             }
 
             val heroDescriptionScalePercent by com.nuvio.tv.data.local.UiScalePreference
@@ -1198,13 +1172,8 @@ fun ModernHomeContent(
                 },
                 portraitMode = !useLandscapePosters,
                 showImdbRatings = uiState.homeImdbRatingsVisibility.showRatings,
-                trailerPlaying = {
-                    if (isRapidHorizontalNav.value) false
-                    else {
-                        val state = heroSceneStateLambda()
-                        state.fullScreenBackdrop && shouldPlayTrailerLambda() && heroTrailerRenderedLambda()
-                    }
-                },
+                // Locandina trailer: keep title/meta visible over the artwork.
+                trailerPlaying = { false },
                 descriptionMaxLines = heroDescriptionMaxLines,
                 modifier = heroMetadataModifier
             )
@@ -1241,7 +1210,7 @@ fun ModernHomeContent(
                     onRowItemFocusedPassedDown.value.invoke(rowKey, index, isCw)
                 }
             }
-            val stableTrailerContentAlphaLambda = remember { { trailerContentAlphaState.value } }
+            val stableTrailerContentAlphaLambda = remember { { 1f } }
             val stableExpandedTrailerPreviewUrl = remember(heroTrailerUrlsState) { { heroTrailerUrlsState.value.first } }
             val stableExpandedTrailerPreviewAudioUrl = remember(heroTrailerUrlsState) { { heroTrailerUrlsState.value.second } }
             val stableEnrichedPreviews = remember { androidx.compose.runtime.mutableStateOf(enrichedPreviews.asStable()) }
@@ -1334,7 +1303,9 @@ fun ModernHomeContent(
                     null
                 },
                 isVerticalRowsScrollingState = isVerticalRowsScrollingState,
-                modifier = Modifier.align(Alignment.BottomStart)
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .zIndex(2f)
             )
     }
 
