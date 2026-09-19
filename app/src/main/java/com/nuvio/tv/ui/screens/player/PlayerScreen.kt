@@ -1868,7 +1868,14 @@ private fun ExoPlayerSurface(
             return@LaunchedEffect
         }
         onSeekrCalibrationStateChanged(true)
+        val originalVolume = player.volume
+        val originalPlayWhenReady = player.playWhenReady
+        val originalPosition = player.currentPosition.coerceAtLeast(0L)
+        val originalSeekParameters = player.seekParameters
         try {
+            player.volume = 0f
+            player.playWhenReady = false
+            player.pause()
             var surfaceReady = false
             repeat(40) {
                 if (!surfaceReady) {
@@ -1885,6 +1892,13 @@ private fun ExoPlayerSurface(
             )
             if (alignment != null) onSeekrCalibrationComplete(alignment)
         } finally {
+            runCatching {
+                player.setSeekParameters(originalSeekParameters)
+                player.seekTo(originalPosition)
+                player.volume = originalVolume
+                player.playWhenReady = originalPlayWhenReady
+                if (originalPlayWhenReady) player.play()
+            }
             onSeekrCalibrationStateChanged(false)
         }
     }
