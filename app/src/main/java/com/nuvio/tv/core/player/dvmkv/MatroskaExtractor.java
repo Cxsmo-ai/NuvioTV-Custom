@@ -879,7 +879,10 @@ public class MatroskaExtractor implements Extractor {
     try {
       return readFromInput(input, seekPosition);
     } catch (EOFException e) {
-      if (sentSeekMap) {
+      // A known-length input ending immediately after the seek map can have a
+      // truncated EBML tail. Do not turn an unknown-length network disconnect
+      // into normal EOS: that would hide a real mid-stream playback failure.
+      if (sentSeekMap && isAtKnownEndOfInput(input)) {
         Log.w(TAG, "MKV stream ended mid-element after seek map; treating as end of input");
         return finishReadAtEndOfInput();
       }
@@ -973,6 +976,15 @@ public class MatroskaExtractor implements Extractor {
     long remaining = Math.max(0L, length - position);
     long tailBudget = Math.max(8L * 1024L * 1024L, length / 50L);
     return remaining <= tailBudget;
+  }
+
+  private static boolean isAtKnownEndOfInput(ExtractorInput input) {
+    long length = input.getLength();
+    if (length == C.LENGTH_UNSET || length <= 0L) {
+      return false;
+    }
+    long remaining = Math.max(0L, length - input.getPosition());
+    return remaining <= 64L * 1024L;
   }
 
   private static boolean isTruncatedEbmlTailError(Throwable error) {

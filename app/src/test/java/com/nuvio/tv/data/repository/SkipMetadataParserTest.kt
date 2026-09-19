@@ -61,6 +61,20 @@ class SkipMetadataParserTest {
     }
 
     @Test
+    fun introDbMovieParserSeparatesCreditsFromPostCredits() {
+        val intervals = SkipMetadataParser.parseIntroDb(
+            """{"outro":{"start_sec":100,"end_sec":140},
+               "post_credits":{"start_sec":125,"end_sec":130}}""",
+            "introdb",
+            isMovie = true
+        )
+
+        assertEquals(listOf("movie-credits", "post-credits"), intervals.map { it.type })
+        assertEquals(125.0, intervals.first().endTime, 0.001)
+        assertEquals(125.0, intervals.last().startTime, 0.001)
+    }
+
+    @Test
     fun theIntroDbParserUsesAllCategoryArraysAndDurationForOpenEnd() {
         val intervals = SkipMetadataParser.parseTheIntroDb(
             """{"intro":[{"start_ms":null,"end_ms":90000}],

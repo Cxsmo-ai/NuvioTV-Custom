@@ -612,7 +612,6 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         pendingInitialStartOption = null
         requestedMediaUrl = null
         pathAtMediaRequest = null
-        appliedHi10pGnextSoftwareFallback = null
     }
 
     override fun initOptions() {
