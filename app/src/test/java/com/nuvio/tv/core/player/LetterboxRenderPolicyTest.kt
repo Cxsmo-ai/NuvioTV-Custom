@@ -16,4 +16,11 @@ class LetterboxRenderPolicyTest {
         assertFalse(LetterboxRenderPolicy.defaultTransparentLetterbox("Amazon"))
         assertFalse(LetterboxRenderPolicy.defaultTransparentLetterbox(" amazon "))
     }
+
+    @Test
+    fun onlyResolvedExoPlayerMayRequestTransparency() {
+        assertTrue(LetterboxRenderPolicy.shouldUseTransparentLetterbox(true, "NVIDIA"))
+        assertFalse(LetterboxRenderPolicy.shouldUseTransparentLetterbox(false, "NVIDIA"))
+        assertFalse(LetterboxRenderPolicy.shouldUseTransparentLetterbox(true, "NVIDIA", exitDispatched = true))
+    }
 }

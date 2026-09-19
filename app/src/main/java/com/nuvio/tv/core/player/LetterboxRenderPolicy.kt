@@ -9,6 +9,14 @@ import androidx.compose.runtime.setValue
 object LetterboxRenderPolicy {
     fun defaultTransparentLetterbox(manufacturer: String? = Build.MANUFACTURER): Boolean =
         !manufacturer.orEmpty().trim().equals("Amazon", ignoreCase = true)
+
+    fun shouldUseTransparentLetterbox(
+        isResolvedExoPlayer: Boolean,
+        manufacturer: String? = Build.MANUFACTURER,
+        exitDispatched: Boolean = false
+    ): Boolean = isResolvedExoPlayer &&
+        !exitDispatched &&
+        defaultTransparentLetterbox(manufacturer)
 }
 
 /** Activity-level backdrop state used while the internal player owns the window. */

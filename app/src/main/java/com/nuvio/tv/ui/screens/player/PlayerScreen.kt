@@ -578,8 +578,10 @@ fun PlayerScreen(
         }
     }
 
-    val transparentLetterbox = LetterboxRenderPolicy.defaultTransparentLetterbox() &&
-        uiState.internalPlayerEngine != InternalPlayerEngine.MVP_PLAYER
+    val transparentLetterbox = LetterboxRenderPolicy.shouldUseTransparentLetterbox(
+        isResolvedExoPlayer = uiState.internalPlayerEngine == InternalPlayerEngine.EXOPLAYER,
+        exitDispatched = exitDispatched
+    )
     DisposableEffect(transparentLetterbox) {
         if (!transparentLetterbox) return@DisposableEffect onDispose {}
         PlayerWindowBackdrop.acquireTransparent()
