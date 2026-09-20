@@ -100,6 +100,15 @@ Implementation detail.
             "fix: trakt CW Regression": (
                 "Fixed Trakt regressions affecting Continue Watching and new episodes"
             ),
+            "fix: don't save previous episode position after MPV switch": (
+                "Prevented stale episode progress after an MPV switch"
+            ),
+            "fix: gate transparent letterbox to resolved exoplayer": (
+                "Restricted transparent letterboxing to resolved ExoPlayer output"
+            ),
+            "fix: gate playback until asynchronous Seekr alignment": (
+                "Ensured player presentation waits for Seekr preview alignment"
+            ),
         }
         for source, expected in cases.items():
             with self.subTest(source=source):

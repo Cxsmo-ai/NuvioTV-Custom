@@ -2,6 +2,18 @@ from __future__ import annotations
 
 SPECIAL_RULES = [
     (
+        r"don't\s+save\s+previous\s+episode\s+position\s+after\s+MPV\s+switch",
+        "Prevented stale episode progress after an MPV switch",
+    ),
+    (
+        r"gate\s+transparent\s+letterbox\s+to\s+resolved\s+exoplayer",
+        "Restricted transparent letterboxing to resolved ExoPlayer output",
+    ),
+    (
+        r"gate\s+playback\s+until\s+asynchronous\s+Seekr\s+alignment",
+        "Ensured player presentation waits for Seekr preview alignment",
+    ),
+    (
         r"align\s+Seekr\s+previews\s+to\s+nearest\s+cue",
         "Improved Seekr preview timing against the nearest available cue",
     ),
