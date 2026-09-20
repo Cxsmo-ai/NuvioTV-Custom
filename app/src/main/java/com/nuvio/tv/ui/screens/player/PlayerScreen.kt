@@ -158,6 +158,11 @@ import java.util.concurrent.TimeUnit
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.media3.exoplayer.ExoPlayer
@@ -208,6 +213,14 @@ fun PlayerScreen(
     var showDimmerDialog by remember { mutableStateOf(false) }
     val seekrTrack by viewModel.seekrTrack.collectAsState()
     var seekrCalibrationActive by remember { mutableStateOf(false) }
+    var seekrCalibrationFinishedTrackKey by remember { mutableStateOf<Int?>(null) }
+    val seekrTrackKey = seekrTrack?.takeIf { !it.isEmpty }?.let(System::identityHashCode)
+    // The track itself is the startup gate. This is derived directly from
+    // composition state so the opaque loading screen is present as soon as a
+    // usable Seekr track arrives, before the calibration coroutine gets its
+    // first scheduling turn.
+    val seekrCalibrationPending = uiState.internalPlayerEngine == InternalPlayerEngine.EXOPLAYER &&
+        seekrTrackKey != null && seekrCalibrationFinishedTrackKey != seekrTrackKey
     // One press/release owner shared by the player root and the scrubber. This
     // prevents a focus change during a held key from losing the release event.
     val remoteInputRouter = remember { PlayerRemoteInputRouter() }
@@ -853,6 +866,9 @@ fun PlayerScreen(
                                     )
                                 }
                             },
+                            onSeekrCalibrationFinished = { finishedTrack ->
+                                seekrCalibrationFinishedTrackKey = System.identityHashCode(finishedTrack)
+                            },
                             isPlaying = uiState.isPlaying,
                             isBuffering = uiState.isBuffering,
                             aspectMode = uiState.aspectMode,
@@ -923,12 +939,12 @@ fun PlayerScreen(
         }
 
         LoadingOverlay(
-            visible = (uiState.showLoadingOverlay || seekrCalibrationActive) &&
+            visible = (uiState.showLoadingOverlay || seekrCalibrationActive || seekrCalibrationPending) &&
                 uiState.error == null && !postPlayRecommendationState.isVisible,
             backdropUrl = uiState.backdrop,
             logoUrl = uiState.logo,
             title = uiState.title,
-            message = if (seekrCalibrationActive) {
+            message = if (seekrCalibrationActive || seekrCalibrationPending) {
                 stringResource(R.string.player_loading_preview_sync)
             } else {
                 uiState.loadingMessage.takeIf { uiState.showPlayerLoadingStatus || uiState.isTorrentStream }
@@ -947,6 +963,7 @@ fun PlayerScreen(
             },
             filename = viewModel.currentFilename,
             progress = uiState.loadingProgress,
+            immediate = seekrCalibrationActive || seekrCalibrationPending,
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(2f)
@@ -1743,6 +1760,7 @@ private fun ExoPlayerSurface(
     seekrTrack: SeekrTrack?,
     onSeekrCalibrationStateChanged: (Boolean) -> Unit,
     onSeekrCalibrationComplete: (SeekrFrameAlignment) -> Unit,
+    onSeekrCalibrationFinished: (SeekrTrack) -> Unit,
     isPlaying: Boolean,
     isBuffering: Boolean,
     aspectMode: AspectMode,
@@ -1887,15 +1905,20 @@ private fun ExoPlayerSurface(
             onSeekrCalibrationStateChanged(false)
             return@LaunchedEffect
         }
-        onSeekrCalibrationStateChanged(true)
         val originalVolume = player.volume
         val originalPlayWhenReady = player.playWhenReady
         val originalPosition = player.currentPosition.coerceAtLeast(0L)
         val originalSeekParameters = player.seekParameters
+        var calibrationCompleted = false
+        // Raise the startup gate before any suspension and stop both audio and
+        // rendering intent before calibration begins. The player surface stays
+        // mounted for PixelCopy, but the caller keeps it behind an opaque
+        // loading screen until the offset has been decided.
+        player.volume = 0f
+        player.playWhenReady = false
+        player.pause()
+        onSeekrCalibrationStateChanged(true)
         try {
-            player.volume = 0f
-            player.playWhenReady = false
-            player.pause()
             var surfaceReady = false
             repeat(40) {
                 if (!surfaceReady) {
@@ -1905,12 +1928,25 @@ private fun ExoPlayerSurface(
                     if (!surfaceReady) delay(50L)
                 }
             }
-            val alignment = calibrateSeekrTrack(
-                track = track,
-                playbackDurationMs = player.duration,
-                frameSource = ExoSeekrFrameCapture(player, playerView)::captureAt
-            )
+            val alignment = withContext(Dispatchers.Default) {
+                calibrateSeekrTrack(
+                    track = track,
+                    playbackDurationMs = player.duration,
+                    frameSource = SeekrCalibrationFrameSource { positionMs ->
+                        withContext(Dispatchers.Main.immediate) {
+                            ExoSeekrFrameCapture(player, playerView).captureAt(positionMs)
+                        }
+                    }
+                )
+            }
+            calibrationCompleted = true
             if (alignment != null) onSeekrCalibrationComplete(alignment)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // A missing/unsupported frame surface should never strand the
+            // player behind the gate. It simply leaves the manual offset at 0.
+            calibrationCompleted = true
         } finally {
             runCatching {
                 player.setSeekParameters(originalSeekParameters)
@@ -1918,6 +1954,12 @@ private fun ExoPlayerSurface(
                 player.volume = originalVolume
                 player.playWhenReady = originalPlayWhenReady
                 if (originalPlayWhenReady) player.play()
+            }
+            // A cancelled effect must not release the gate for a track that
+            // never finished calibration. This matters when the player view is
+            // recreated during an engine switch or a configuration change.
+            if (calibrationCompleted && currentCoroutineContext().isActive) {
+                onSeekrCalibrationFinished(track)
             }
             onSeekrCalibrationStateChanged(false)
         }

@@ -6,6 +6,7 @@ import com.nuvio.tv.ui.theme.NuvioTheme
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -68,6 +69,7 @@ fun LoadingOverlay(
     sourceLine: String? = null,
     filename: String? = null,
     progress: Float? = null,
+    immediate: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var logoLoadFailed by remember(logoUrl) { mutableStateOf(false) }
@@ -75,7 +77,7 @@ fun LoadingOverlay(
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(animationSpec = tween(250)),
+        enter = if (immediate) EnterTransition.None else fadeIn(animationSpec = tween(250)),
         exit = fadeOut(animationSpec = tween(200)),
         modifier = modifier
     ) {
