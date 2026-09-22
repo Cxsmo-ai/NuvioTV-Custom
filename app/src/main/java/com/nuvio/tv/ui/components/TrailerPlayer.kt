@@ -17,6 +17,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -288,6 +289,10 @@ fun TrailerPlayer(
                 modifier = modifier
                     .clipToBounds()
                     .graphicsLayer {
+                        // Offscreen flattens TextureView into this Compose layer so
+                        // hero trailers can sit behind catalog rows instead of
+                        // punching through the homepage.
+                        compositingStrategy = CompositingStrategy.Offscreen
                         alpha = playerAlphaState.value
                         // Fork: overscanZoom was declared but never applied upstream.
                         scaleX = overscanZoom

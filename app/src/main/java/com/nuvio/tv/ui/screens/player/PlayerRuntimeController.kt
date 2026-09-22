@@ -539,6 +539,8 @@ class PlayerRuntimeController(
     internal var skipSettingsFingerprint: String = ""
     internal var playerSettingsInitialized: Boolean = false
     internal var skipIntroFetchedKey: String? = null
+    internal var skipFetchGeneration: Int = 0
+    internal var skipDurationRetryAttempted: Boolean = false
     internal val autoSkippedIntervalKeys: MutableSet<String> = mutableSetOf()
     internal var lastActiveSkipType: String? = null
     internal var autoSubtitleSelected: Boolean = false

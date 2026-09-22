@@ -1484,8 +1484,10 @@ internal fun PlayerRuntimeController.switchToEpisodeStream(
     updateEpisodeDescription()
 
     playbackStartedForParentalGuide = false
+    skipFetchGeneration++
     skipIntervals = emptyList()
     skipIntroFetchedKey = null
+    skipDurationRetryAttempted = false
     lastActiveSkipType = null
     autoSkippedIntervalKeys.clear()
 
@@ -1598,8 +1600,10 @@ private fun PlayerRuntimeController.switchToEpisodeStreamCommon(
     refreshSubtitlesForCurrentEpisode()
 
     playbackStartedForParentalGuide = false
+    skipFetchGeneration++
     skipIntervals = emptyList()
     skipIntroFetchedKey = null
+    skipDurationRetryAttempted = false
     lastActiveSkipType = null
     autoSkippedIntervalKeys.clear()
 

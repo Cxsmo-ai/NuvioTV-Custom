@@ -265,6 +265,7 @@ internal fun PlayerRuntimeController.startProgressUpdates() {
                     if (playerDuration > lastKnownDuration) {
                         lastKnownDuration = playerDuration
                     }
+                    maybeRefetchSkipIntervalsWhenDurationKnown(playerDuration)
                     val displayPosition = pendingPreviewSeekPosition ?: pos
                     val playingForWatchClock = playingNow && !cacheBuffering
                     publishPlaybackTimeline(
@@ -318,6 +319,7 @@ internal fun PlayerRuntimeController.startProgressUpdates() {
                 if (playerDuration > lastKnownDuration) {
                     lastKnownDuration = playerDuration
                 }
+                maybeRefetchSkipIntervalsWhenDurationKnown(playerDuration)
                 // 5c: duration backstop. Content-length was cleared at READY (2a);
                 // here the decoded duration is trustworthy. Guarded on a blank error so
                 // it fires once -- the reject sets error, and every later tick short-circuits.

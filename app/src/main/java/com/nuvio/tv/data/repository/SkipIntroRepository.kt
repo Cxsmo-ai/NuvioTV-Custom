@@ -19,6 +19,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import okio.Buffer
+import okio.BufferedSource
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Normalizer
@@ -98,7 +100,10 @@ class SkipIntroRepository @Inject constructor(
             credentials.theIntroDbApiKey.isNotBlank()
         ).joinToString(":")
         val now = System.currentTimeMillis()
-        cache[key]?.takeIf { now - it.storedAtMs < CACHE_TTL_MS }?.let { return it.intervals }
+        cache[key]?.takeIf { cached ->
+            val ttl = if (cached.intervals.isEmpty()) EMPTY_CACHE_TTL_MS else CACHE_TTL_MS
+            now - cached.storedAtMs < ttl
+        }?.let { return it.intervals }
 
         val isSeries = mediaType?.lowercase(Locale.US) in setOf("series", "tv", "show") ||
             (season > 0 && episode > 0)
@@ -279,9 +284,9 @@ class SkipIntroRepository @Inject constructor(
         val headers = buildMap {
             put("Accept", "application/json")
             put("User-Agent", "NuvioTV/skip-metadata")
-            if (apiKey.isNotBlank()) put("Authorization", "Bearer $$apiKey")
+            if (apiKey.isNotBlank()) put("Authorization", bearerAuthorization(apiKey))
         }
-        return getText("https://api.theintrodb.org/v3/media?$$query", headers = headers)
+        return getText(theIntroDbMediaUrl(query), headers = headers)
             ?.let { SkipMetadataParser.parseTheIntroDb(it, "theintrodb", durationMs) }
             .orEmpty()
     }
@@ -294,19 +299,13 @@ class SkipIntroRepository @Inject constructor(
         apiKey: String
     ): List<SkipInterval> {
         if (apiKey.isBlank()) return emptyList()
-        val headers = mapOf("Accept" to "application/json", "Authorization" to "Bearer $$apiKey")
+        val headers = mapOf("Accept" to "application/json", "Authorization" to bearerAuthorization(apiKey))
         val mediaType = if (isSeries) "tv" else "movie"
         val mapping = getText(
-            "https://publicmetadb.com/api/external/mappings/lookup?id_type=imdb&id_value=$$imdbId&media_type=$$mediaType",
+            publicMetaDbMappingUrl(imdbId, mediaType),
             headers = headers
         )?.let(SkipMetadataParser::parsePublicMetaDbMapping) ?: return emptyList()
-        val url = buildString {
-            append("https://publicmetadb.com/api/external/skips?tmdb_id=$$mapping&media_type=$$mediaType")
-            if (isSeries) {
-                append("&season=").append(season)
-                append("&episode=").append(episode)
-            }
-        }
+        val url = publicMetaDbSkipsUrl(mapping, mediaType, season, episode, isSeries)
         return getText(url, headers = headers)
             ?.let { SkipMetadataParser.parsePublicMetaDb(it, "publicmetadb") }
             .orEmpty()
@@ -371,7 +370,7 @@ class SkipIntroRepository @Inject constructor(
                     if (!response.isSuccessful) return@use null
                     val body = response.body ?: return@use null
                     if (body.contentLength() > maxBytes) return@use null
-                    body.source().peek().readUtf8(maxBytes)
+                    readUtf8AtMost(body.source(), maxBytes)
                 }
             }.getOrNull()
         }
@@ -396,7 +395,7 @@ class SkipIntroRepository @Inject constructor(
                         }
                         val responseBody = response.body ?: return@use null
                         if (responseBody.contentLength() > MAX_RESPONSE_BYTES) return@use null
-                        responseBody.source().readUtf8(MAX_RESPONSE_BYTES)
+                        readUtf8AtMost(responseBody.source(), MAX_RESPONSE_BYTES)
                     }
                 }.getOrNull()
                 if (responseBody != null) return@withContext responseBody
@@ -416,6 +415,7 @@ class SkipIntroRepository @Inject constructor(
     private companion object {
         const val TAG = "SkipIntro"
         const val CACHE_TTL_MS = 6L * 60L * 60L * 1000L
+        const val EMPTY_CACHE_TTL_MS = 60_000L
         const val PROVIDER_TIMEOUT_MS = 6_000L
         const val MAX_CACHE_ENTRIES = 256
         const val MAX_INTERVALS = 256
@@ -431,6 +431,72 @@ class SkipIntroRepository @Inject constructor(
 }
 
 private fun Long?.isNullOrPositive(): Boolean = this != null && this > 0L
+
+internal fun introDbSegmentsUrl(base: String, imdbId: String, season: Int, episode: Int): String =
+    "$base/segments?imdb_id=$imdbId&season=$season&episode=$episode"
+
+internal fun theIntroDbMediaUrl(query: String): String =
+    "https://api.theintrodb.org/v3/media?$query"
+
+internal fun publicMetaDbMappingUrl(imdbId: String, mediaType: String): String =
+    "https://publicmetadb.com/api/external/mappings/lookup?id_type=imdb&id_value=$imdbId&media_type=$mediaType"
+
+internal fun publicMetaDbSkipsUrl(
+    tmdbId: String,
+    mediaType: String,
+    season: Int,
+    episode: Int,
+    isSeries: Boolean
+): String = buildString {
+    append("https://publicmetadb.com/api/external/skips?tmdb_id=")
+    append(tmdbId)
+    append("&media_type=")
+    append(mediaType)
+    if (isSeries) {
+        append("&season=").append(season)
+        append("&episode=").append(episode)
+    }
+}
+
+internal fun bearerAuthorization(apiKey: String): String = "Bearer $apiKey"
+
+/** Duration sits before the settings fingerprint, which itself contains colons. */
+internal fun skipIntervalsFetchKey(
+    imdbId: String?,
+    tmdbId: Int?,
+    season: Int?,
+    episode: Int?,
+    durationMs: Long,
+    settingsFingerprint: String
+): String = listOf(
+    imdbId.orEmpty(),
+    "tmdb=${tmdbId ?: 0}",
+    (season ?: 0).toString(),
+    (episode ?: 0).toString(),
+    durationMs.toString(),
+    settingsFingerprint
+).joinToString(":")
+
+internal fun skipFetchKeyDurationMs(key: String): Long? =
+    key.split(':', limit = 6).getOrNull(4)?.toLongOrNull()
+
+/**
+ * Reads a response body up to [maxBytes].
+ *
+ * [BufferedSource.readUtf8] with a byte count requires that many bytes and
+ * throws when the payload is shorter, which discarded every normal skip
+ * response. [BufferedSource.read] also stops after one 8 KB segment, so this
+ * loops until the body ends or the cap is hit.
+ */
+internal fun readUtf8AtMost(source: BufferedSource, maxBytes: Long): String? {
+    if (maxBytes <= 0L) return null
+    val buffer = Buffer()
+    while (buffer.size < maxBytes) {
+        val read = source.read(buffer, maxBytes - buffer.size)
+        if (read == -1L) return buffer.readUtf8()
+    }
+    return if (source.exhausted()) buffer.readUtf8() else null
+}
 
 /**
  * Merges provider reports that describe the same category/action and overlap
