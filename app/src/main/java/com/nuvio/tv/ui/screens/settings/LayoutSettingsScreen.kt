@@ -486,6 +486,20 @@ fun LayoutSettingsContent(
                         onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
                     )
 
+                    CompactToggleRow(
+                        title = stringResource(R.string.random_episode_mystery_mode),
+                        subtitle = stringResource(R.string.random_episode_mystery_mode_subtitle),
+                        checked = uiState.randomEpisodeMysteryMode,
+                        onToggle = {
+                            viewModel.onEvent(
+                                LayoutSettingsEvent.SetRandomEpisodeMysteryMode(
+                                    !uiState.randomEpisodeMysteryMode
+                                )
+                            )
+                        },
+                        onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
+                    )
+
                     if (AppFeaturePolicy.inAppTrailerPlaybackEnabled) {
                         CompactToggleRow(
                             title = stringResource(R.string.audio_autoplay_trailers),

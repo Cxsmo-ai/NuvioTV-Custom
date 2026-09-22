@@ -149,8 +149,11 @@ class AvatarRepository @Inject constructor(
         return catalog
     }
 
-    fun getAvatarImageUrl(avatarId: String, catalog: List<AvatarCatalogItem>): String? {
-        return catalog.find { it.id == avatarId }?.imageUrl
+    fun getAvatarImageUrl(avatarId: String, catalog: List<AvatarCatalogItem>? = null): String? {
+        val effectiveCatalog = if (!catalog.isNullOrEmpty()) catalog else cachedStandardCatalog.orEmpty()
+        val fromCatalog = effectiveCatalog.find { it.id == avatarId }?.imageUrl
+            ?: standardMetadata.find { it.id == avatarId }?.let { toStandardCatalogItem(it).imageUrl }
+        return fromCatalog
             ?: latestCachedMemberAvatar(avatarId)?.toURI()?.toString()
     }
 
@@ -244,8 +247,14 @@ class AvatarRepository @Inject constructor(
 
     private fun avatarImageUrl(storagePath: String): String {
         if (storagePath.startsWith("http://") || storagePath.startsWith("https://")) return storagePath
-        val baseUrl = serverConfiguration.avatarPublicBaseUrl.orEmpty().trimEnd('/')
-        return if (baseUrl.isNotEmpty()) "$baseUrl/$storagePath" else storagePath
+        val configuredBase = serverConfiguration.avatarPublicBaseUrl?.trim()?.trimEnd('/')
+            ?.takeIf { it.isNotEmpty() }
+        val backendBase = serverConfiguration.backendUrl.trimEnd('/').takeIf { it.isNotEmpty() }
+        val baseUrl = configuredBase
+            ?: backendBase?.let { "$it/storage/v1/object/public/avatars" }
+            ?: "https://api.nuvio.tv/storage/v1/object/public/avatars"
+        val cleanPath = storagePath.trimStart('/')
+        return "$baseUrl/$cleanPath"
     }
 
     private suspend fun cacheMemberAvatar(item: SupabaseMemberAvatarCatalogItem): File = withContext(Dispatchers.IO) {

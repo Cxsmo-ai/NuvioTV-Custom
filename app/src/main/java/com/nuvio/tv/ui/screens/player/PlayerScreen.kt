@@ -139,6 +139,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
+import com.nuvio.tv.core.player.LetterboxRenderPolicy
+import com.nuvio.tv.core.player.PlayerWindowBackdrop
 import com.nuvio.tv.ui.util.localizeEpisodeTitle
 import com.nuvio.tv.data.local.InternalPlayerEngine
 import com.nuvio.tv.data.local.LibassRenderType
@@ -156,6 +158,11 @@ import java.util.concurrent.TimeUnit
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.media3.exoplayer.ExoPlayer
@@ -206,6 +213,14 @@ fun PlayerScreen(
     var showDimmerDialog by remember { mutableStateOf(false) }
     val seekrTrack by viewModel.seekrTrack.collectAsState()
     var seekrCalibrationActive by remember { mutableStateOf(false) }
+    var seekrCalibrationFinishedTrackKey by remember { mutableStateOf<Int?>(null) }
+    val seekrTrackKey = seekrTrack?.takeIf { !it.isEmpty }?.let(System::identityHashCode)
+    // The track itself is the startup gate. This is derived directly from
+    // composition state so the opaque loading screen is present as soon as a
+    // usable Seekr track arrives, before the calibration coroutine gets its
+    // first scheduling turn.
+    val seekrCalibrationPending = uiState.internalPlayerEngine == InternalPlayerEngine.EXOPLAYER &&
+        seekrTrackKey != null && seekrCalibrationFinishedTrackKey != seekrTrackKey
     // One press/release owner shared by the player root and the scrubber. This
     // prevents a focus change during a held key from losing the release event.
     val remoteInputRouter = remember { PlayerRemoteInputRouter() }
@@ -328,7 +343,9 @@ fun PlayerScreen(
             } else {
                 viewModel.onEvent(PlayerEvent.OnDismissEpisodesPanel)
             }
-        } else if (uiState.postPlayMode is PostPlayMode.AutoPlay) {
+        } else if (uiState.postPlayMode is PostPlayMode.AutoPlay &&
+            postPlayRecommendationState.recommendation == null
+        ) {
             viewModel.onEvent(PlayerEvent.OnDismissNextEpisodeCard)
             // Transfer focus to skip button if it's still visible
             if (skipButtonActuallyVisible) {
@@ -574,10 +591,20 @@ fun PlayerScreen(
         }
     }
 
+    val transparentLetterbox = LetterboxRenderPolicy.shouldUseTransparentLetterbox(
+        isResolvedExoPlayer = uiState.internalPlayerEngine == InternalPlayerEngine.EXOPLAYER,
+        exitDispatched = exitDispatched
+    )
+    DisposableEffect(transparentLetterbox) {
+        if (!transparentLetterbox) return@DisposableEffect onDispose {}
+        PlayerWindowBackdrop.acquireTransparent()
+        onDispose { PlayerWindowBackdrop.releaseTransparent() }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .then(if (transparentLetterbox) Modifier else Modifier.background(Color.Black))
             .focusRequester(containerFocusRequester)
             .focusable()
             .onPreviewKeyEvent { keyEvent ->
@@ -785,6 +812,8 @@ fun PlayerScreen(
             label = "postPlayRecommendationPlayerBorderAlpha"
         )
         val playerSurfaceShape = RoundedCornerShape(postPlayRecommendationPlayerCornerRadius)
+        val playerSurfaceIsFullscreen = !postPlayRecommendationState.isVisible &&
+            postPlayRecommendationPlayerWidth >= 0.999f
         val playerSurfaceModifier = Modifier
             .align(Alignment.TopEnd)
             .padding(end = postPlayRecommendationPlayerPadding, top = postPlayRecommendationPlayerPadding)
@@ -795,7 +824,10 @@ fun PlayerScreen(
                 BorderStroke(1.dp, Color.White.copy(alpha = postPlayRecommendationPlayerBorderAlpha)),
                 playerSurfaceShape
             )
-            .background(Color.Black)
+            .then(
+                if (transparentLetterbox && playerSurfaceIsFullscreen) Modifier
+                else Modifier.background(Color.Black)
+            )
             .zIndex(
                 if (postPlayRecommendationState.isVisible || postPlayRecommendationPlayerWidth < 0.999f) {
                     2.2f
@@ -833,6 +865,9 @@ fun PlayerScreen(
                                         PlayerEvent.OnSetSeekPreviewOffset(alignment.seekrOffsetMs)
                                     )
                                 }
+                            },
+                            onSeekrCalibrationFinished = { finishedTrack ->
+                                seekrCalibrationFinishedTrackKey = System.identityHashCode(finishedTrack)
                             },
                             isPlaying = uiState.isPlaying,
                             isBuffering = uiState.isBuffering,
@@ -904,12 +939,12 @@ fun PlayerScreen(
         }
 
         LoadingOverlay(
-            visible = (uiState.showLoadingOverlay || seekrCalibrationActive) &&
+            visible = (uiState.showLoadingOverlay || seekrCalibrationActive || seekrCalibrationPending) &&
                 uiState.error == null && !postPlayRecommendationState.isVisible,
             backdropUrl = uiState.backdrop,
             logoUrl = uiState.logo,
             title = uiState.title,
-            message = if (seekrCalibrationActive) {
+            message = if (seekrCalibrationActive || seekrCalibrationPending) {
                 stringResource(R.string.player_loading_preview_sync)
             } else {
                 uiState.loadingMessage.takeIf { uiState.showPlayerLoadingStatus || uiState.isTorrentStream }
@@ -928,6 +963,7 @@ fun PlayerScreen(
             },
             filename = viewModel.currentFilename,
             progress = uiState.loadingProgress,
+            immediate = seekrCalibrationActive || seekrCalibrationPending,
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(2f)
@@ -958,12 +994,12 @@ fun PlayerScreen(
             onClose = { viewModel.onEvent(PlayerEvent.OnDismissPauseOverlay) },
             title = uiState.title,
             logo = uiState.logo,
-            episodeTitle = uiState.currentEpisodeTitle,
-            season = uiState.currentSeason,
-            episode = uiState.currentEpisode,
+            episodeTitle = if (uiState.mysteryMode) stringResource(R.string.random_episode_mystery_title) else uiState.currentEpisodeTitle,
+            season = if (uiState.mysteryMode) null else uiState.currentSeason,
+            episode = if (uiState.mysteryMode) null else uiState.currentEpisode,
             year = uiState.releaseYear,
             type = uiState.contentType,
-            description = uiState.description,
+            description = if (uiState.mysteryMode) null else uiState.description,
             cast = uiState.castMembers,
             showClock = !viewModel.playbackTimeline.collectAsState().value.isLive,
             modifier = Modifier
@@ -1115,7 +1151,8 @@ fun PlayerScreen(
             dismissed = uiState.skipIntervalDismissed,
             controlsVisible = uiState.showControls,
             // Autoplay next-episode card owns focus; subtitle menu must keep D-pad focus (#2874).
-            suppressFocus = uiState.postPlayMode is PostPlayMode.AutoPlay || !skipIntroCanFocus,
+            suppressFocus = (uiState.postPlayMode is PostPlayMode.AutoPlay &&
+                postPlayRecommendationState.recommendation == null) || !skipIntroCanFocus,
             canFocus = skipIntroCanFocus,
             onSkip = { viewModel.onEvent(PlayerEvent.OnSkipIntro) },
             onDismiss = { viewModel.onEvent(PlayerEvent.OnDismissSkipIntro) },
@@ -1723,6 +1760,7 @@ private fun ExoPlayerSurface(
     seekrTrack: SeekrTrack?,
     onSeekrCalibrationStateChanged: (Boolean) -> Unit,
     onSeekrCalibrationComplete: (SeekrFrameAlignment) -> Unit,
+    onSeekrCalibrationFinished: (SeekrTrack) -> Unit,
     isPlaying: Boolean,
     isBuffering: Boolean,
     aspectMode: AspectMode,
@@ -1867,6 +1905,18 @@ private fun ExoPlayerSurface(
             onSeekrCalibrationStateChanged(false)
             return@LaunchedEffect
         }
+        val originalVolume = player.volume
+        val originalPlayWhenReady = player.playWhenReady
+        val originalPosition = player.currentPosition.coerceAtLeast(0L)
+        val originalSeekParameters = player.seekParameters
+        var calibrationCompleted = false
+        // Raise the startup gate before any suspension and stop both audio and
+        // rendering intent before calibration begins. The player surface stays
+        // mounted for PixelCopy, but the caller keeps it behind an opaque
+        // loading screen until the offset has been decided.
+        player.volume = 0f
+        player.playWhenReady = false
+        player.pause()
         onSeekrCalibrationStateChanged(true)
         try {
             var surfaceReady = false
@@ -1878,13 +1928,39 @@ private fun ExoPlayerSurface(
                     if (!surfaceReady) delay(50L)
                 }
             }
-            val alignment = calibrateSeekrTrack(
-                track = track,
-                playbackDurationMs = player.duration,
-                frameSource = ExoSeekrFrameCapture(player, playerView)::captureAt
-            )
+            val alignment = withContext(Dispatchers.Default) {
+                calibrateSeekrTrack(
+                    track = track,
+                    playbackDurationMs = player.duration,
+                    frameSource = SeekrCalibrationFrameSource { positionMs ->
+                        withContext(Dispatchers.Main.immediate) {
+                            ExoSeekrFrameCapture(player, playerView).captureAt(positionMs)
+                        }
+                    }
+                )
+            }
+            calibrationCompleted = true
             if (alignment != null) onSeekrCalibrationComplete(alignment)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // A missing/unsupported frame surface should never strand the
+            // player behind the gate. It simply leaves the manual offset at 0.
+            calibrationCompleted = true
         } finally {
+            runCatching {
+                player.setSeekParameters(originalSeekParameters)
+                player.seekTo(originalPosition)
+                player.volume = originalVolume
+                player.playWhenReady = originalPlayWhenReady
+                if (originalPlayWhenReady) player.play()
+            }
+            // A cancelled effect must not release the gate for a track that
+            // never finished calibration. This matters when the player view is
+            // recreated during an engine switch or a configuration change.
+            if (calibrationCompleted && currentCoroutineContext().isActive) {
+                onSeekrCalibrationFinished(track)
+            }
             onSeekrCalibrationStateChanged(false)
         }
     }
@@ -2232,7 +2308,16 @@ private fun PlayerControlsOverlay(
                         )
                     }
 
-                    if (uiState.currentSeason != null && uiState.currentEpisode != null) {
+                    if (uiState.mysteryMode) {
+                        Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
+                        Text(
+                            text = stringResource(R.string.random_episode_mystery_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White.copy(alpha = 0.9f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else if (uiState.currentSeason != null && uiState.currentEpisode != null) {
                         Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
                         val seasonEpisodeCode = stringResource(
                             R.string.season_episode_format,

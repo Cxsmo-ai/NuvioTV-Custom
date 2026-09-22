@@ -60,6 +60,7 @@ import androidx.media3.extractor.text.SubtitleParser;
 import androidx.media3.extractor.text.SubtitleTranscodingExtractorOutput;
 import com.google.common.collect.ImmutableList;
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -243,6 +244,7 @@ public class MatroskaExtractor implements Extractor {
   private static final int MAX_EARLY_DTS_SCAN_BYTES = 8 * 1024 * 1024;
   private static final int MAX_EARLY_DTS_FRAME_BYTES = 256 * 1024;
   private static final int MAX_EBML_HEADER_SIZE = 12; // 4-byte id + 8-byte data size.
+  private static final int MAX_SEEK_HEAD_FOLLOWS = 4;
 
   private static final String DOC_TYPE_MATROSKA = "matroska";
   private static final String DOC_TYPE_WEBM = "webm";
@@ -630,6 +632,9 @@ public class MatroskaExtractor implements Extractor {
   private int primarySeekTrackNumber = C.INDEX_UNSET;
   private boolean seekForCues;
   private long cuesContentPosition = C.INDEX_UNSET;
+  private long pendingSeekHeadPosition = C.INDEX_UNSET;
+  private boolean seekForSeekHead;
+  private int followedSeekHeadCount;
   private long seekPositionAfterBuildingCues = C.INDEX_UNSET;
   private long clusterTimecodeUs = C.TIME_UNSET;
 
@@ -871,6 +876,33 @@ public class MatroskaExtractor implements Extractor {
 
   @Override
   public final int read(ExtractorInput input, PositionHolder seekPosition) throws IOException {
+    try {
+      return readFromInput(input, seekPosition);
+    } catch (EOFException e) {
+      // A known-length input ending immediately after the seek map can have a
+      // truncated EBML tail. Do not turn an unknown-length network disconnect
+      // into normal EOS: that would hide a real mid-stream playback failure.
+      if (sentSeekMap && isAtKnownEndOfInput(input)) {
+        Log.w(TAG, "MKV stream ended mid-element after seek map; treating as end of input");
+        return finishReadAtEndOfInput();
+      }
+      throw e;
+    } catch (ParserException e) {
+      if (shouldTreatEbmlErrorAsEndOfInput(input, e)) {
+        Log.w(TAG, "Ignoring truncated MKV tail: " + e.getMessage());
+        return finishReadAtEndOfInput();
+      }
+      throw e;
+    } catch (IllegalStateException e) {
+      if (shouldTreatEbmlErrorAsEndOfInput(input, e)) {
+        Log.w(TAG, "Ignoring truncated MKV tail: " + e.getMessage());
+        return finishReadAtEndOfInput();
+      }
+      throw e;
+    }
+  }
+
+  private int readFromInput(ExtractorInput input, PositionHolder seekPosition) throws IOException {
     haveOutputSample = false;
     boolean continueReading = true;
     while (continueReading && !haveOutputSample) {
@@ -914,18 +946,54 @@ public class MatroskaExtractor implements Extractor {
       }
     }
     if (!continueReading) {
-      if (pendingFinishTracks) {
-        pendingFinishTracks = false;
-        finishTracksElement();
-      }
-      for (int i = 0; i < tracks.size(); i++) {
-        Track track = tracks.valueAt(i);
-        track.assertOutputInitialized();
-        track.outputPendingSampleMetadata();
-      }
-      return Extractor.RESULT_END_OF_INPUT;
+      return finishReadAtEndOfInput();
     }
     return Extractor.RESULT_CONTINUE;
+  }
+
+  private int finishReadAtEndOfInput() throws ParserException {
+    if (pendingFinishTracks) {
+      pendingFinishTracks = false;
+      finishTracksElement();
+    }
+    for (int i = 0; i < tracks.size(); i++) {
+      Track track = tracks.valueAt(i);
+      track.assertOutputInitialized();
+      track.outputPendingSampleMetadata();
+    }
+    return Extractor.RESULT_END_OF_INPUT;
+  }
+
+  private boolean shouldTreatEbmlErrorAsEndOfInput(ExtractorInput input, Throwable error) {
+    if (!sentSeekMap || !isTruncatedEbmlTailError(error)) {
+      return false;
+    }
+    long length = input.getLength();
+    long position = input.getPosition();
+    if (length == C.LENGTH_UNSET || length <= 0L) {
+      return true;
+    }
+    long remaining = Math.max(0L, length - position);
+    long tailBudget = Math.max(8L * 1024L * 1024L, length / 50L);
+    return remaining <= tailBudget;
+  }
+
+  private static boolean isAtKnownEndOfInput(ExtractorInput input) {
+    long length = input.getLength();
+    if (length == C.LENGTH_UNSET || length <= 0L) {
+      return false;
+    }
+    long remaining = Math.max(0L, length - input.getPosition());
+    return remaining <= 64L * 1024L;
+  }
+
+  private static boolean isTruncatedEbmlTailError(Throwable error) {
+    String message = error.getMessage();
+    if (message == null) {
+      return false;
+    }
+    return message.contains("No valid varint length mask found")
+        || message.contains("EBML lacing sample size out of range");
   }
 
   /**
@@ -1098,6 +1166,12 @@ public class MatroskaExtractor implements Extractor {
           if (seekForCuesEnabled && cuesContentPosition != C.INDEX_UNSET) {
             // We know where the Cues element is located. Seek to request it.
             seekForCues = true;
+          } else if (shouldFollowNestedSeekHead(
+              seekForCuesEnabled,
+              cuesContentPosition,
+              pendingSeekHeadPosition,
+              followedSeekHeadCount)) {
+            seekForSeekHead = true;
           } else {
             // We don't know where the Cues element is located. It's most likely omitted. Allow
             // playback, but disable seeking.
@@ -1157,7 +1231,17 @@ public class MatroskaExtractor implements Extractor {
         }
         if (seekEntryId == ID_CUES) {
           cuesContentPosition = seekEntryPosition;
+        } else if (seekEntryId == ID_SEEK_HEAD) {
+          pendingSeekHeadPosition =
+              nextNestedSeekHeadPosition(
+                  seekEntryPosition,
+                  cuesContentPosition,
+                  pendingSeekHeadPosition,
+                  seekPositionAfterBuildingCues);
         }
+        break;
+      case ID_SEEK_HEAD:
+        maybeFollowPendingIndexAfterSeekHead();
         break;
       case ID_CUES:
         if (!sentSeekMap) {
@@ -1319,7 +1403,9 @@ public class MatroskaExtractor implements Extractor {
     int firstAudioTrackNumber = C.INDEX_UNSET;
 
     // If we're not going to seek for cues, output the formats immediately.
-    boolean mayBeSendFormatsEarly = !seekForCuesEnabled || cuesContentPosition == C.INDEX_UNSET;
+    boolean mayBeSendFormatsEarly =
+        !seekForCuesEnabled
+            || (cuesContentPosition == C.INDEX_UNSET && pendingSeekHeadPosition == C.INDEX_UNSET);
 
     for (int i = 0; i < tracks.size(); i++) {
       Track trackItem = tracks.valueAt(i);
@@ -2636,8 +2722,30 @@ public class MatroskaExtractor implements Extractor {
    * @return Whether the seek position was updated.
    */
   private boolean maybeSeekForCues(PositionHolder seekPosition, long currentPosition) {
+    if (seekForSeekHead) {
+      long target = pendingSeekHeadPosition;
+      pendingSeekHeadPosition = C.INDEX_UNSET;
+      seekForSeekHead = false;
+      if (target < 0
+          || target == currentPosition
+          || followedSeekHeadCount >= MAX_SEEK_HEAD_FOLLOWS) {
+        if (!sentSeekMap) {
+          checkNotNull(extractorOutput).seekMap(new SeekMap.Unseekable(durationUs));
+          sentSeekMap = true;
+        }
+        return false;
+      }
+      if (seekPositionAfterBuildingCues == C.INDEX_UNSET) {
+        seekPositionAfterBuildingCues = currentPosition;
+      }
+      seekPosition.position = target;
+      followedSeekHeadCount++;
+      return true;
+    }
     if (seekForCues) {
-      seekPositionAfterBuildingCues = currentPosition;
+      if (seekPositionAfterBuildingCues == C.INDEX_UNSET) {
+        seekPositionAfterBuildingCues = currentPosition;
+      }
       seekPosition.position = cuesContentPosition;
       seekForCues = false;
       return true;
@@ -2650,6 +2758,47 @@ public class MatroskaExtractor implements Extractor {
       return true;
     }
     return false;
+  }
+
+  private void maybeFollowPendingIndexAfterSeekHead() {
+    if (sentSeekMap || !seekForCuesEnabled || seekPositionAfterBuildingCues == C.INDEX_UNSET) {
+      return;
+    }
+    if (cuesContentPosition != C.INDEX_UNSET) {
+      seekForCues = true;
+    } else if (shouldFollowNestedSeekHead(
+        seekForCuesEnabled, cuesContentPosition, pendingSeekHeadPosition, followedSeekHeadCount)) {
+      seekForSeekHead = true;
+    } else {
+      extractorOutput.seekMap(new SeekMap.Unseekable(durationUs));
+      sentSeekMap = true;
+    }
+  }
+
+  static boolean shouldFollowNestedSeekHead(
+      boolean seekForCuesEnabled,
+      long cuesContentPosition,
+      long pendingSeekHeadPosition,
+      int followedSeekHeadCount) {
+    return seekForCuesEnabled
+        && cuesContentPosition == C.INDEX_UNSET
+        && pendingSeekHeadPosition != C.INDEX_UNSET
+        && followedSeekHeadCount < MAX_SEEK_HEAD_FOLLOWS;
+  }
+
+  static long nextNestedSeekHeadPosition(
+      long position,
+      long cuesContentPosition,
+      long pendingSeekHeadPosition,
+      long seekPositionAfterBuildingCues) {
+    if (position < 0 || position == cuesContentPosition || position == pendingSeekHeadPosition) {
+      return pendingSeekHeadPosition;
+    }
+    if (seekPositionAfterBuildingCues != C.INDEX_UNSET
+        && position <= seekPositionAfterBuildingCues) {
+      return pendingSeekHeadPosition;
+    }
+    return position;
   }
 
   private long scaleTimecodeToUs(long unscaledTimecode) throws ParserException {

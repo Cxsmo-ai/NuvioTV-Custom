@@ -2,7 +2,9 @@ package com.nuvio.tv.ui.screens.player
 
 import android.graphics.Bitmap
 import tv.seekr.previews.android.SeekrTrack
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -190,11 +192,21 @@ internal suspend fun calibrateSeekrTrack(
         val candidates = buildList {
             for (candidatePositionMs in SeekrFrameCalibrator.candidatePositions(expectedPlaybackMs)) {
                 val clamped = candidatePositionMs.coerceIn(0L, (playbackDurationMs - 1L).coerceAtLeast(0L))
-                val frame = frameSource.captureAt(clamped)
+                // Surface capture and player seeks must stay on the main
+                // dispatcher, but the perceptual comparison is pure CPU work
+                // and must not steal frames from Compose/Media3. Keeping this
+                // split here also makes the whole calibration coroutine safe
+                // to launch from a background dispatcher.
+                val frame = withContext(Dispatchers.Main.immediate) {
+                    frameSource.captureAt(clamped)
+                }
+                val similarity = withContext(Dispatchers.Default) {
+                    SeekrFrameCalibrator.perceptualSimilarity(thumbnail.bitmap, frame)
+                }
                 add(
                     SeekrCalibrationCandidate(
                         positionMs = clamped,
-                        similarity = SeekrFrameCalibrator.perceptualSimilarity(thumbnail.bitmap, frame)
+                        similarity = similarity
                     )
                 )
             }

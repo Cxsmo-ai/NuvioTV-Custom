@@ -73,6 +73,7 @@ import com.nuvio.tv.ui.components.SynopsisDescription
 import com.nuvio.tv.ui.theme.NuvioTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.platform.LocalContext
@@ -99,6 +100,7 @@ fun HeroContentSection(
     isMovieWatched: Boolean,
     isMovieWatchedPending: Boolean,
     onToggleMovieWatched: () -> Unit,
+    onRandomClick: (() -> Unit)? = null,
     trailerAvailable: Boolean = false,
     onTrailerClick: () -> Unit = {},
     hideLogoDuringTrailer: Boolean = false,
@@ -291,6 +293,15 @@ fun HeroContentSection(
                                 painter = trailerPainter,
                                 contentDescription = stringResource(R.string.hero_play_trailer),
                                 onClick = onTrailerClick,
+                                onFocused = onHeroActionFocused
+                            )
+                        }
+
+                        if (isSeriesApi && onRandomClick != null) {
+                            ActionIconButton(
+                                icon = Icons.Default.Shuffle,
+                                contentDescription = stringResource(R.string.hero_random_episode),
+                                onClick = onRandomClick,
                                 onFocused = onHeroActionFocused
                             )
                         }

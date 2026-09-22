@@ -259,8 +259,9 @@ fun MetaDetailsScreen(
         genres: String?,
         year: String?,
         runtime: Int?,
-        contentLanguage: String?
-    ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+        contentLanguage: String?,
+        mysteryMode: Boolean
+    ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onPlayManuallyClick: (
         videoId: String,
         contentType: String,
@@ -532,7 +533,8 @@ fun MetaDetailsScreen(
                         null,
                         null,
                         video.runtime,
-                        meta.resolveContentLanguage()
+                        meta.resolveContentLanguage(),
+                        false
                     )
                 }
                 val playEpisodeManually: (Video) -> Unit = { video ->
@@ -553,6 +555,28 @@ fun MetaDetailsScreen(
                         meta.resolveContentLanguage()
                     )
                 }
+                val playRandomEpisode: (Video, Boolean) -> Unit = { video, isMystery ->
+                    val mysteryTitle = if (isMystery) context.getString(R.string.random_episode_mystery_title) else video.title
+                    val mysteryPoster = if (isMystery) null else (video.thumbnail ?: meta.poster)
+
+                    onPlayClick(
+                        video.id,
+                        meta.apiType,
+                        meta.id,
+                        meta.name,
+                        mysteryPoster,
+                        meta.backdropUrl,
+                        meta.logo,
+                        video.season,
+                        video.episode,
+                        mysteryTitle,
+                        genresString,
+                        yearString,
+                        video.runtime,
+                        meta.resolveContentLanguage(),
+                        isMystery
+                    )
+                }
                 val playTitle: (String) -> Unit = { videoId ->
                     onPlayClick(
                         videoId,
@@ -568,7 +592,8 @@ fun MetaDetailsScreen(
                         genresString,
                         yearString,
                         null,
-                        meta.resolveContentLanguage()
+                        meta.resolveContentLanguage(),
+                        false
                     )
                 }
                 val playTitleManually: (String) -> Unit = { videoId ->
@@ -689,6 +714,11 @@ fun MetaDetailsScreen(
                     onSeasonSelected = { viewModel.onEvent(MetaDetailsEvent.OnSeasonSelected(it)) },
                     onEpisodeClick = playEpisode,
                     onEpisodeManualPlayClick = playEpisodeManually,
+                    onPlayRandomEpisode = playRandomEpisode,
+                    randomEpisodeMysteryMode = uiState.randomEpisodeMysteryMode,
+                    onMysteryModeChange = { viewModel.onEvent(MetaDetailsEvent.SetRandomEpisodeMysteryMode(it)) },
+                    randomEpisodeUnwatchedOnly = uiState.randomEpisodeUnwatchedOnly,
+                    onUnwatchedOnlyChange = { viewModel.onEvent(MetaDetailsEvent.SetRandomEpisodeUnwatchedOnly(it)) },
                     onPlayClick = playTitle,
                     onPlayManuallyClick = playTitleManually,
                     onEpisodeStartFromBeginningClick = { video ->
@@ -1003,6 +1033,11 @@ private fun MetaDetailsContent(
     onSeasonSelected: (Int) -> Unit,
     onEpisodeClick: (Video) -> Unit,
     onEpisodeManualPlayClick: (Video) -> Unit,
+    onPlayRandomEpisode: (Video, Boolean) -> Unit = { _, _ -> },
+    randomEpisodeMysteryMode: Boolean = false,
+    onMysteryModeChange: (Boolean) -> Unit = {},
+    randomEpisodeUnwatchedOnly: Boolean = false,
+    onUnwatchedOnlyChange: (Boolean) -> Unit = {},
     onEpisodeStartFromBeginningClick: (Video) -> Unit = {},
     onPlayClick: (String) -> Unit,
     onPlayManuallyClick: (String) -> Unit,
@@ -1455,6 +1490,7 @@ private fun MetaDetailsContent(
     }
     var activePeopleTab by rememberSaveable(meta.id) { mutableStateOf(initialPeopleTab) }
     var seasonOptionsDialogSeason by remember { mutableStateOf<Int?>(null) }
+    var showRandomEpisodeDialog by rememberSaveable(meta.id) { mutableStateOf(false) }
     // Tracks whether the initial auto-scroll to the "next to play" episode has fired.
     // Once it fires, no more auto-scrolls happen for the lifetime of this detail screen.
     var initialEpisodeScrollDone by remember(meta.id) { mutableStateOf(false) }
@@ -1799,6 +1835,7 @@ private fun MetaDetailsContent(
                         isMovieWatched = isMovieWatched,
                         isMovieWatchedPending = isMovieWatchedPending,
                         onToggleMovieWatched = onToggleMovieWatched,
+                        onRandomClick = { showRandomEpisodeDialog = true },
                         mdbListRatings = visibleMdbListRatings,
                         sourceSignal = heroSourceSignal,
                         hideMetaInfoImdb = !showStandardOverallRatings,
@@ -1850,7 +1887,8 @@ private fun MetaDetailsContent(
                             selectedTabFocusRequester = selectedSeasonFocusRequester,
                             upFocusRequester = heroPlayFocusRequester,
                             downFocusRequester = seasonDownFocusRequester,
-                            isFocusEnabled = pendingRestoreType != RestoreTarget.EPISODE
+                            isFocusEnabled = pendingRestoreType != RestoreTarget.EPISODE,
+                            onRandomSeasonClick = { showRandomEpisodeDialog = true }
                         )
                         }
                     }
@@ -2247,6 +2285,23 @@ private fun MetaDetailsContent(
                     showHeroPlayOptionsDialog = false
                     heroPlayStartFromBeginningClick()
                 }
+            )
+        }
+
+        if (showRandomEpisodeDialog) {
+            RandomEpisodeDialog(
+                meta = meta,
+                selectedSeason = selectedSeason,
+                watchedEpisodes = watchedEpisodes,
+                mysteryMode = randomEpisodeMysteryMode,
+                onMysteryModeChange = onMysteryModeChange,
+                unwatchedOnly = randomEpisodeUnwatchedOnly,
+                onUnwatchedOnlyChange = onUnwatchedOnlyChange,
+                onPlayEpisode = { video, isMystery ->
+                    showRandomEpisodeDialog = false
+                    onPlayRandomEpisode(video, isMystery)
+                },
+                onDismiss = { showRandomEpisodeDialog = false }
             )
         }
 

@@ -19,10 +19,21 @@ internal fun resolveProfileAvatarImageUrl(
     val catalogUrl = avatarId
         ?.let(resolveCatalogAvatar)
         ?.trim()
-        ?.takeIf { it.isNotEmpty() }
+        ?.takeIf { it.isNotEmpty() && isValidAvatarUri(it) }
     if (catalogUrl != null) return catalogUrl
+
+    val directUrl = profile.avatarUrl
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() && isValidAvatarUri(it) }
+    if (directUrl != null) return directUrl
 
     return profile.avatarUrl
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
 }
+
+private fun isValidAvatarUri(uri: String): Boolean =
+    uri.startsWith("http://", ignoreCase = true) ||
+        uri.startsWith("https://", ignoreCase = true) ||
+        uri.startsWith("file:", ignoreCase = true) ||
+        uri.startsWith("content:", ignoreCase = true)

@@ -202,7 +202,14 @@ internal class PostPlayRecommendationController(
         _uiState.value = returnedState
         returnToPlayerAnimationJob = scope.launch {
             delay(POST_PLAY_RECOMMENDATION_TRANSITION_MS.toLong())
-            _uiState.value = PostPlayRecommendationUiState(hasReturnedToPlayer = true)
+            _uiState.update {
+                it.copy(
+                    isVisible = false,
+                    hasReturnedToPlayer = true,
+                    countdownSeconds = null,
+                    isTrailerPlaying = false
+                )
+            }
             returnToPlayerAnimationJob = null
         }
     }

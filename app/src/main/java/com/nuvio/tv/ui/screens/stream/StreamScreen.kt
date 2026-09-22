@@ -420,6 +420,7 @@ fun StreamScreen(
                     runtime = uiState.runtime,
                     genres = uiState.genres,
                     year = uiState.year,
+                    mysteryMode = uiState.mysteryMode,
                     modifier = Modifier
                         .weight(0.4f)
                         .fillMaxHeight()
@@ -624,6 +625,7 @@ private fun LeftContentSection(
     runtime: Int?,
     genres: String?,
     year: String?,
+    mysteryMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -672,7 +674,15 @@ private fun LeftContentSection(
             }
 
             // Show episode info or movie info
-            if (isEpisode && season != null && episode != null) {
+            if (mysteryMode) {
+                Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
+                Text(
+                    text = stringResource(R.string.random_episode_mystery_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = NuvioTheme.extendedColors.textSecondary,
+                    textAlign = TextAlign.Center
+                )
+            } else if (isEpisode && season != null && episode != null) {
                 // Episode info
                 Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
                 Text(

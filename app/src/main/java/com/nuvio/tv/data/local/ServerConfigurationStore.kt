@@ -67,6 +67,7 @@ class ServerConfigurationStore @Inject constructor(
         fallbackBackendUrl = BuildConfig.SUPABASE_FALLBACK_URL.trim().trimEnd('/').takeIf { it.isNotBlank() },
         tvLoginWebBaseUrl = BuildConfig.TV_LOGIN_WEB_BASE_URL,
         avatarPublicBaseUrl = BuildConfig.AVATAR_PUBLIC_BASE_URL.trimEnd('/').takeIf { it.isNotBlank() }
+            ?: "${BuildConfig.SUPABASE_URL.trimEnd('/')}/storage/v1/object/public/avatars"
     )
 
     private companion object {

@@ -161,7 +161,7 @@ private suspend fun PlayerRuntimeController.enrichDescriptionFromTmdb(id: String
     }
 
     // Also enrich episode title from TMDB if available.
-    if (settings.useBasicInfo) {
+    if (settings.useBasicInfo && !mysteryMode) {
         val tmdbEpisodeTitle = episodeEnrichment?.title
         if (!tmdbEpisodeTitle.isNullOrBlank()) {
             _uiState.update { it.copy(currentEpisodeTitle = tmdbEpisodeTitle) }

@@ -30,12 +30,9 @@ internal class ExoSeekrFrameCapture(
 ) {
     suspend fun captureAt(positionMs: Long): Bitmap? {
         val surface = playerView.videoSurfaceView
-        val originalPosition = player.currentPosition.coerceAtLeast(0L)
-        val originalPlayWhenReady = player.playWhenReady
-        val originalSeekParameters = player.seekParameters
         return try {
+            player.volume = 0f
             player.playWhenReady = false
-            player.pause()
             player.setSeekParameters(SeekParameters.CLOSEST_SYNC)
             player.seekTo(positionMs.coerceAtLeast(0L))
             // CLOSEST_SYNC is deliberately paired with a short settle window:
@@ -47,13 +44,6 @@ internal class ExoSeekrFrameCapture(
             throw CancellationException("Seekr frame calibration cancelled")
         } catch (_: Throwable) {
             null
-        } finally {
-            runCatching {
-                player.setSeekParameters(originalSeekParameters)
-                player.seekTo(originalPosition)
-                player.playWhenReady = originalPlayWhenReady
-                if (originalPlayWhenReady) player.play()
-            }
         }
     }
 

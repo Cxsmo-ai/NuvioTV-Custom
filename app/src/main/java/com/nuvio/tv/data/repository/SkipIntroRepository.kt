@@ -112,8 +112,14 @@ class SkipIntroRepository @Inject constructor(
                                     normalizedId, season, episode, isSeries, durationMs,
                                     tmdbId, tvdbId, anilistId
                                 )
-                                SkipSource.INTRO_DB -> if (normalizedId != null && isSeries && introDbConfigured) {
-                                    fetchFromIntroDb(normalizedId, season, episode, credentials.introDbAppApiKey)
+                                SkipSource.INTRO_DB -> if (normalizedId != null && introDbConfigured) {
+                                    fetchFromIntroDb(
+                                        imdbId = normalizedId,
+                                        season = season.takeIf { isSeries },
+                                        episode = episode.takeIf { isSeries },
+                                        isMovie = !isSeries,
+                                        apiKey = credentials.introDbAppApiKey
+                                    )
                                 } else emptyList()
                                 SkipSource.THE_INTRO_DB -> if (normalizedId != null) {
                                     fetchFromTheIntroDb(
@@ -231,8 +237,9 @@ class SkipIntroRepository @Inject constructor(
 
     private suspend fun fetchFromIntroDb(
         imdbId: String,
-        season: Int,
-        episode: Int,
+        season: Int?,
+        episode: Int?,
+        isMovie: Boolean,
         apiKey: String
     ): List<SkipInterval> {
         val base = BuildConfig.INTRODB_API_URL.trimEnd('/').ifBlank { "https://api.introdb.app" }
@@ -240,10 +247,17 @@ class SkipIntroRepository @Inject constructor(
             put("Accept", "application/json")
             if (apiKey.isNotBlank()) put("X-API-Key", apiKey)
         }
-        return getText(
-            "$$base/segments?imdb_id=$$imdbId&season=$$season&episode=$$episode",
-            headers = headers
-        )?.let { SkipMetadataParser.parseIntroDb(it, "introdb") }.orEmpty()
+        val query = buildString {
+            append("imdb_id=").append(imdbId)
+            if (isMovie) append("&is_movie=true")
+            else {
+                season?.let { append("&season=").append(it) }
+                episode?.let { append("&episode=").append(it) }
+            }
+        }
+        return getText("$base/segments?$query", headers = headers)
+            ?.let { SkipMetadataParser.parseIntroDb(it, "introdb", isMovie) }
+            .orEmpty()
     }
 
     private suspend fun fetchFromTheIntroDb(
@@ -487,20 +501,27 @@ internal fun mergeSkipIntervals(
 }
 
 internal object SkipMetadataParser {
-    fun parseIntroDb(raw: String, provider: String): List<SkipInterval> = runCatching {
+    fun parseIntroDb(
+        raw: String,
+        provider: String,
+        isMovie: Boolean = false
+    ): List<SkipInterval> = runCatching {
         val root = JSONObject(raw)
         val items = mutableListOf<Pair<String, JSONObject>>()
         root.optJSONArray("segments")?.let { array ->
             for (index in 0 until array.length()) {
                 array.optJSONObject(index)?.let { item ->
-                    items += (item.optString("segment_type", item.optString("type", "custom")) to item)
+                    val rawType = item.optString("segment_type", item.optString("type", "custom"))
+                    items += normalizeIntroDbType(rawType, isMovie) to item
                 }
             }
         }
-        listOf("intro", "recap", "outro", "credits").forEach { type ->
-            root.optJSONObject(type)?.let { items += type to it }
+        listOf("intro", "recap", "outro", "credits", "post_credits").forEach { rawType ->
+            root.optJSONObject(rawType)?.let {
+                items += normalizeIntroDbType(rawType, isMovie) to it
+            }
         }
-        items.mapNotNull { (rawType, item) ->
+        val parsed = items.mapNotNull { (rawType, item) ->
             val start = timeSeconds(item, "start_ms", "start_sec") ?: return@mapNotNull null
             val end = timeSeconds(item, "end_ms", "end_sec") ?: return@mapNotNull null
             if (end <= start) return@mapNotNull null
@@ -512,7 +533,32 @@ internal object SkipMetadataParser {
                 confidence = item.optDouble("confidence", 1.0).coerceIn(0.0, 1.0)
             )
         }
+        if (!isMovie) parsed else trimMovieCreditsBeforePostCredits(parsed)
     }.getOrDefault(emptyList())
+
+    private fun normalizeIntroDbType(rawType: String, isMovie: Boolean): String = when {
+        isMovie && rawType.equals("post_credits", ignoreCase = true) -> "post-credits"
+        isMovie && rawType.equals("post-credits", ignoreCase = true) -> "post-credits"
+        isMovie && rawType.equals("outro", ignoreCase = true) -> "movie-credits"
+        isMovie && rawType.equals("credits", ignoreCase = true) -> "movie-credits"
+        else -> rawType.replace('_', '-')
+    }
+
+    private fun trimMovieCreditsBeforePostCredits(intervals: List<SkipInterval>): List<SkipInterval> {
+        val postCredits = intervals.filter { it.type == "post-credits" }
+            .minByOrNull { it.startTime } ?: return intervals
+        return intervals.mapNotNull { interval ->
+            if (interval.type != "movie-credits" ||
+                postCredits.startTime >= interval.endTime ||
+                postCredits.endTime <= interval.startTime
+            ) {
+                interval
+            } else {
+                interval.copy(endTime = postCredits.startTime)
+                    .takeIf { it.endTime > it.startTime }
+            }
+        }
+    }
 
     fun parseTheIntroDb(
         raw: String,

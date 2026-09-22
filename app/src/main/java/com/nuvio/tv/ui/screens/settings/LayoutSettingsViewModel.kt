@@ -78,6 +78,7 @@ data class LayoutSettingsUiState(
     val detailPageTrailerAutoplayEnabled: Boolean = true,
     val detailPageTrailerAutoplayDelaySeconds: Int = 7,
     val detailPageTrailerAudioEnabled: Boolean = true,
+    val randomEpisodeMysteryMode: Boolean = false,
     val imdbTrailersEnabled: Boolean = false,
     val preferExternalMetaAddonDetail: Boolean = false,
     val hideUnreleasedContent: Boolean = false,
@@ -128,6 +129,7 @@ sealed class LayoutSettingsEvent {
         val enabled: Boolean
     ) : LayoutSettingsEvent()
     data class SetBlurUnwatchedEpisodes(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetRandomEpisodeMysteryMode(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetEpisodeOptionsOverlayStyle(val style: EpisodeOptionsOverlayStyle) : LayoutSettingsEvent()
     data class SetHomeImdbRatingsVisibility(val visibility: HomeImdbRatingsVisibility) : LayoutSettingsEvent()
     data class SetDetailImdbRatingsVisibility(val visibility: DetailImdbRatingsVisibility) : LayoutSettingsEvent()
@@ -316,6 +318,11 @@ class LayoutSettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            layoutPreferenceDataStore.randomEpisodeMysteryMode.distinctUntilChanged().collectLatest { enabled ->
+                updateUiStateIfChanged { it.copy(randomEpisodeMysteryMode = enabled) }
+            }
+        }
+        viewModelScope.launch {
             layoutPreferenceDataStore.episodeOptionsOverlayStyle.distinctUntilChanged().collectLatest { style ->
                 updateUiStateIfChanged { it.copy(episodeOptionsOverlayStyle = style) }
             }
@@ -437,6 +444,7 @@ class LayoutSettingsViewModel @Inject constructor(
             is LayoutSettingsEvent.SetCardDepthSurfaceEnabled ->
                 setCardDepthSurfaceEnabled(event.surface, event.enabled)
             is LayoutSettingsEvent.SetBlurUnwatchedEpisodes -> setBlurUnwatchedEpisodes(event.enabled)
+            is LayoutSettingsEvent.SetRandomEpisodeMysteryMode -> setRandomEpisodeMysteryMode(event.enabled)
             is LayoutSettingsEvent.SetEpisodeOptionsOverlayStyle -> setEpisodeOptionsOverlayStyle(event.style)
             is LayoutSettingsEvent.SetHomeImdbRatingsVisibility -> setHomeImdbRatingsVisibility(event.visibility)
             is LayoutSettingsEvent.SetDetailImdbRatingsVisibility -> setDetailImdbRatingsVisibility(event.visibility)
@@ -755,6 +763,13 @@ class LayoutSettingsViewModel @Inject constructor(
         if (_uiState.value.blurUnwatchedEpisodes == enabled) return
         viewModelScope.launch {
             layoutPreferenceDataStore.setBlurUnwatchedEpisodes(enabled)
+        }
+    }
+
+    private fun setRandomEpisodeMysteryMode(enabled: Boolean) {
+        if (_uiState.value.randomEpisodeMysteryMode == enabled) return
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setRandomEpisodeMysteryMode(enabled)
         }
     }
 
