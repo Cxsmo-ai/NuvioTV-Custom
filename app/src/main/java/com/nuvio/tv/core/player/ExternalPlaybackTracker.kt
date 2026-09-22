@@ -461,7 +461,9 @@ class ExternalPlaybackTracker @Inject constructor(
                     imdbId = imdbId,
                     season = 0,
                     episode = 0,
-                    mediaType = "movie"
+                    title = metadata.contentName,
+                    mediaType = "movie",
+                    releaseYear = metadata.year
                 )
             } else {
                 val s = metadata.season ?: return@withTimeoutOrNull null
@@ -470,7 +472,9 @@ class ExternalPlaybackTracker @Inject constructor(
                     imdbId = imdbId,
                     season = s,
                     episode = e,
-                    mediaType = metadata.contentType
+                    title = metadata.episodeTitle ?: metadata.contentName,
+                    mediaType = metadata.contentType,
+                    releaseYear = metadata.year
                 )
             }
         }

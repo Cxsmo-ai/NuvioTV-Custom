@@ -178,4 +178,57 @@ class SkipMetadataParserTest {
         assertTrue(skip.confidence > 0.86)
         assertEquals("mute", merged.first { it.action == "mute" }.action)
     }
+
+    @Test
+    fun providerUrlsIncludeIdsWithoutALiteralDollar() {
+        assertEquals(
+            "https://api.introdb.app/segments?imdb_id=tt0944947&season=1&episode=3",
+            introDbSegmentsUrl("https://api.introdb.app", "tt0944947", 1, 3)
+        )
+        assertEquals(
+            "https://api.theintrodb.org/v3/media?imdb_id=tt0944947&season=1&episode=3",
+            theIntroDbMediaUrl("imdb_id=tt0944947&season=1&episode=3")
+        )
+        assertEquals(
+            "https://publicmetadb.com/api/external/mappings/lookup?id_type=imdb&id_value=tt0944947&media_type=tv",
+            publicMetaDbMappingUrl("tt0944947", "tv")
+        )
+        assertEquals(
+            "https://publicmetadb.com/api/external/skips?tmdb_id=1396&media_type=tv&season=1&episode=3",
+            publicMetaDbSkipsUrl("1396", "tv", season = 1, episode = 3, isSeries = true)
+        )
+        assertEquals("Bearer secret", bearerAuthorization("secret"))
+    }
+
+    @Test
+    fun skipFetchKeyKeepsDurationAheadOfTheFingerprint() {
+        val fingerprint = "AUTO:introdb,skipme:intro,credits"
+        val missingDuration = skipIntervalsFetchKey(
+            imdbId = "tt0944947",
+            tmdbId = null,
+            season = 1,
+            episode = 3,
+            durationMs = 0L,
+            settingsFingerprint = fingerprint
+        )
+        assertEquals(0L, skipFetchKeyDurationMs(missingDuration))
+        val withDuration = skipIntervalsFetchKey(
+            imdbId = "tt0944947",
+            tmdbId = 1396,
+            season = 1,
+            episode = 3,
+            durationMs = 2_700_000L,
+            settingsFingerprint = fingerprint
+        )
+        assertEquals(2_700_000L, skipFetchKeyDurationMs(withDuration))
+    }
+
+    @Test
+    fun readUtf8AtMostAcceptsShortAndMultiSegmentBodies() {
+        val json = """{"intro":[{"start_ms":1,"end_ms":2}]}"""
+        assertEquals(json, readUtf8AtMost(okio.Buffer().writeUtf8(json), 2L * 1024 * 1024))
+        val large = "x".repeat(20_000)
+        assertEquals(large, readUtf8AtMost(okio.Buffer().writeUtf8(large), 2L * 1024 * 1024))
+        assertEquals(null, readUtf8AtMost(okio.Buffer().writeUtf8("abcdef"), 3))
+    }
 }

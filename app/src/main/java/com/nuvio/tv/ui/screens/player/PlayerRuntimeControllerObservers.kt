@@ -7,6 +7,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import com.nuvio.tv.data.local.FrameRateMatchingMode
 import com.nuvio.tv.data.local.InternalPlayerEngine
+import com.nuvio.tv.data.repository.skipFetchKeyDurationMs
+import com.nuvio.tv.data.repository.skipIntervalsFetchKey
 import com.nuvio.tv.domain.model.Subtitle
 import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.domain.model.enabledAddons
@@ -500,8 +502,10 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
 
             if (!skipIntroEnabled) {
                 if (skipIntervals.isNotEmpty() || _uiState.value.activeSkipInterval != null) {
+                    skipFetchGeneration++
                     skipIntervals = emptyList()
                     skipIntroFetchedKey = null
+                    skipDurationRetryAttempted = false
                     autoSkippedIntervalKeys.clear()
                     _uiState.update { it.copy(activeSkipInterval = null, skipIntervalDismissed = true) }
                 }
@@ -695,12 +699,20 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
         // movie endpoint requires duration_ms, and an early empty response must
         // never poison the cache for the rest of the session.
         val durationKey = lookupDurationMs ?: 0L
-        val key = "${imdbId.orEmpty()}:tmdb=${tmdbId ?: 0}:${season ?: 0}:${episode ?: 0}:$durationKey:$skipSettingsFingerprint"
-        if (skipIntroFetchedKey == key) return@launch
+        val key = skipIntervalsFetchKey(
+            imdbId = imdbId,
+            tmdbId = tmdbId,
+            season = season,
+            episode = episode,
+            durationMs = durationKey,
+            settingsFingerprint = skipSettingsFingerprint
+        )
+        if (skipIntroFetchedKey == key && skipIntervals.isNotEmpty()) return@launch
+        val generation = ++skipFetchGeneration
         skipIntroFetchedKey = key
 
         val fetchT0 = android.os.SystemClock.elapsedRealtime()
-        skipIntervals = withTimeoutOrNull(8_000L) {
+        val fetched = withTimeoutOrNull(8_000L) {
             skipIntroRepository.getSkipIntervals(
                 imdbId = imdbId,
                 season = season ?: 0,
@@ -712,6 +724,12 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
                 tmdbId = tmdbId
             )
         } ?: emptyList()
+        if (generation != skipFetchGeneration || skipIntroFetchedKey != key) return@launch
+        // A later duration-aware lookup that comes back empty must not wipe
+        // intervals already found without a runtime.
+        if (fetched.isNotEmpty() || skipIntervals.isEmpty()) {
+            skipIntervals = fetched
+        }
         // The nt4 capture could not answer why the next-episode card fired at
         // the 99% threshold rather than at the start of a two-minute credit
         // roll. SkipIntroRepository logs only its no-data path, and at DEBUG,
@@ -736,6 +754,20 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
         )
     }
 }
+
+internal fun PlayerRuntimeController.maybeRefetchSkipIntervalsWhenDurationKnown(durationMs: Long) {
+    if (skipDurationRetryAttempted || durationMs <= 0L || !skipIntroEnabled) return
+    val fetchedDuration = skipIntroFetchedKey?.let(::skipFetchKeyDurationMs) ?: return
+    val durationMismatch = skipIntervals.isEmpty() &&
+        kotlin.math.abs(durationMs - fetchedDuration) > SKIP_DURATION_RETRY_TOLERANCE_MS
+    // SkipMe needs a real runtime. The startup lookup often runs before the
+    // player knows the duration; retry once when that runtime arrives.
+    if (fetchedDuration != 0L && !durationMismatch) return
+    skipDurationRetryAttempted = true
+    fetchSkipIntervals(contentId, currentSeason, currentEpisode)
+}
+
+private const val SKIP_DURATION_RETRY_TOLERANCE_MS = 30_000L
 
 private fun extractImdbId(value: String): String? =
     value.substringBefore(':').substringBefore('/').trim()
